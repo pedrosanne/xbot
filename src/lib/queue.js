@@ -257,6 +257,43 @@ async function startFlowForContact(contact, flow) {
 async function sendStepResponse(contactId, step) {
   const text = step.text || '';
   const options = step.buttons || [];
+  const media = step.media || null;
+
+  // Send media first if present
+  if (media && media.type && media.url) {
+    try {
+      await logToDb('INFO', 'API', `Enviando mídia do tipo '${media.type}' para ${contactId} na etapa '${step.id}'`);
+      const caption = media.caption || '';
+
+      if (media.type === 'image') {
+        await sendImage(contactId, media.url, caption);
+        await saveOutgoingMessage(`bot_${Date.now()}_media_img`, contactId, 'image', media.url, caption);
+      } else if (media.type === 'video') {
+        await sendVideo(contactId, media.url, caption);
+        await saveOutgoingMessage(`bot_${Date.now()}_media_vid`, contactId, 'video', media.url, caption);
+      } else if (media.type === 'audio') {
+        await sendAudio(contactId, media.url);
+        await saveOutgoingMessage(`bot_${Date.now()}_media_aud`, contactId, 'audio', media.url, 'Áudio do fluxo');
+      } else if (media.type === 'document') {
+        await sendDocument(contactId, media.url, 'documento', caption);
+        await saveOutgoingMessage(`bot_${Date.now()}_media_doc`, contactId, 'document', media.url, caption);
+      } else if (media.type === 'link') {
+        // For links, prepend to the text message
+        const linkText = media.url;
+        const fullText = text ? `${linkText}\n\n${text}` : linkText;
+        // Will be sent below with buttons or as plain text
+        // Skip sending separately, instead modify text below
+      }
+    } catch (err) {
+      await logToDb('WARN', 'API', `Falha ao enviar mídia na etapa '${step.id}': ${err.message}`);
+    }
+  }
+
+  // Build text content, optionally prepending link
+  let finalText = text;
+  if (media && media.type === 'link' && media.url) {
+    finalText = text ? `🔗 ${media.url}\n\n${text}` : `🔗 ${media.url}`;
+  }
 
   if (options.length > 0) {
     const formattedButtons = options.slice(0, 3).map(opt => ({
@@ -266,21 +303,21 @@ async function sendStepResponse(contactId, step) {
 
     try {
       await logToDb('INFO', 'API', `Enviando botões interativos para ${contactId} na etapa '${step.id}'`);
-      await sendButtons(contactId, text, formattedButtons);
-      await saveOutgoingMessage(`bot_${Date.now()}_buttons`, contactId, 'text', '', `${text} [Botões: ${formattedButtons.map(b => b.title).join(', ')}]`);
+      await sendButtons(contactId, finalText, formattedButtons);
+      await saveOutgoingMessage(`bot_${Date.now()}_buttons`, contactId, 'text', '', `${finalText} [Botões: ${formattedButtons.map(b => b.title).join(', ')}]`);
     } catch (err) {
       console.error('Failed to send WhatsApp buttons, falling back to text options', err);
-      let fallbackText = text + '\n\n';
+      let fallbackText = finalText + '\n\n';
       formattedButtons.forEach((btn, idx) => {
         fallbackText += `*${idx + 1}*. ${btn.title}\n`;
       });
       await sendText(contactId, fallbackText);
       await saveOutgoingMessage(`bot_${Date.now()}_text_fallback`, contactId, 'text', '', fallbackText);
     }
-  } else {
+  } else if (finalText) {
     await logToDb('INFO', 'API', `Enviando texto simples para ${contactId} na etapa '${step.id}'`);
-    await sendText(contactId, text);
-    await saveOutgoingMessage(`bot_${Date.now()}_text`, contactId, 'text', '', text);
+    await sendText(contactId, finalText);
+    await saveOutgoingMessage(`bot_${Date.now()}_text`, contactId, 'text', '', finalText);
   }
 }
 
