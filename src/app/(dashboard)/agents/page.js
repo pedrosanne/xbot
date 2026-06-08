@@ -26,7 +26,7 @@ export default function AgentsPage() {
   const [agentName, setAgentName] = useState('');
   const [agentDescription, setAgentDescription] = useState('');
   const [agentSystemPrompt, setAgentSystemPrompt] = useState('');
-  const [agentModel, setAgentModel] = useState('gemini-1.5-flash');
+  const [agentModel, setAgentModel] = useState('gemini-2.5-flash');
   const [agentTemperature, setAgentTemperature] = useState(0.7);
   const [agentIsActive, setAgentIsActive] = useState(false);
   const [editingAgentId, setEditingAgentId] = useState(null);
@@ -217,7 +217,7 @@ export default function AgentsPage() {
     setAgentName('');
     setAgentDescription('');
     setAgentSystemPrompt('');
-    setAgentModel('gemini-1.5-flash');
+    setAgentModel('gemini-2.5-flash');
     setAgentTemperature(0.7);
     setAgentIsActive(false);
   };
@@ -698,8 +698,10 @@ export default function AgentsPage() {
                     onChange={(e) => setAgentModel(e.target.value)}
                     className="form-select"
                   >
-                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Recomendado - Rápido)</option>
-                    <option value="gemini-1.5-pro">Gemini 1.5 Pro (Raciocínio Avançado)</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado - Rápido)</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (Raciocínio Avançado)</option>
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legado)</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro (Legado)</option>
                   </select>
                 </div>
 

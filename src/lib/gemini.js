@@ -23,15 +23,23 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
     agent = {
       name: 'Padrão',
       systemPrompt: 'Você é um atendente simpático. Responda de forma curta, prestativa e natural, simulando um contato humano.',
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       temperature: 0.7
     };
+  }
+
+  // Mapeia modelos legados/indisponíveis para equivalentes modernos válidos na API
+  let modelName = agent.model || 'gemini-2.5-flash';
+  if (modelName === 'gemini-1.5-flash') {
+    modelName = 'gemini-2.5-flash';
+  } else if (modelName === 'gemini-1.5-pro') {
+    modelName = 'gemini-2.5-pro';
   }
 
   // 2. Initialize Gemini
   const genAI = new GoogleGenerativeAI(geminiApiKey);
   const model = genAI.getGenerativeModel({
-    model: agent.model || 'gemini-1.5-flash',
+    model: modelName,
     generationConfig: {
       temperature: agent.temperature || 0.7,
     }
