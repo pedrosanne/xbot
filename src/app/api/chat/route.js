@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendText, sendAudio, sendImage, sendDocument, sendVideo } from '@/lib/whatsapp';
 import { getSystemSettings } from '@/lib/settings';
+import { logToDb } from '@/lib/log';
 
 // GET: Retrieve contacts list OR message history for a contact
 export async function GET(request) {
@@ -55,11 +56,13 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing contactId or type' }, { status: 400 });
     }
 
+    await logToDb('INFO', 'API', `Solicitação de envio de mensagem manual para o contato ${contactId}. Tipo: ${type}`, { content });
+
     // Fetch system settings to see if they are configured
     const settings = await getSystemSettings();
     if (!settings.whatsappToken || !settings.whatsappPhoneId) {
-      // In local simulation mode, if no tokens are configured, we save the message anyway to let the simulator work!
       console.warn('WhatsApp credentials not set. Saving message locally for simulation.');
+      await logToDb('WARN', 'API', `WhatsApp não está configurado para envio real. Salvando mensagem localmente de forma simulada.`);
     }
 
     let result = null;
@@ -104,8 +107,13 @@ export async function POST(request) {
       }
     });
 
+    await logToDb('INFO', 'API', `Mensagem manual registrada e enviada com sucesso para ${contactId}. ID: ${messageId}`);
     return NextResponse.json(savedMessage);
   } catch (error) {
+    await logToDb('ERROR', 'API', `Erro ao enviar mensagem manual para o contato ${contactId}: ${error.message}`, {
+      error: error.message,
+      stack: error.stack
+    });
     console.error('Error sending manual message:', error);
     return NextResponse.json({ error: error.message || 'Failed to send message' }, { status: 500 });
   }
