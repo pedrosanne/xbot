@@ -9,6 +9,12 @@ export default function ChatPage() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // Call Modal State
+  const [showCallModal, setShowCallModal] = useState(false);
+  const [callFirstMessage, setCallFirstMessage] = useState('');
+  const [callLoading, setCallLoading] = useState(false);
+  const [callResult, setCallResult] = useState(null); // { success, message }
+  
   // Simulated Client states
   const [simName, setSimName] = useState('João Silva');
   const [simPhone, setSimPhone] = useState('5511999999999');
@@ -120,6 +126,38 @@ export default function ChatPage() {
       console.error('Error sending manual message:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Initiate AI Voice Call via Vapi.ai
+  const handleInitiateCall = async () => {
+    if (!selectedContact) return;
+    setCallLoading(true);
+    setCallResult(null);
+
+    try {
+      const res = await fetch('/api/calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedContact.id,
+          firstMessage: callFirstMessage || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setCallResult({ success: true, message: 'Chamada iniciada com sucesso! A IA está ligando para o cliente.' });
+        setCallFirstMessage('');
+        setTimeout(() => { setShowCallModal(false); setCallResult(null); }, 4000);
+      } else {
+        setCallResult({ success: false, message: data.error || 'Erro ao iniciar chamada.' });
+      }
+    } catch (err) {
+      console.error('Error initiating call:', err);
+      setCallResult({ success: false, message: 'Erro de conexão com a API.' });
+    } finally {
+      setCallLoading(false);
     }
   };
 
@@ -248,19 +286,85 @@ export default function ChatPage() {
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>WhatsApp: {selectedContact.id}</span>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  {selectedContact.status === 'AUTO' ? 'IA respondendo automaticamente' : 'Controle manual ativo (IA silenciada)'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'none' }}>
+                  {selectedContact.status === 'AUTO' ? 'IA ativa' : 'Manual'}
                 </span>
+                <button
+                  onClick={() => { setShowCallModal(!showCallModal); setCallResult(null); }}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 14px', fontSize: '0.85rem', position: 'relative' }}
+                  title="Ligar para o cliente com IA"
+                >
+                  📞 Ligar
+                </button>
                 <button 
                   onClick={handleToggleStatus}
-                  className={`btn ${selectedContact.status === 'AUTO' ? 'btn-success' : 'btn-warning'}`}
+                  className={`btn ${selectedContact.status === 'AUTO' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '8px 16px', fontSize: '0.85rem' }}
                 >
                   {selectedContact.status === 'AUTO' ? '🤖 Bot: Ligado' : '👤 Bot: Pausado'}
                 </button>
               </div>
             </div>
+
+            {/* Call Modal */}
+            {showCallModal && (
+              <div style={{
+                padding: '16px 24px',
+                borderBottom: '1px solid var(--border-glass)',
+                background: 'rgba(0,0,0,0.3)',
+                animation: 'fadeIn 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 600 }}>📞 Chamada com IA para {selectedContact.name}</h4>
+                  <button onClick={() => setShowCallModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.1rem' }}>✕</button>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'end' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Primeira mensagem da IA (opcional)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+                      placeholder={`Olá ${selectedContact.name}! Aqui é a assistente virtual...`}
+                      value={callFirstMessage}
+                      onChange={(e) => setCallFirstMessage(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    onClick={handleInitiateCall}
+                    className="btn btn-primary"
+                    style={{ padding: '8px 20px', whiteSpace: 'nowrap' }}
+                    disabled={callLoading}
+                  >
+                    {callLoading ? '⏳ Ligando...' : '📞 Iniciar Chamada'}
+                  </button>
+                </div>
+
+                {callResult && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
+                    fontWeight: 500,
+                    background: callResult.success ? 'rgba(74,222,128,0.08)' : 'rgba(255,92,92,0.08)',
+                    border: `1px solid ${callResult.success ? 'rgba(74,222,128,0.2)' : 'rgba(255,92,92,0.2)'}`,
+                    color: callResult.success ? '#4ade80' : '#ff5c5c',
+                  }}>
+                    {callResult.success ? '✓' : '✗'} {callResult.message}
+                  </div>
+                )}
+
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  ℹ A IA usará a persona do agente ativo para conversar como um ser humano real. Requer Vapi.ai configurado em Agentes → Central de Chamadas.
+                </div>
+              </div>
+            )}
 
             {/* Message Area */}
             <div style={{ flexGrow: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>

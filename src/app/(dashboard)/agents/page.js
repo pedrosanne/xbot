@@ -64,6 +64,23 @@ export default function AgentsPage() {
   const [dragNode, setDragNode] = useState(null); // { id, offsetX, offsetY }
 
   // ==========================================
+  // STATE: Vapi.ai & Calls
+  // ==========================================
+  const [vapiApiKey, setVapiApiKey] = useState('');
+  const [vapiPhoneNumberId, setVapiPhoneNumberId] = useState('');
+  const [vapiAssistantId, setVapiAssistantId] = useState('');
+  const [vapiSaving, setVapiSaving] = useState(false);
+  const [vapiSuccess, setVapiSuccess] = useState(false);
+  const [calls, setCalls] = useState([]);
+  const [callPhone, setCallPhone] = useState('');
+  const [callFirstMsg, setCallFirstMsg] = useState('');
+  const [callCustomPrompt, setCallCustomPrompt] = useState('');
+  const [callMaxDuration, setCallMaxDuration] = useState('300');
+  const [callLoading, setCallLoading] = useState(false);
+  const [callResult, setCallResult] = useState(null);
+  const [expandedCallId, setExpandedCallId] = useState(null);
+
+  // ==========================================
   // LIFECYCLE & DATA FETCHING
   // ==========================================
   useEffect(() => {
@@ -73,6 +90,7 @@ export default function AgentsPage() {
     fetchSettings();
     fetchAgents();
     fetchFlows();
+    fetchCalls();
   }, []);
 
   const fetchSettings = async () => {
@@ -86,6 +104,9 @@ export default function AgentsPage() {
         setGeminiApiKey(data.geminiApiKey || '');
         setElevenLabsApiKey(data.elevenLabsApiKey || '');
         setElevenLabsVoiceId(data.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM');
+        setVapiApiKey(data.vapiApiKey || '');
+        setVapiPhoneNumberId(data.vapiPhoneNumberId || '');
+        setVapiAssistantId(data.vapiAssistantId || '');
       }
     } catch (err) {
       console.error('Error fetching settings:', err);
@@ -184,6 +205,66 @@ export default function AgentsPage() {
   // ==========================================
   // METHODS: CHATBOT FLOWS
   // ==========================================
+  // ==========================================
+  // METHODS: CALLS
+  // ==========================================
+  const fetchCalls = async () => {
+    try {
+      const res = await fetch('/api/calls');
+      if (res.ok) setCalls(await res.json());
+    } catch (err) { console.error('Error fetching calls:', err); }
+  };
+
+  const handleSaveVapiSettings = async () => {
+    setVapiSaving(true);
+    setVapiSuccess(false);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whatsappToken, whatsappPhoneId, whatsappVerifyToken, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId, vapiApiKey, vapiPhoneNumberId, vapiAssistantId }),
+      });
+      if (res.ok) { setVapiSuccess(true); setTimeout(() => setVapiSuccess(false), 3000); }
+    } catch (err) { console.error('Error saving Vapi settings:', err); }
+    finally { setVapiSaving(false); }
+  };
+
+  const handleMakeCall = async () => {
+    if (!callPhone.trim()) { alert('Informe o número de telefone.'); return; }
+    setCallLoading(true);
+    setCallResult(null);
+    try {
+      const res = await fetch('/api/calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: callPhone,
+          firstMessage: callFirstMsg || undefined,
+          systemPrompt: callCustomPrompt || undefined,
+          maxDuration: callMaxDuration || '300',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCallResult({ success: true, message: 'Chamada iniciada! A IA está ligando...' });
+        setCallPhone(''); setCallFirstMsg(''); setCallCustomPrompt('');
+        fetchCalls();
+        setTimeout(() => setCallResult(null), 5000);
+      } else {
+        setCallResult({ success: false, message: data.error || 'Erro ao iniciar chamada.' });
+      }
+    } catch (err) {
+      setCallResult({ success: false, message: 'Erro de conexão.' });
+    } finally { setCallLoading(false); }
+  };
+
+  const formatDuration = (seconds) => {
+    if (!seconds) return '0s';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  };
+
   const fetchFlows = async () => {
     try {
       const res = await fetch('/api/flows');
@@ -557,6 +638,9 @@ export default function AgentsPage() {
           </button>
           <button onClick={() => { setActiveTab('flows'); }} className={`btn ${activeTab === 'flows' ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '8px 16px', fontSize: '0.85rem', border: activeTab === 'flows' ? 'none' : undefined }}>
             Chatbot &amp; Fluxos
+          </button>
+          <button onClick={() => { setActiveTab('calls'); closeBuilder(); }} className={`btn ${activeTab === 'calls' ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '8px 16px', fontSize: '0.85rem', border: activeTab === 'calls' ? 'none' : undefined }}>
+            📞 Central de Chamadas
           </button>
         </div>
       </header>
@@ -1176,6 +1260,185 @@ export default function AgentsPage() {
             </div>
           </div>
         )}
+
+        {/* =====================================================================
+            TAB 4: CENTRAL DE CHAMADAS
+            ===================================================================== */}
+        {activeTab === 'calls' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', alignItems: 'start' }}>
+
+            {/* Config Panel */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+              {/* Vapi.ai Configuration */}
+              <div className="glass-panel" style={{ padding: '24px' }}>
+                <div className="section-title-line"><h3>⚙️ Configuração do Vapi.ai</h3></div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '16px', lineHeight: '1.5' }}>
+                  Configure sua conta do <a href="https://vapi.ai" target="_blank" rel="noopener noreferrer" style={{ color: '#4ade80', textDecoration: 'underline' }}>Vapi.ai</a> para habilitar chamadas com IA conversacional em tempo real.
+                </p>
+
+                {vapiSuccess && (
+                  <div style={{ padding: '10px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80', borderRadius: '8px', fontSize: '0.82rem', marginBottom: '12px', fontWeight: 500 }}>✓ Configurações Vapi.ai salvas!</div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">API Key do Vapi.ai</label>
+                    <input type="password" className="form-input" placeholder="vapi_xxxxxxxx" value={vapiApiKey} onChange={(e) => setVapiApiKey(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Phone Number ID (Número Vapi)</label>
+                    <input type="text" className="form-input" placeholder="ID do número no dashboard Vapi" value={vapiPhoneNumberId} onChange={(e) => setVapiPhoneNumberId(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Assistant ID (opcional - usa agente IA ativo se vazio)</label>
+                    <input type="text" className="form-input" placeholder="ID do assistente pré-configurado no Vapi" value={vapiAssistantId} onChange={(e) => setVapiAssistantId(e.target.value)} />
+                  </div>
+                  <button onClick={handleSaveVapiSettings} className="btn btn-primary" style={{ justifyContent: 'center', padding: '10px' }} disabled={vapiSaving}>
+                    {vapiSaving ? 'Salvando...' : 'Salvar Configurações Vapi.ai'}
+                  </button>
+                </div>
+
+                {/* Status */}
+                <div style={{ marginTop: '16px', display: 'flex', gap: '8px', alignItems: 'center', padding: '10px', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
+                  <span className={`led-indicator ${vapiApiKey && vapiPhoneNumberId ? 'active' : 'inactive'}`} />
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    {vapiApiKey && vapiPhoneNumberId ? 'Vapi.ai conectado e pronto' : 'Configure a API Key e Phone Number ID'}
+                  </span>
+                </div>
+
+                <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-glass)', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                  <strong>Webhook URL para o Vapi.ai:</strong><br/>
+                  <code style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>{callbackUrl ? callbackUrl.replace('/api/webhook', '/api/calls/webhook') : '...'}</code>
+                  <br/>Configure esta URL no dashboard do Vapi.ai em "Server URL" para receber transcrições e eventos.
+                </div>
+              </div>
+
+              {/* Make Call Panel */}
+              <div className="glass-panel" style={{ padding: '24px' }}>
+                <div className="section-title-line"><h3>📞 Realizar Chamada</h3></div>
+
+                {callResult && (
+                  <div style={{
+                    padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 500, marginBottom: '12px',
+                    background: callResult.success ? 'rgba(74,222,128,0.08)' : 'rgba(255,92,92,0.08)',
+                    border: `1px solid ${callResult.success ? 'rgba(74,222,128,0.2)' : 'rgba(255,92,92,0.2)'}`,
+                    color: callResult.success ? '#4ade80' : '#ff5c5c',
+                  }}>
+                    {callResult.success ? '✓' : '✗'} {callResult.message}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Número do Telefone (com DDD e código do país)</label>
+                    <input type="text" className="form-input" placeholder="5511999999999" value={callPhone} onChange={(e) => setCallPhone(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Primeira mensagem da IA (saudação)</label>
+                    <input type="text" className="form-input" placeholder="Olá! Aqui é a assistente virtual da empresa..." value={callFirstMsg} onChange={(e) => setCallFirstMsg(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Prompt personalizado (opcional - usa agente ativo se vazio)</label>
+                    <textarea className="form-textarea" style={{ minHeight: '80px' }} placeholder="Instruções específicas para esta chamada..." value={callCustomPrompt} onChange={(e) => setCallCustomPrompt(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Duração máxima (segundos)</label>
+                    <input type="number" className="form-input" value={callMaxDuration} onChange={(e) => setCallMaxDuration(e.target.value)} min="30" max="1800" />
+                  </div>
+                  <button onClick={handleMakeCall} className="btn btn-primary" style={{ justifyContent: 'center', padding: '12px', fontSize: '0.95rem', fontWeight: 600 }} disabled={callLoading || !vapiApiKey}>
+                    {callLoading ? '⏳ Iniciando Chamada...' : '📞 Ligar Agora'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Call History */}
+            <div className="glass-panel" style={{ padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div className="section-title-line" style={{ marginBottom: 0, flex: 1 }}><h3>📋 Histórico de Chamadas</h3></div>
+                <button onClick={fetchCalls} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>↻ Atualizar</button>
+              </div>
+
+              {calls.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📞</div>
+                  <p style={{ fontSize: '0.9rem' }}>Nenhuma chamada registrada.</p>
+                  <p style={{ fontSize: '0.78rem', marginTop: '4px' }}>Realize sua primeira chamada pelo painel ao lado.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '600px', overflowY: 'auto' }}>
+                  {calls.map((call) => {
+                    const isExpanded = expandedCallId === call.id;
+                    const statusColors = {
+                      'completed': { bg: 'rgba(74,222,128,0.08)', color: '#4ade80', label: 'Concluída' },
+                      'in-progress': { bg: 'rgba(96,165,250,0.08)', color: '#60a5fa', label: 'Em andamento' },
+                      'queued': { bg: 'rgba(251,191,36,0.08)', color: '#fbbf24', label: 'Na fila' },
+                      'ringing': { bg: 'rgba(251,191,36,0.08)', color: '#fbbf24', label: 'Chamando' },
+                      'failed': { bg: 'rgba(255,92,92,0.08)', color: '#ff5c5c', label: 'Falhou' },
+                      'no-answer': { bg: 'rgba(255,92,92,0.08)', color: '#ff5c5c', label: 'Sem resposta' },
+                      'busy': { bg: 'rgba(255,92,92,0.08)', color: '#ff5c5c', label: 'Ocupado' },
+                    };
+                    const st = statusColors[call.status] || statusColors['queued'];
+
+                    return (
+                      <div key={call.id} style={{ padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', borderRadius: '12px', cursor: 'pointer', transition: 'var(--transition-smooth)' }} onClick={() => setExpandedCallId(isExpanded ? null : call.id)}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div className="agent-avatar" style={{ width: '36px', height: '36px', fontSize: '1rem', borderRadius: '10px' }}>📞</div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{call.contact?.name || call.contactId}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {new Date(call.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                {call.duration > 0 && ` • ${formatDuration(call.duration)}`}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {call.cost > 0 && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>${call.cost.toFixed(3)}</span>}
+                            <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600, background: st.bg, color: st.color }}>
+                              {st.label}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {call.summary && (
+                              <div>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Resumo da IA</div>
+                                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{call.summary}</p>
+                              </div>
+                            )}
+                            {call.transcript && (
+                              <div>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Transcrição</div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', whiteSpace: 'pre-wrap' }}>
+                                  {call.transcript}
+                                </div>
+                              </div>
+                            )}
+                            {call.recordingUrl && (
+                              <div>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Gravação</div>
+                                <audio src={call.recordingUrl} controls style={{ width: '100%', height: '36px' }} />
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: '12px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              {call.endedReason && <span>Motivo: {call.endedReason}</span>}
+                              {call.vapiCallId && <span>Vapi ID: {call.vapiCallId.substring(0, 12)}...</span>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

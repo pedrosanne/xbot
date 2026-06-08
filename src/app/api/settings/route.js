@@ -28,7 +28,10 @@ export async function POST(request) {
         elevenLabsApiKey: data.elevenLabsApiKey ?? '',
         elevenLabsVoiceId: data.elevenLabsVoiceId ?? '21m00Tcm4TlvDq8ikWAM',
         vapidPublicKey: data.vapidPublicKey ?? '',
-        vapidPrivateKey: data.vapidPrivateKey ?? ''
+        vapidPrivateKey: data.vapidPrivateKey ?? '',
+        vapiApiKey: data.vapiApiKey ?? '',
+        vapiPhoneNumberId: data.vapiPhoneNumberId ?? '',
+        vapiAssistantId: data.vapiAssistantId ?? ''
       }
     });
 

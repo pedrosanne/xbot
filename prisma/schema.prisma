@@ -18,6 +18,9 @@ model Setting {
   elevenLabsVoiceId   String   @default("21m00Tcm4TlvDq8ikWAM") // Rachel
   vapidPublicKey      String   @default("")
   vapidPrivateKey     String   @default("")
+  vapiApiKey          String   @default("")
+  vapiPhoneNumberId   String   @default("")
+  vapiAssistantId     String   @default("")
   updatedAt           DateTime @updatedAt
 }
 
@@ -42,6 +45,7 @@ model Contact {
   activeFlowId    String    @default("")
   lastInteraction DateTime  @default(now())
   messages        Message[]
+  calls           Call[]
   createdAt       DateTime  @default(now())
 }
 
@@ -99,4 +103,18 @@ model PushSubscription {
   createdAt  DateTime @default(now())
 }
 
-
+model Call {
+  id            String   @id @default(uuid())
+  contactId     String
+  contact       Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  vapiCallId    String   @default("")
+  type          String   @default("outbound") // "outbound" ou "inbound"
+  status        String   @default("queued")   // "queued","ringing","in-progress","completed","failed","no-answer","busy"
+  duration      Int      @default(0)
+  transcript    String   @default("")
+  recordingUrl  String   @default("")
+  summary       String   @default("")
+  cost          Float    @default(0)
+  endedReason   String   @default("")
+  createdAt     DateTime @default(now())
+}
