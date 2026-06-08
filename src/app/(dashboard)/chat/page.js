@@ -22,6 +22,11 @@ export default function ChatPage() {
   const [simType, setSimType] = useState('text');
   const [simMediaId, setSimMediaId] = useState('wamid_test_media_123');
 
+  // Simulator Drawer and Contact Search/Filters
+  const [showSimulator, setShowSimulator] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL', 'AUTO', 'MANUAL'
+
   const messagesEndRef = useRef(null);
 
   // 1. Fetch Contact List
@@ -222,52 +227,112 @@ export default function ChatPage() {
     }
   };
 
+  const filteredContacts = contacts.filter((contact) => {
+    const matchesSearch = 
+      contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      contact.id?.includes(searchQuery);
+    const matchesFilter = 
+      statusFilter === 'ALL' || 
+      contact.status === statusFilter;
+    return matchesSearch && matchesFilter;
+  });
+
+  const getInitials = (name) => {
+    if (!name) return 'C';
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div className="chat-page-container">
       
       {/* 1. Contact List Panel */}
-      <div style={{ width: '320px', borderRight: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '20px 16px', borderBottom: '1px solid var(--border-glass)' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Contatos</h2>
+      <div className={`contacts-panel ${selectedContact ? 'hidden-mobile' : ''}`}>
+        <div className="contacts-header">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Contatos</h2>
+            <button 
+              onClick={() => setShowSimulator(!showSimulator)} 
+              className={`btn ${showSimulator ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+              title="Abrir Simulador de Clientes"
+            >
+              🧪 Simulador
+            </button>
+          </div>
+          
+          {/* Search bar */}
+          <div className="contacts-search-wrapper">
+            <svg className="contacts-search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input 
+              type="text" 
+              placeholder="Buscar por nome ou número..." 
+              className="contacts-search-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
-        <div style={{ flexGrow: 1, overflowY: 'auto', padding: '8px' }}>
-          {contacts.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.9rem' }}>
-              Nenhum contato ativo. Use o simulador no painel lateral!
+
+        {/* Tab Filters */}
+        <div className="contacts-filters">
+          <button 
+            className={`filter-tab ${statusFilter === 'ALL' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('ALL')}
+          >
+            Todos
+          </button>
+          <button 
+            className={`filter-tab ${statusFilter === 'AUTO' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('AUTO')}
+          >
+            Robô
+          </button>
+          <button 
+            className={`filter-tab ${statusFilter === 'MANUAL' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('MANUAL')}
+          >
+            Manual
+          </button>
+        </div>
+
+        {/* Contact list body */}
+        <div className="contacts-list">
+          {filteredContacts.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 8px', fontSize: '0.85rem' }}>
+              Nenhum contato encontrado.
             </div>
           ) : (
-            contacts.map((contact) => {
+            filteredContacts.map((contact) => {
               const isSelected = selectedContact?.id === contact.id;
               const isManual = contact.status === 'MANUAL';
+              const initials = getInitials(contact.name || contact.profileName || contact.id);
               return (
                 <div
                   key={contact.id}
                   onClick={() => handleSelectContact(contact)}
-                  style={{
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    marginBottom: '6px',
-                    cursor: 'pointer',
-                    background: isSelected ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
-                    border: `1px solid ${isSelected ? 'var(--color-primary)' : 'transparent'}`,
-                    transition: 'var(--transition-smooth)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px'
-                  }}
-                  className={!isSelected ? 'glass-card' : ''}
+                  className={`contact-item ${isSelected ? 'selected' : ''}`}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600, fontSize: '0.95rem', color: isSelected ? 'white' : 'var(--text-primary)' }}>
-                      {contact.name}
-                    </span>
-                    <span className={`badge ${isManual ? 'badge-warning' : 'badge-success'}`} style={{ scale: '0.85' }}>
-                      {isManual ? 'Manual' : 'Auto'}
-                    </span>
+                  <div className="contact-avatar">
+                    {initials}
                   </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {contact.lastMessage?.content || '(Sem mensagens)'}
-                  </span>
+                  <div className="contact-info">
+                    <div className="contact-name-row">
+                      <span className="contact-name">{contact.name || 'Sem Nome'}</span>
+                      <span className={`status-indicator ${isManual ? 'manual' : 'auto'}`} />
+                    </div>
+                    <div className="contact-msg-row">
+                      <span className="contact-last-msg">
+                        {contact.lastMessage?.content || '(Sem mensagens)'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               );
             })
@@ -276,24 +341,34 @@ export default function ChatPage() {
       </div>
 
       {/* 2. Main Chat Panel */}
-      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#07080c' }}>
+      <div className={`chat-window-panel ${!selectedContact ? 'hidden-mobile' : ''}`}>
         {selectedContact ? (
           <>
             {/* Chat Header */}
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-glass)' }}>
-              <div>
-                <h3 style={{ fontWeight: 600 }}>{selectedContact.name}</h3>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>WhatsApp: {selectedContact.id}</span>
+            <div className="chat-header">
+              <div className="chat-header-info">
+                {/* Back button for mobile */}
+                <button 
+                  onClick={() => setSelectedContact(null)}
+                  className="btn btn-secondary back-btn-mobile"
+                  style={{ marginRight: '8px', padding: '6px 10px' }}
+                >
+                  ← Voltar
+                </button>
+                <div className="contact-avatar" style={{ width: '36px', height: '36px' }}>
+                  {getInitials(selectedContact.name)}
+                </div>
+                <div className="chat-header-text">
+                  <span className="chat-header-title">{selectedContact.name}</span>
+                  <span className="chat-header-sub">WhatsApp: {selectedContact.id}</span>
+                </div>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'none' }}>
-                  {selectedContact.status === 'AUTO' ? 'IA ativa' : 'Manual'}
-                </span>
+              <div className="chat-header-actions">
                 <button
                   onClick={() => { setShowCallModal(!showCallModal); setCallResult(null); }}
                   className="btn btn-secondary"
-                  style={{ padding: '8px 14px', fontSize: '0.85rem', position: 'relative' }}
+                  style={{ padding: '8px 12px', fontSize: '0.8rem' }}
                   title="Ligar para o cliente com IA"
                 >
                   📞 Ligar
@@ -301,9 +376,9 @@ export default function ChatPage() {
                 <button 
                   onClick={handleToggleStatus}
                   className={`btn ${selectedContact.status === 'AUTO' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+                  style={{ padding: '8px 12px', fontSize: '0.8rem' }}
                 >
-                  {selectedContact.status === 'AUTO' ? '🤖 Bot: Ligado' : '👤 Bot: Pausado'}
+                  {selectedContact.status === 'AUTO' ? '🤖 Robô Ativo' : '👤 Manual'}
                 </button>
               </div>
             </div>
@@ -367,39 +442,28 @@ export default function ChatPage() {
             )}
 
             {/* Message Area */}
-            <div style={{ flexGrow: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="messages-container">
               {messages.map((msg) => {
                 const isClient = msg.direction === 'INCOMING';
                 const isBot = msg.senderType === 'BOT';
                 
-                // Color coding for different senders
-                let bgBubble = 'rgba(255, 255, 255, 0.05)';
-                let borderBubble = '1px solid var(--border-glass)';
-                let alignSelf = 'flex-start';
+                let wrapperClass = 'message-wrapper';
                 let senderLabel = selectedContact.name;
 
-                if (!isClient) {
-                  alignSelf = 'flex-end';
+                if (isClient) {
+                  wrapperClass += ' incoming';
+                } else {
+                  wrapperClass += ' outgoing';
+                  wrapperClass += isBot ? ' bot' : ' human';
                   senderLabel = isBot ? 'IA (Assistente)' : 'Você (Humano)';
-                  bgBubble = isBot ? 'rgba(139, 92, 246, 0.25)' : 'rgba(59, 130, 246, 0.25)';
-                  borderBubble = `1px solid ${isBot ? 'var(--color-primary)' : '#3b82f6'}`;
                 }
 
                 return (
-                  <div key={msg.id} style={{ alignSelf, maxWidth: '65%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', alignSelf: isClient ? 'flex-start' : 'flex-end', margin: '0 4px' }}>
+                  <div key={msg.id} className={wrapperClass}>
+                    <span className="message-meta">
                       {senderLabel} • {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    <div style={{ 
-                      padding: '12px 16px', 
-                      borderRadius: isClient ? '4px 16px 16px 16px' : '16px 4px 16px 16px', 
-                      background: bgBubble,
-                      border: borderBubble,
-                      fontSize: '0.95rem',
-                      lineHeight: '1.4',
-                      wordBreak: 'break-word',
-                      color: 'white'
-                    }}>
+                    <div className="message-bubble">
                       {/* Media Renderers */}
                       {msg.type === 'image' && msg.mediaUrl && (
                         <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden' }}>
@@ -425,8 +489,8 @@ export default function ChatPage() {
                           <svg style={{ width: '24px', height: '24px', color: '#ef4444' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
-                          <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary-hover)', fontSize: '0.85rem' }}>
-                            Ver Documento PDF / Arquivo
+                          <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', fontSize: '0.85rem', textDecoration: 'underline' }}>
+                            Ver Documento / Arquivo
                           </a>
                         </div>
                       )}
@@ -440,7 +504,7 @@ export default function ChatPage() {
             </div>
 
             {/* Input Bar */}
-            <form onSubmit={handleSendMessage} style={{ padding: '16px 24px', borderTop: '1px solid var(--border-glass)', display: 'flex', gap: '12px', background: 'var(--bg-glass)' }}>
+            <form onSubmit={handleSendMessage} className="chat-input-form">
               <input
                 type="text"
                 value={inputText}
@@ -467,21 +531,28 @@ export default function ChatPage() {
             </svg>
             <h3 style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>Nenhum chat aberto</h3>
             <p style={{ fontSize: '0.9rem', maxWidth: '350px', textAlign: 'center' }}>
-              Selecione um contato na lista lateral ou utilize o simulador à direita para simular novas interações!
+              Selecione um contato na lista lateral ou utilize o simulador para criar interações de teste.
             </p>
           </div>
         )}
       </div>
 
-      {/* 3. Simulator Sidebar Panel */}
-      <div style={{ width: '340px', borderLeft: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', background: 'var(--bg-glass)', overflowY: 'auto' }}>
-        <div style={{ padding: '20px 16px', borderBottom: '1px solid var(--border-glass)' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Simulador de Clientes</h2>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Teste sem chaves de API do WhatsApp</span>
+      {/* 3. Simulator Sidebar Panel (Drawer style) */}
+      <div className={`simulator-drawer ${!showSimulator ? 'collapsed' : ''}`}>
+        <div className="simulator-header">
+          <div>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Simulador de Clientes</h2>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Simule mensagens do WhatsApp</span>
+          </div>
+          <button 
+            onClick={() => setShowSimulator(false)} 
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}
+          >
+            ✕
+          </button>
         </div>
         
         <form onSubmit={handleSimulateWebhook} style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          
           <div className="form-group">
             <label className="form-label">Nome do Cliente</label>
             <input 
@@ -549,7 +620,7 @@ export default function ChatPage() {
                   className="form-input"
                   placeholder="ID da mídia para download mockado"
                 />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                   Nota: Se a API do WhatsApp não estiver configurada, simulamos o download salvando uma imagem de exemplo.
                 </span>
               </div>
@@ -565,7 +636,7 @@ export default function ChatPage() {
                 onChange={(e) => setSimMediaId(e.target.value)} 
                 className="form-input"
               />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                 Simula o envio de um arquivo de áudio. Na ausência de chaves, colocaremos um áudio de exemplo.
               </span>
             </div>
@@ -577,7 +648,7 @@ export default function ChatPage() {
         </form>
         
         <div style={{ margin: 'auto 16px 16px', padding: '12px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-          💡 <strong>Dica de Teste:</strong> {"Clique em \"Simular\" para receber a mensagem. A IA processará e responderá automaticamente em cerca de 3 segundos, atualizando este painel do chat em tempo real!"}
+          💡 <strong>Dica de Teste:</strong> Clique em "Simular" para receber a mensagem. A IA processará e responderá automaticamente em cerca de 3 segundos, atualizando este painel do chat em tempo real!
         </div>
       </div>
 
