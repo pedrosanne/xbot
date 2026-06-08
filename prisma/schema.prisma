@@ -16,6 +16,8 @@ model Setting {
   geminiApiKey        String   @default("")
   elevenLabsApiKey    String   @default("")
   elevenLabsVoiceId   String   @default("21m00Tcm4TlvDq8ikWAM") // Rachel
+  vapidPublicKey      String   @default("")
+  vapidPrivateKey     String   @default("")
   updatedAt           DateTime @updatedAt
 }
 
@@ -87,6 +89,14 @@ model Log {
   message   String
   details   String   @default("") // Trace do erro ou dados do payload
   timestamp DateTime @default(now())
+}
+
+model PushSubscription {
+  id         String   @id @default(uuid())
+  endpoint   String   @unique
+  keysAuth   String
+  keysP256dh String
+  createdAt  DateTime @default(now())
 }
 
 

@@ -26,7 +26,9 @@ export async function POST(request) {
         whatsappVerifyToken: data.whatsappVerifyToken ?? 'antigravity_token_123',
         geminiApiKey: data.geminiApiKey ?? '',
         elevenLabsApiKey: data.elevenLabsApiKey ?? '',
-        elevenLabsVoiceId: data.elevenLabsVoiceId ?? '21m00Tcm4TlvDq8ikWAM'
+        elevenLabsVoiceId: data.elevenLabsVoiceId ?? '21m00Tcm4TlvDq8ikWAM',
+        vapidPublicKey: data.vapidPublicKey ?? '',
+        vapidPrivateKey: data.vapidPrivateKey ?? ''
       }
     });
 

@@ -3,6 +3,7 @@ import { generateAIResponse } from './gemini';
 import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons } from './whatsapp';
 import { textToSpeech } from './tts';
 import { logToDb } from './log';
+import { sendPushNotification } from './push';
 
 // Removida a fila de debounce em memória que causava timeouts e instabilidade na Vercel
 
@@ -56,6 +57,18 @@ export async function enqueueMessage(contactId, messageData) {
     // 3. Verifica se o contato está em modo MANUAL (atendimento humano)
     if (contact.status === 'MANUAL') {
       await logToDb('INFO', 'SYSTEM', `Contato ${contactId} está em modo MANUAL. Resposta automática pausada.`);
+      
+      // Envia notificação push para os administradores/operadores
+      const contactName = contact.name || contact.profileName || contactId;
+      const messageSnippet = messageData.content 
+        ? (messageData.content.length > 60 ? messageData.content.substring(0, 60) + '...' : messageData.content) 
+        : 'Mídia recebida';
+
+      await sendPushNotification(
+        `Atendimento Manual: ${contactName} 💬`,
+        messageSnippet,
+        `/chat?contactId=${contactId}`
+      );
       return;
     }
 
@@ -319,6 +332,14 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
     const transferMessage = option.text || "Entendido. Estou transferindo sua conversa para um atendente humano. Aguarde um instante.";
     await sendText(contact.id, transferMessage);
     await saveOutgoingMessage(`bot_${Date.now()}_human_transfer`, contact.id, 'text', '', transferMessage);
+
+    // Envia notificação push para os operadores indicando o transbordo
+    const contactName = contact.name || contact.profileName || contact.id;
+    await sendPushNotification(
+      `Solicitação de Atendimento: ${contactName} 👤`,
+      `Cliente solicitou atendimento humano no fluxo.`,
+      `/chat?contactId=${contact.id}`
+    );
   }
 }
 

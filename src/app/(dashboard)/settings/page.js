@@ -2,38 +2,93 @@
 
 import { useState, useEffect } from 'react';
 
+// Helper function to convert VAPID public key
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 export default function SettingsPage() {
+  // Configs
   const [whatsappToken, setWhatsappToken] = useState('');
   const [whatsappPhoneId, setWhatsappPhoneId] = useState('');
   const [whatsappVerifyToken, setWhatsappVerifyToken] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
   const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState('21m00Tcm4TlvDq8ikWAM');
+  
+  // VAPID keys
+  const [vapidPublicKey, setVapidPublicKey] = useState('');
+  const [vapidPrivateKey, setVapidPrivateKey] = useState('');
 
+  // Status/Loading States
   const [loading, setLoading] = useState(false);
+  const [vapidLoading, setVapidLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
 
-  // Fetch settings on mount
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const res = await fetch('/api/settings');
-        if (res.ok) {
-          const data = await res.json();
-          setWhatsappToken(data.whatsappToken || '');
-          setWhatsappPhoneId(data.whatsappPhoneId || '');
-          setWhatsappVerifyToken(data.whatsappVerifyToken || 'antigravity_token_123');
-          setGeminiApiKey(data.geminiApiKey || '');
-          setElevenLabsApiKey(data.elevenLabsApiKey || '');
-          setElevenLabsVoiceId(data.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM');
-        }
-      } catch (err) {
-        console.error('Error fetching settings:', err);
-      }
-    };
+  // PWA/Push State
+  const [pushSupported, setPushSupported] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState('default');
+  const [subLoading, setSubLoading] = useState(false);
+  
+  // Test Push Customization
+  const [testTitle, setTestTitle] = useState('Mensagem do ZapFlow ⚡');
+  const [testBody, setTestBody] = useState('Uma nova mensagem precisa de atendimento humano no painel!');
 
+  // Fetch settings & check push status on mount
+  useEffect(() => {
     fetchSettings();
+    checkPushCapability();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        setWhatsappToken(data.whatsappToken || '');
+        setWhatsappPhoneId(data.whatsappPhoneId || '');
+        setWhatsappVerifyToken(data.whatsappVerifyToken || 'antigravity_token_123');
+        setGeminiApiKey(data.geminiApiKey || '');
+        setElevenLabsApiKey(data.elevenLabsApiKey || '');
+        setElevenLabsVoiceId(data.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM');
+        setVapidPublicKey(data.vapidPublicKey || '');
+        setVapidPrivateKey(data.vapidPrivateKey || '');
+      }
+    } catch (err) {
+      console.error('Error fetching settings:', err);
+    }
+  };
+
+  const checkPushCapability = async () => {
+    if (typeof window !== 'undefined') {
+      const isSupported = 'serviceWorker' in navigator && 'PushManager' in window;
+      setPushSupported(isSupported);
+
+      if (isSupported) {
+        setNotificationPermission(Notification.permission);
+        
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.getSubscription();
+          setIsSubscribed(!!subscription);
+        } catch (e) {
+          console.error('Error checking push subscription status:', e);
+        }
+      }
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,7 +105,9 @@ export default function SettingsPage() {
           whatsappVerifyToken,
           geminiApiKey,
           elevenLabsApiKey,
-          elevenLabsVoiceId
+          elevenLabsVoiceId,
+          vapidPublicKey,
+          vapidPrivateKey
         })
       });
 
@@ -67,13 +124,146 @@ export default function SettingsPage() {
     }
   };
 
+  // Generate VAPID keys API Call
+  const handleGenerateVapidKeys = async () => {
+    setVapidLoading(true);
+    setStatusMsg({ type: '', text: '' });
+    try {
+      const res = await fetch('/api/vapid/generate', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setVapidPublicKey(data.publicKey);
+        setVapidPrivateKey(data.privateKey);
+        setStatusMsg({ type: 'success', text: 'Novas chaves VAPID geradas e salvas com sucesso no banco!' });
+      } else {
+        setStatusMsg({ type: 'error', text: 'Erro ao gerar chaves VAPID.' });
+      }
+    } catch (err) {
+      console.error('Error generating VAPID keys:', err);
+      setStatusMsg({ type: 'error', text: 'Falha ao conectar na API de chaves.' });
+    } finally {
+      setVapidLoading(false);
+    }
+  };
+
+  // Subscribe browser to push
+  const handleSubscribe = async () => {
+    if (!pushSupported) return;
+    if (!vapidPublicKey) {
+      alert('Por favor, gere ou adicione as chaves VAPID antes de inscrever o dispositivo.');
+      return;
+    }
+
+    setSubLoading(true);
+    setStatusMsg({ type: '', text: '' });
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+
+      if (permission !== 'granted') {
+        setStatusMsg({ type: 'error', text: 'Permissão de notificação negada pelo usuário.' });
+        setSubLoading(false);
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Unsubscribe any existing one first to clean up
+      const oldSub = await registration.pushManager.getSubscription();
+      if (oldSub) {
+        await oldSub.unsubscribe();
+      }
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+      });
+
+      // Send to server
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription })
+      });
+
+      if (res.ok) {
+        setIsSubscribed(true);
+        setStatusMsg({ type: 'success', text: 'Este dispositivo foi inscrito com sucesso no PWA Notificações!' });
+      } else {
+        setStatusMsg({ type: 'error', text: 'Falha ao registrar inscrição de notificações no banco.' });
+      }
+    } catch (err) {
+      console.error('Push subscription error:', err);
+      setStatusMsg({ type: 'error', text: `Erro na inscrição: ${err.message}` });
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
+  // Unsubscribe browser from push
+  const handleUnsubscribe = async () => {
+    if (!pushSupported) return;
+    setSubLoading(true);
+    setStatusMsg({ type: '', text: '' });
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+
+      if (subscription) {
+        await subscription.unsubscribe();
+
+        // Delete from server
+        await fetch('/api/push/subscribe', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: subscription.endpoint })
+        });
+      }
+
+      setIsSubscribed(false);
+      setStatusMsg({ type: 'success', text: 'Dispositivo desinscrito com sucesso.' });
+    } catch (err) {
+      console.error('Push unsubscribe error:', err);
+      setStatusMsg({ type: 'error', text: 'Falha ao remover a inscrição.' });
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
+  // Dispatch test push API Call
+  const handleSendTestPush = async () => {
+    setStatusMsg({ type: '', text: '' });
+    try {
+      const res = await fetch('/api/push/send-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: testTitle, body: testBody })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.total === 0) {
+          setStatusMsg({ type: 'error', text: 'Não foi possível testar: Nenhum dispositivo está inscrito ainda.' });
+        } else {
+          setStatusMsg({ type: 'success', text: `Notificação enviada para ${data.sent} de ${data.total} aparelhos inscritos!` });
+        }
+      } else {
+        setStatusMsg({ type: 'error', text: `Erro no envio de teste: ${data.error || 'Erro desconhecido'}` });
+      }
+    } catch (err) {
+      console.error('Error sending test push:', err);
+      setStatusMsg({ type: 'error', text: 'Falha ao conectar na API de envio de teste.' });
+    }
+  };
+
   return (
     <div className="main-content">
       <header className="page-header">
         <h1 className="page-title">Configurações do Sistema</h1>
       </header>
 
-      <div className="page-body animate-fade-in" style={{ maxWidth: '720px', margin: '0 auto' }}>
+      <div className="page-body animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto', paddingBottom: '40px' }}>
         
         {statusMsg.text && (
           <div 
@@ -84,10 +274,11 @@ export default function SettingsPage() {
               fontSize: '0.9rem', 
               borderRadius: '8px', 
               marginBottom: '20px',
-              justifyContent: 'center' 
+              justifyContent: 'center',
+              fontWeight: 500
             }}
           >
-            {statusMsg.text}
+            {statusMsg.type === 'success' ? '✓ ' : '✗ '} {statusMsg.text}
           </div>
         )}
 
@@ -192,10 +383,154 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* 4. PWA and Push Notifications Settings */}
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h3 style={{ marginBottom: '16px', fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ background: 'var(--color-primary-hover)', color: 'white', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>⚡</span>
+              Configurações de PWA e Notificações Push
+            </h3>
+
+            {/* Browser Support & Registration status */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-glass)', borderRadius: '8px', fontSize: '0.8rem' }}>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Suporte Push no Navegador:</span>
+                <strong style={{ color: pushSupported ? 'var(--color-success)' : 'var(--color-error)' }}>
+                  {pushSupported ? 'Suportado' : 'Não suportado / Incompatível'}
+                </strong>
+              </div>
+
+              <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-glass)', borderRadius: '8px', fontSize: '0.8rem' }}>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Inscrição deste Dispositivo:</span>
+                <strong style={{ color: isSubscribed ? 'var(--color-success)' : 'var(--text-muted)' }}>
+                  {isSubscribed ? 'Inscrito e Ativo' : 'Não inscrito'}
+                </strong>
+              </div>
+
+              <div style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-glass)', borderRadius: '8px', fontSize: '0.8rem' }}>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Permissão Nativa:</span>
+                <strong style={{ 
+                  color: notificationPermission === 'granted' ? 'var(--color-success)' : 
+                         notificationPermission === 'denied' ? 'var(--color-error)' : 'var(--text-muted)'
+                }}>
+                  {notificationPermission === 'granted' ? 'Permitido' : 
+                   notificationPermission === 'denied' ? 'Bloqueado' : 'Pendente (Default)'}
+                </strong>
+              </div>
+            </div>
+
+            {/* Subscribe Actions */}
+            {pushSupported && (
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '20px' }}>
+                {!isSubscribed ? (
+                  <button
+                    type="button"
+                    onClick={handleSubscribe}
+                    className="btn btn-primary"
+                    style={{ fontSize: '0.85rem', padding: '10px 16px', background: 'var(--color-primary-hover)' }}
+                    disabled={subLoading}
+                  >
+                    {subLoading ? 'Inscrevendo...' : 'Ativar Notificações Neste Dispositivo 🔔'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleUnsubscribe}
+                    className="btn btn-danger"
+                    style={{ fontSize: '0.85rem', padding: '10px 16px' }}
+                    disabled={subLoading}
+                  >
+                    {subLoading ? 'Desinscrevendo...' : 'Desativar Notificações Neste Dispositivo 🔕'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* VAPID credentials */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '24px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Chaves VAPID do Servidor Push</h4>
+                <button
+                  type="button"
+                  onClick={handleGenerateVapidKeys}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.75rem', padding: '6px 12px', borderColor: 'var(--color-primary)', color: 'var(--color-primary-hover)' }}
+                  disabled={vapidLoading}
+                >
+                  {vapidLoading ? 'Gerando...' : 'Gerar Novas Chaves VAPID 🔑'}
+                </button>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Chave Pública VAPID (VAPID Public Key)</label>
+                <input
+                  type="text"
+                  value={vapidPublicKey}
+                  onChange={(e) => setVapidPublicKey(e.target.value)}
+                  placeholder="Gere ou insira a chave pública..."
+                  className="form-input"
+                  style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Chave Privada VAPID (VAPID Private Key)</label>
+                <input
+                  type="password"
+                  value={vapidPrivateKey}
+                  onChange={(e) => setVapidPrivateKey(e.target.value)}
+                  placeholder="Gere ou insira a chave privada..."
+                  className="form-input"
+                  style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
+                />
+              </div>
+            </div>
+
+            {/* Push Test Box */}
+            <div>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                Enviar Notificação Push de Teste
+              </h4>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Título do Teste</label>
+                  <input
+                    type="text"
+                    value={testTitle}
+                    onChange={(e) => setTestTitle(e.target.value)}
+                    className="form-input"
+                    style={{ padding: '8px' }}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Mensagem do Teste</label>
+                  <input
+                    type="text"
+                    value={testBody}
+                    onChange={(e) => setTestBody(e.target.value)}
+                    className="form-input"
+                    style={{ padding: '8px' }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSendTestPush}
+                className="btn btn-secondary"
+                style={{ width: '100%', padding: '12px', justifyContent: 'center', fontWeight: 600, fontSize: '0.85rem' }}
+              >
+                Disparar Teste de Notificação Nativa ⚡
+              </button>
+            </div>
+
+          </div>
+
+          {/* Action button */}
           <button 
             type="submit" 
             className="btn btn-primary" 
-            style={{ justifyContent: 'center', padding: '14px', fontSize: '1rem' }} 
+            style={{ justifyContent: 'center', padding: '14px', fontSize: '1rem', marginTop: '10px' }} 
             disabled={loading}
           >
             {loading ? 'Salvando Configurações...' : 'Salvar Configurações'}
@@ -204,7 +539,7 @@ export default function SettingsPage() {
         </form>
 
         <div className="glass-panel" style={{ padding: '20px', marginTop: '24px', background: 'rgba(255,255,255,0.01)', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-          💡 <strong>Como testar sem WhatsApp API:</strong> Deixe os campos de WhatsApp em branco e insira apenas a chave do Google Gemini. Vá para a aba <strong>Live Chat</strong> e use o <strong>Simulador de Clientes</strong> à direita para enviar e receber mensagens como se estivesse conversando no WhatsApp!
+          💡 <strong>Como funciona o PWA:</strong> Clique na barra de endereços do seu navegador (no botão de instalação "+" ou "Instalar aplicativo") para adicionar o ZapFlow à tela inicial do seu computador ou celular. Após salvar as chaves VAPID e clicar em "Ativar Notificações", você receberá notificações pop-up nativas mesmo se a aba do sistema estiver fechada!
         </div>
 
       </div>
