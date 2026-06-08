@@ -80,3 +80,13 @@ model Flow {
   updatedAt DateTime @updatedAt
 }
 
+model Log {
+  id        String   @id @default(uuid())
+  level     String   @default("INFO") // "INFO", "WARN", "ERROR"
+  category  String   @default("SYSTEM") // "WEBHOOK", "FLOW", "API", "DATABASE", "AI"
+  message   String
+  details   String   @default("") // Trace do erro ou dados do payload
+  timestamp DateTime @default(now())
+}
+
+

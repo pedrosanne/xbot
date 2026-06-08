@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getSystemSettings } from './settings';
+import { logToDb } from './log';
 
 const WHATSAPP_API_VERSION = 'v20.0';
 
@@ -9,6 +10,7 @@ export async function sendWhatsAppMessage(payload) {
   const { whatsappToken, whatsappPhoneId } = settings;
 
   if (!whatsappToken || !whatsappPhoneId) {
+    await logToDb('ERROR', 'API', 'Falha no envio de mensagem: Credenciais do WhatsApp não configuradas (Token ou Phone ID em branco).');
     console.error('WhatsApp API not configured. Missing Token or Phone ID.');
     return null;
   }
@@ -16,6 +18,8 @@ export async function sendWhatsAppMessage(payload) {
   const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${whatsappPhoneId}/messages`;
 
   try {
+    await logToDb('INFO', 'API', `Enviando mensagem WhatsApp para o número ${payload.to}`, { type: payload.type });
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -27,11 +31,18 @@ export async function sendWhatsAppMessage(payload) {
 
     const data = await response.json();
     if (!response.ok) {
+      await logToDb('ERROR', 'API', `Erro retornado pela API do WhatsApp (Código HTTP ${response.status})`, data);
       console.error('WhatsApp API Error Response:', JSON.stringify(data));
       throw new Error(data.error?.message || 'Error sending message via WhatsApp API');
     }
+    
+    await logToDb('INFO', 'API', `Mensagem WhatsApp enviada com sucesso para ${payload.to}. ID: ${data.messages?.[0]?.id || 'N/A'}`);
     return data;
   } catch (error) {
+    await logToDb('ERROR', 'API', `Exceção de rede ao enviar mensagem via WhatsApp: ${error.message}`, {
+      error: error.message,
+      stack: error.stack
+    });
     console.error('Failed to send WhatsApp message:', error);
     throw error;
   }
