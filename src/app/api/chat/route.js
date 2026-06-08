@@ -11,12 +11,15 @@ export async function GET(request) {
 
   try {
     if (contactId) {
-      // Return message history for a specific contact
+      // Return message history and profile details for a specific contact
       const messages = await prisma.message.findMany({
         where: { contactId },
         orderBy: { timestamp: 'asc' }
       });
-      return NextResponse.json(messages);
+      const contact = await prisma.contact.findUnique({
+        where: { id: contactId }
+      });
+      return NextResponse.json({ messages, contact });
     }
 
     // Return list of all contacts with their last message
@@ -30,12 +33,16 @@ export async function GET(request) {
       }
     });
 
-    // Format output to include last message snippet directly
+    // Format output to include last message snippet and profile details directly
     const formattedContacts = contacts.map(c => ({
       id: c.id,
       name: c.name,
       profileName: c.profileName,
       status: c.status,
+      email: c.email || '',
+      notes: c.notes || '',
+      tags: c.tags || '',
+      avatarUrl: c.avatarUrl || '',
       lastInteraction: c.lastInteraction,
       lastMessage: c.messages[0] || null
     }));
@@ -49,8 +56,13 @@ export async function GET(request) {
 
 // POST: Send a manual message from human agent (takeover)
 export async function POST(request) {
+  let contactId, type, content, mediaUrl;
   try {
-    const { contactId, type, content, mediaUrl } = await request.json();
+    const body = await request.json();
+    contactId = body.contactId;
+    type = body.type;
+    content = body.content;
+    mediaUrl = body.mediaUrl;
 
     if (!contactId || !type) {
       return NextResponse.json({ error: 'Missing contactId or type' }, { status: 400 });
@@ -60,25 +72,28 @@ export async function POST(request) {
 
     // Fetch system settings to see if they are configured
     const settings = await getSystemSettings();
-    if (!settings.whatsappToken || !settings.whatsappPhoneId) {
-      console.warn('WhatsApp credentials not set. Saving message locally for simulation.');
-      await logToDb('WARN', 'API', `WhatsApp não está configurado para envio real. Salvando mensagem localmente de forma simulada.`);
-    }
-
     let result = null;
+    let sendError = '';
 
-    // Send via official WhatsApp API if configured
-    if (settings.whatsappToken && settings.whatsappPhoneId) {
-      if (type === 'text') {
-        result = await sendText(contactId, content);
-      } else if (type === 'audio') {
-        result = await sendAudio(contactId, mediaUrl);
-      } else if (type === 'image') {
-        result = await sendImage(contactId, mediaUrl, content);
-      } else if (type === 'document') {
-        result = await sendDocument(contactId, mediaUrl, 'documento', content);
-      } else if (type === 'video') {
-        result = await sendVideo(contactId, mediaUrl, content);
+    if (!settings.whatsappToken || !settings.whatsappPhoneId) {
+      sendError = 'WhatsApp credentials not set';
+      await logToDb('WARN', 'API', `WhatsApp não está configurado para envio real. Salvando mensagem localmente de forma simulada.`);
+    } else {
+      try {
+        if (type === 'text') {
+          result = await sendText(contactId, content);
+        } else if (type === 'audio') {
+          result = await sendAudio(contactId, mediaUrl);
+        } else if (type === 'image') {
+          result = await sendImage(contactId, mediaUrl, content);
+        } else if (type === 'document') {
+          result = await sendDocument(contactId, mediaUrl, 'documento', content);
+        } else if (type === 'video') {
+          result = await sendVideo(contactId, mediaUrl, content);
+        }
+      } catch (apiError) {
+        sendError = apiError.message || 'Meta WhatsApp API Error';
+        await logToDb('ERROR', 'API', `Erro retornado pela API do WhatsApp ao enviar mensagem manual: ${sendError}`);
       }
     }
 
@@ -94,7 +109,8 @@ export async function POST(request) {
         senderType: 'HUMAN',
         type,
         content: content || '',
-        mediaUrl: mediaUrl || ''
+        mediaUrl: mediaUrl || '',
+        sendError: sendError || ''
       }
     });
 
@@ -107,7 +123,7 @@ export async function POST(request) {
       }
     });
 
-    await logToDb('INFO', 'API', `Mensagem manual registrada e enviada com sucesso para ${contactId}. ID: ${messageId}`);
+    await logToDb('INFO', 'API', `Mensagem manual registrada com sucesso para ${contactId}. ID: ${messageId}`);
     return NextResponse.json(savedMessage);
   } catch (error) {
     await logToDb('ERROR', 'API', `Erro ao enviar mensagem manual para o contato ${contactId}: ${error.message}`, {
@@ -119,23 +135,31 @@ export async function POST(request) {
   }
 }
 
-// PUT: Toggle Bot Mode (AUTO) vs Manual Mode (MANUAL)
+// PUT: Update contact details (status, name, email, notes, tags, avatarUrl)
 export async function PUT(request) {
   try {
-    const { contactId, status } = await request.json();
+    const { contactId, status, name, email, notes, tags, avatarUrl } = await request.json();
 
-    if (!contactId || !status) {
-      return NextResponse.json({ error: 'Missing contactId or status' }, { status: 400 });
+    if (!contactId) {
+      return NextResponse.json({ error: 'Missing contactId' }, { status: 400 });
     }
+
+    const dataToUpdate = {};
+    if (status !== undefined) dataToUpdate.status = status;
+    if (name !== undefined) dataToUpdate.name = name;
+    if (email !== undefined) dataToUpdate.email = email;
+    if (notes !== undefined) dataToUpdate.notes = notes;
+    if (tags !== undefined) dataToUpdate.tags = tags;
+    if (avatarUrl !== undefined) dataToUpdate.avatarUrl = avatarUrl;
 
     const updatedContact = await prisma.contact.update({
       where: { id: contactId },
-      data: { status }
+      data: dataToUpdate
     });
 
     return NextResponse.json(updatedContact);
   } catch (error) {
-    console.error('Error updating bot status:', error);
-    return NextResponse.json({ error: 'Failed to update status' }, { status: 500 });
+    console.error('Error updating contact:', error);
+    return NextResponse.json({ error: 'Failed to update contact' }, { status: 500 });
   }
 }

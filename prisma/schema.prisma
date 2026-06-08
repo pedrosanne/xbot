@@ -36,9 +36,13 @@ model Agent {
 }
 
 model Contact {
-  id              String    @id // WhatsApp ID (número de telefone, ex: "5511999999999")
+  id              String    @id
   name            String    @default("Cliente WhatsApp")
   profileName     String    @default("")
+  email           String    @default("")
+  notes           String    @default("")
+  tags            String    @default("")
+  avatarUrl       String    @default("")
   status          String    @default("AUTO") // "AUTO" ou "MANUAL" (transbordo humano)
   botMode         String    @default("FLOW") // "FLOW" ou "IA"
   currentStepId   String    @default("")
@@ -58,6 +62,7 @@ model Message {
   type        String   // "text", "image", "audio", "video", "document"
   content     String   // Texto ou legenda da mídia
   mediaUrl    String   @default("") // Caminho local do arquivo salvo no Next.js public
+  sendError   String   @default("") // Erro de entrega se falhar
   timestamp   DateTime @default(now())
 }
 
