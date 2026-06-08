@@ -77,9 +77,14 @@ export async function POST(request) {
     const type = message.type;
     let content = '';
     let mediaUrl = '';
+    let buttonId = '';
 
     if (type === 'text') {
       content = message.text?.body || '';
+    } else if (type === 'interactive') {
+      const buttonReply = message.interactive?.button_reply;
+      content = buttonReply?.title || '';
+      buttonId = buttonReply?.id || '';
     } else if (type === 'audio') {
       const mediaId = message.audio?.id;
       const mimeType = message.audio?.mime_type || 'audio/ogg';
@@ -114,7 +119,8 @@ export async function POST(request) {
       mediaUrl,
       timestamp: parseInt(message.timestamp) * 1000, // WhatsApp timestamp is in seconds
       profileName,
-      name: profileName || contactId
+      name: profileName || contactId,
+      ...(buttonId && { buttonId })
     };
 
     // Run enqueue asynchronously to avoid blocking the webhook response

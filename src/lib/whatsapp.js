@@ -102,6 +102,29 @@ export async function sendVideo(to, videoUrl, caption = '') {
   return sendWhatsAppMessage(payload);
 }
 
+export async function sendButtons(to, bodyText, buttons) {
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: bodyText },
+      action: {
+        buttons: buttons.slice(0, 3).map((btn) => ({
+          type: 'reply',
+          reply: {
+            id: btn.id,
+            title: btn.title.substring(0, 20),
+          },
+        })),
+      },
+    },
+  };
+  return sendWhatsAppMessage(payload);
+}
+
 // Downloads media from Meta Servers to local storage
 export async function downloadWhatsAppMedia(mediaId, mimeType) {
   const settings = await getSystemSettings();
