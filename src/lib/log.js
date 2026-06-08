@@ -16,18 +16,16 @@ export async function logToDb(level, category, message, details = '') {
     // Output to stdout as well
     console.log(`[${level}] [${category}] ${message} ${detailStr ? '- details available' : ''}`);
 
-    // Fire-and-forget: do not await so it does not block execution threads
-    prisma.log.create({
+    // Aguarda a gravação no banco de dados para evitar thread suspensa na Vercel
+    await prisma.log.create({
       data: {
         level,
         category,
         message,
         details: detailStr
       }
-    }).catch(err => {
-      console.error('Prisma failed to write log to Database:', err);
     });
   } catch (err) {
-    console.error('Error in logToDb utility:', err);
+    console.error('Error in logToDb utility or Prisma failed to write log:', err);
   }
 }

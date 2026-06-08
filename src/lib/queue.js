@@ -4,20 +4,13 @@ import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons } 
 import { textToSpeech } from './tts';
 import { logToDb } from './log';
 
-// Global queue storage to survive Next.js dev server hot-reloads
-const globalForQueue = global;
-if (!globalForQueue.messageQueues) {
-  globalForQueue.messageQueues = new Map(); // contactId -> { messages: [], timeout: null }
-}
-
-const queues = globalForQueue.messageQueues;
-const DEBOUNCE_MS = 2500; // Wait 2.5 seconds to group consecutive messages
+// Removida a fila de debounce em memória que causava timeouts e instabilidade na Vercel
 
 export async function enqueueMessage(contactId, messageData) {
   try {
     await logToDb('INFO', 'SYSTEM', `Mensagem recebida do contato ${contactId}. Tipo: ${messageData.type}`, { content: messageData.content });
 
-    // 1. Ensure contact exists in database
+    // 1. Garante que o contato existe no banco de dados
     let contact = await prisma.contact.findUnique({
       where: { id: contactId }
     });
@@ -34,13 +27,13 @@ export async function enqueueMessage(contactId, messageData) {
       });
     } else if (messageData.profileName && contact.profileName !== messageData.profileName) {
       await logToDb('INFO', 'DATABASE', `Atualizando nome de perfil do contato ${contactId}: ${messageData.profileName}`);
-      await prisma.contact.update({
+      contact = await prisma.contact.update({
         where: { id: contactId },
         data: { profileName: messageData.profileName }
       });
     }
 
-    // 2. Save incoming message to DB
+    // 2. Salva a mensagem recebida no banco de dados
     await prisma.message.create({
       data: {
         id: messageData.id,
@@ -54,34 +47,20 @@ export async function enqueueMessage(contactId, messageData) {
       }
     });
 
-    // Update contact's last interaction
-    await prisma.contact.update({
+    // Atualiza a última interação do contato
+    contact = await prisma.contact.update({
       where: { id: contactId },
       data: { lastInteraction: new Date() }
     });
 
-    // 3. Check if contact is in MANUAL mode (human takeover)
+    // 3. Verifica se o contato está em modo MANUAL (atendimento humano)
     if (contact.status === 'MANUAL') {
       await logToDb('INFO', 'SYSTEM', `Contato ${contactId} está em modo MANUAL. Resposta automática pausada.`);
       return;
     }
 
-    // 4. Enqueue for processing
-    if (!queues.has(contactId)) {
-      queues.set(contactId, { messages: [], timeout: null });
-    }
-
-    const contactQueue = queues.get(contactId);
-    contactQueue.messages.push(messageData);
-
-    // Clear previous timeout and set a new one (debounce)
-    if (contactQueue.timeout) {
-      clearTimeout(contactQueue.timeout);
-    }
-
-    contactQueue.timeout = setTimeout(() => {
-      processQueue(contactId);
-    }, DEBOUNCE_MS);
+    // 4. Processa a mensagem de forma síncrona e imediata
+    await processSingleMessage(contact, messageData);
 
   } catch (err) {
     await logToDb('ERROR', 'SYSTEM', `Erro ao enfileirar mensagem para o contato ${contactId}: ${err.message}`, {
@@ -91,58 +70,52 @@ export async function enqueueMessage(contactId, messageData) {
   }
 }
 
-async function processQueue(contactId) {
-  const contactQueue = queues.get(contactId);
-  if (!contactQueue || contactQueue.messages.length === 0) return;
-
-  const messagesToProcess = [...contactQueue.messages];
-  queues.delete(contactId);
-
-  await logToDb('INFO', 'FLOW', `Iniciando processamento de ${messagesToProcess.length} mensagens agrupadas do contato ${contactId}`);
+async function processSingleMessage(contact, messageData) {
+  const contactId = contact.id;
+  await logToDb('INFO', 'FLOW', `Iniciando processamento síncrono para o contato ${contactId}`);
 
   try {
-    const contact = await prisma.contact.findUnique({ where: { id: contactId } });
-    if (!contact || contact.status === 'MANUAL') {
-      await logToDb('WARN', 'FLOW', `Contato ${contactId} mudou para MANUAL durante o tempo de espera. Cancelando resposta.`);
+    // Busca o estado mais atual do contato no banco
+    const freshContact = await prisma.contact.findUnique({ where: { id: contactId } });
+    if (!freshContact || freshContact.status === 'MANUAL') {
+      await logToDb('WARN', 'FLOW', `Contato ${contactId} mudou para MANUAL ou não existe. Cancelando resposta.`);
       return;
     }
 
-    // 1. Group text messages and find media or clicked buttons
-    let groupedText = '';
-    let latestMediaUrl = '';
-    let latestMimeType = '';
+    // 1. Extrai detalhes da mensagem única
+    let text = '';
+    let mediaUrl = '';
+    let mimeType = '';
     let clickedButtonId = '';
 
-    messagesToProcess.forEach((msg) => {
-      if (msg.buttonId) {
-        clickedButtonId = msg.buttonId;
-      }
+    if (messageData.buttonId) {
+      clickedButtonId = messageData.buttonId;
+    }
 
-      if (msg.type === 'text' && msg.content) {
-        groupedText += (groupedText ? '\n' : '') + msg.content;
-      } else if (msg.type === 'interactive' && msg.content) {
-        groupedText += (groupedText ? '\n' : '') + msg.content;
-      } else if (msg.type === 'audio') {
-        groupedText += (groupedText ? '\n' : '') + `[Áudio recebido]`;
-        latestMediaUrl = msg.mediaUrl;
-        latestMimeType = 'audio/ogg';
-      } else if (msg.mediaUrl) {
-        groupedText += (groupedText ? '\n' : '') + `[Mídia enviada (${msg.type}): ${msg.content || ''}]`;
-        latestMediaUrl = msg.mediaUrl;
-        if (msg.type === 'image') latestMimeType = 'image/jpeg';
-        else if (msg.type === 'video') latestMimeType = 'video/mp4';
-        else if (msg.type === 'document') latestMimeType = 'application/pdf';
-      }
-    });
+    if (messageData.type === 'text' && messageData.content) {
+      text = messageData.content;
+    } else if (messageData.type === 'interactive' && messageData.content) {
+      text = messageData.content;
+    } else if (messageData.type === 'audio') {
+      text = `[Áudio recebido]`;
+      mediaUrl = messageData.mediaUrl;
+      mimeType = 'audio/ogg';
+    } else if (messageData.mediaUrl) {
+      text = `[Mídia enviada (${messageData.type}): ${messageData.content || ''}]`;
+      mediaUrl = messageData.mediaUrl;
+      if (messageData.type === 'image') mimeType = 'image/jpeg';
+      else if (messageData.type === 'video') mimeType = 'video/mp4';
+      else if (messageData.type === 'document') mimeType = 'application/pdf';
+    }
 
-    await logToDb('INFO', 'FLOW', `Entrada consolidada - Texto: "${groupedText}", Botão ID: "${clickedButtonId}"`);
+    await logToDb('INFO', 'FLOW', `Entrada consolidada - Texto: "${text}", Botão ID: "${clickedButtonId}"`);
 
-    const normalizedInput = groupedText.trim().toLowerCase();
+    const normalizedInput = text.trim().toLowerCase();
 
-    // 2. Load active flows
+    // 2. Carrega os fluxos ativos
     const activeFlows = await prisma.flow.findMany({ where: { isActive: true } });
 
-    // 3. Check if user typed a keyword to trigger a NEW flow
+    // 3. Verifica se o usuário digitou uma palavra-chave para iniciar um NOVO fluxo
     let triggeredFlow = null;
     if (!clickedButtonId && normalizedInput) {
       triggeredFlow = activeFlows.find(f => {
@@ -154,18 +127,18 @@ async function processQueue(contactId) {
 
     if (triggeredFlow) {
       await logToDb('INFO', 'FLOW', `Fluxo '${triggeredFlow.name}' disparado por palavra-chave para o contato ${contactId}`);
-      await startFlowForContact(contact, triggeredFlow);
+      await startFlowForContact(freshContact, triggeredFlow);
       return;
     }
 
-    // 4. Handle ongoing Flow execution
-    if (contact.botMode === 'FLOW' && contact.activeFlowId) {
-      const currentFlow = activeFlows.find(f => f.id === contact.activeFlowId);
+    // 4. Se o contato já estiver em execução de um fluxo
+    if (freshContact.botMode === 'FLOW' && freshContact.activeFlowId) {
+      const currentFlow = activeFlows.find(f => f.id === freshContact.activeFlowId);
       if (currentFlow) {
         const steps = JSON.parse(currentFlow.steps || '[]');
-        let currentStep = steps.find(s => s.id === contact.currentStepId);
+        let currentStep = steps.find(s => s.id === freshContact.currentStepId);
         
-        // If currentStepId is empty, start from the first step in the flow
+        // Se currentStepId estiver vazio, começa da primeira etapa do fluxo
         if (!currentStep && steps.length > 0) {
           currentStep = steps[0];
         }
@@ -183,20 +156,20 @@ async function processQueue(contactId) {
 
           if (matchedOption) {
             await logToDb('INFO', 'FLOW', `Opção de botão correspondente encontrada: '${matchedOption.title}'. Executando ação: ${matchedOption.action}`);
-            await executeFlowOption(contact, currentFlow, steps, matchedOption, groupedText, latestMediaUrl, latestMimeType);
+            await executeFlowOption(freshContact, currentFlow, steps, matchedOption, text, mediaUrl, mimeType);
             return;
           } else {
-            // User typed something else. Fallback to AI if configured, otherwise repeat current step.
+            // Entrada livre de texto no fluxo. Fallback para IA se configurado, senão repete a etapa.
             const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
             if (activeAgent) {
               await logToDb('INFO', 'AI', `Entrada de texto livre no fluxo. Acionando fallback híbrido com Gemini AI.`);
-              const aiTextResponse = await generateAIResponse(contactId, groupedText, latestMediaUrl, latestMimeType);
+              const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType);
               
-              // Send AI reply
+              // Envia resposta da IA
               await sendText(contactId, aiTextResponse);
               await saveOutgoingMessage(`bot_${Date.now()}_ai_hybrid`, contactId, 'text', '', aiTextResponse);
 
-              // Repeat menu
+              // Repete o menu de opções
               await logToDb('INFO', 'FLOW', `Reenviando opções da etapa '${currentStep.id}' após resposta da IA.`);
               await sendStepResponse(contactId, currentStep);
               return;
@@ -211,38 +184,38 @@ async function processQueue(contactId) {
       }
     }
 
-    // 5. Handle AI Mode
+    // 5. Modo IA Puro
     const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
-    if (contact.botMode === 'IA' && activeAgent) {
+    if (freshContact.botMode === 'IA' && activeAgent) {
       await logToDb('INFO', 'AI', `Contato está em modo IA puro. Chamando Gemini...`);
-      const aiTextResponse = await generateAIResponse(contactId, groupedText, latestMediaUrl, latestMimeType);
+      const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType);
       await sendBotResponse(contactId, aiTextResponse);
       return;
     }
 
-    // 6. Check for a "welcome" flow if no other flows or active modes are running
+    // 6. Verifica se existe um fluxo de "boas-vindas" padrão
     const welcomeFlow = activeFlows.find(f => f.trigger === 'welcome');
     if (welcomeFlow) {
       await logToDb('INFO', 'FLOW', `Disparando fluxo de boas-vindas padrão (Welcome Flow) para o contato ${contactId}`);
-      await startFlowForContact(contact, welcomeFlow);
+      await startFlowForContact(freshContact, welcomeFlow);
       return;
     }
 
-    // 7. Last Fallback: route to AI Agent
+    // 7. Último Fallback: roteia para o Agente de IA
     if (activeAgent) {
       await logToDb('INFO', 'AI', `Sem fluxo ativo. Definindo contato ${contactId} para modo IA e chamando Gemini.`);
       await prisma.contact.update({
         where: { id: contactId },
         data: { botMode: 'IA' }
       });
-      const aiTextResponse = await generateAIResponse(contactId, groupedText, latestMediaUrl, latestMimeType);
+      const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType);
       await sendBotResponse(contactId, aiTextResponse);
     } else {
       await logToDb('WARN', 'SYSTEM', 'Nenhuma persona de IA ativa ou fluxo de chatbot encontrado para responder à mensagem.');
     }
 
   } catch (error) {
-    await logToDb('ERROR', 'SYSTEM', `Erro crítico ao processar fila do contato ${contactId}: ${error.message}`, {
+    await logToDb('ERROR', 'SYSTEM', `Erro crítico ao processar mensagem do contato ${contactId}: ${error.message}`, {
       error: error.message,
       stack: error.stack
     });

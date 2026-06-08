@@ -133,13 +133,8 @@ export async function POST(request) {
 
     await logToDb('INFO', 'WEBHOOK', `Enfileirando mensagem para o contato ${contactId}`, messageData);
 
-    // Enqueue
-    enqueueMessage(contactId, messageData).catch((err) => {
-      logToDb('ERROR', 'WEBHOOK', `Erro ao enfileirar mensagem para o contato ${contactId}`, {
-        error: err.message,
-        stack: err.stack
-      });
-    });
+    // Processa de forma síncrona aguardando a finalização antes de responder à chamada de API
+    await enqueueMessage(contactId, messageData);
 
     return NextResponse.json({ status: 'success' });
   } catch (error) {

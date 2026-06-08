@@ -175,20 +175,29 @@ export async function downloadWhatsAppMedia(mediaId, mimeType) {
     // 3. Define local filename & path
     const extension = getExtensionFromMimeType(mimeType);
     const filename = `${mediaId}${extension}`;
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-
-    // Ensure directory exists
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    
+    // Verifica se estamos no ambiente da Vercel ou se a pasta public não existe/não é gravável
+    const isVercel = process.env.VERCEL === '1' || !fs.existsSync(path.join(process.cwd(), 'public'));
+    
+    let filePath;
+    let fileUrl;
+    
+    if (isVercel) {
+      filePath = path.join('/tmp', filename);
+      fileUrl = `/api/uploads/${filename}`;
+    } else {
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      filePath = path.join(uploadDir, filename);
+      fileUrl = `/uploads/${filename}`;
     }
 
-    const filePath = path.join(uploadDir, filename);
     fs.writeFileSync(filePath, buffer);
+    console.log(`Saved media file at: ${filePath}`);
 
-    console.log(`Saved media file locally at: ${filePath}`);
-
-    // Return the web-accessible URL path in Next.js
-    return `/uploads/${filename}`;
+    return fileUrl;
   } catch (error) {
     console.error('Error downloading WhatsApp media:', error);
     return '';

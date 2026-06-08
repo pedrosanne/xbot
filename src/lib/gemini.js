@@ -76,9 +76,16 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
 
   promptParts.push(systemPrompt);
 
-  // 5. If there is an active media attachment (multimodal analysis)
+  // Se houver anexo de mídia ativo
   if (mediaUrl && mimeType) {
-    const localFilePath = path.join(process.cwd(), 'public', mediaUrl);
+    let localFilePath;
+    if (mediaUrl.startsWith('/api/uploads/')) {
+      const filename = mediaUrl.replace('/api/uploads/', '');
+      localFilePath = path.join('/tmp', filename);
+    } else {
+      localFilePath = path.join(process.cwd(), 'public', mediaUrl);
+    }
+
     if (fs.existsSync(localFilePath)) {
       try {
         const fileBuffer = fs.readFileSync(localFilePath);
