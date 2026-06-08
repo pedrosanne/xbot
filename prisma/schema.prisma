@@ -1,0 +1,68 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Setting {
+  id                  String   @id @default("system")
+  whatsappToken       String   @default("")
+  whatsappPhoneId     String   @default("")
+  whatsappVerifyToken String   @default("antigravity_token_123")
+  geminiApiKey        String   @default("")
+  elevenLabsApiKey    String   @default("")
+  elevenLabsVoiceId   String   @default("21m00Tcm4TlvDq8ikWAM") // Rachel
+  updatedAt           DateTime @updatedAt
+}
+
+model Agent {
+  id           String   @id @default(uuid())
+  name         String
+  description  String   @default("")
+  systemPrompt String   @default("Você é um atendente virtual simpático da nossa empresa. Responda de maneira clara, prestativa e natural, simulando um contato humano.")
+  model        String   @default("gemini-1.5-flash")
+  temperature  Float    @default(0.7)
+  isActive     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model Contact {
+  id              String    @id // WhatsApp ID (número de telefone, ex: "5511999999999")
+  name            String    @default("Cliente WhatsApp")
+  profileName     String    @default("")
+  status          String    @default("AUTO") // "AUTO" ou "MANUAL" (transbordo humano)
+  lastInteraction DateTime  @default(now())
+  messages        Message[]
+  createdAt       DateTime  @default(now())
+}
+
+model Message {
+  id          String   @id // Message ID retornado pelo WhatsApp
+  contactId   String
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  direction   String   // "INCOMING" (cliente para bot) ou "OUTGOING" (bot/humano para cliente)
+  senderType  String   // "BOT", "HUMAN", "CLIENT"
+  type        String   // "text", "image", "audio", "video", "document"
+  content     String   // Texto ou legenda da mídia
+  mediaUrl    String   @default("") // Caminho local do arquivo salvo no Next.js public
+  timestamp   DateTime @default(now())
+}
+
+model ProcessedWebhook {
+  id          String   @id // Message ID do WhatsApp para evitar processar duplicados
+  processedAt DateTime @default(now())
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String   // Hashed password
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
