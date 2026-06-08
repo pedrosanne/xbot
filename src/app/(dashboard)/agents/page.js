@@ -269,6 +269,9 @@ export default function AgentsPage() {
       if (res.ok) {
         closeFlowEditor();
         fetchFlows();
+      } else {
+        const errorData = await res.json();
+        alert(`Erro ao salvar fluxo: ${errorData.error || 'Erro desconhecido'}`);
       }
     } catch (err) {
       console.error('Error saving flow:', err);
