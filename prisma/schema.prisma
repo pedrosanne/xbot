@@ -123,3 +123,12 @@ model Call {
   endedReason   String   @default("")
   createdAt     DateTime @default(now())
 }
+
+model Upload {
+  id        String   @id @default(uuid())
+  filename  String   @unique
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+

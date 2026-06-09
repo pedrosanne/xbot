@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
+import { prisma } from '@/lib/prisma';
 import path from 'path';
 
 export async function POST(request) {
@@ -17,11 +17,16 @@ export async function POST(request) {
     // Create unique filename
     const extension = path.extname(file.name) || '.ogg';
     const filename = `manual_upload_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${extension}`;
-    const filePath = path.join('/tmp', filename);
 
-    // Save file locally
-    fs.writeFileSync(filePath, buffer);
-    console.log(`Manual upload saved to: ${filePath}`);
+    // Save to database
+    await prisma.upload.create({
+      data: {
+        filename,
+        mimeType: file.type || 'application/octet-stream',
+        data: buffer
+      }
+    });
+    console.log(`Manual upload saved to database: ${filename}`);
 
     const fileUrl = `/api/uploads/${filename}`;
     return NextResponse.json({ success: true, url: fileUrl, filename: file.name });
@@ -30,3 +35,4 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Falha ao processar upload.' }, { status: 500 });
   }
 }
+

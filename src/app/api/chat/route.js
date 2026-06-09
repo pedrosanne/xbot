@@ -70,6 +70,15 @@ export async function POST(request) {
 
     await logToDb('INFO', 'API', `Solicitação de envio de mensagem manual para o contato ${contactId}. Tipo: ${type}`, { content });
 
+    // Convert relative mediaUrl to absolute if needed for Meta WhatsApp API
+    let absoluteMediaUrl = mediaUrl;
+    if (mediaUrl && !mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
+      const requestUrl = new URL(request.url);
+      const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+      absoluteMediaUrl = `${baseUrl}${mediaUrl}`;
+      await logToDb('INFO', 'API', `Convertendo URL de mídia relativa para absoluta: ${absoluteMediaUrl}`);
+    }
+
     // Fetch system settings to see if they are configured
     const settings = await getSystemSettings();
     let result = null;
@@ -83,13 +92,13 @@ export async function POST(request) {
         if (type === 'text') {
           result = await sendText(contactId, content);
         } else if (type === 'audio') {
-          result = await sendAudio(contactId, mediaUrl);
+          result = await sendAudio(contactId, absoluteMediaUrl);
         } else if (type === 'image') {
-          result = await sendImage(contactId, mediaUrl, content);
+          result = await sendImage(contactId, absoluteMediaUrl, content);
         } else if (type === 'document') {
-          result = await sendDocument(contactId, mediaUrl, 'documento', content);
+          result = await sendDocument(contactId, absoluteMediaUrl, 'documento', content);
         } else if (type === 'video') {
-          result = await sendVideo(contactId, mediaUrl, content);
+          result = await sendVideo(contactId, absoluteMediaUrl, content);
         }
       } catch (apiError) {
         sendError = apiError.message || 'Meta WhatsApp API Error';

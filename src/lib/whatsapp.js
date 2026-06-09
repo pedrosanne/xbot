@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { getSystemSettings } from './settings';
 import { logToDb } from './log';
+import { prisma } from './prisma';
 
 const WHATSAPP_API_VERSION = 'v20.0';
 
@@ -136,7 +137,7 @@ export async function sendButtons(to, bodyText, buttons) {
   return sendWhatsAppMessage(payload);
 }
 
-// Downloads media from Meta Servers to local storage
+// Downloads media from Meta Servers to database storage
 export async function downloadWhatsAppMedia(mediaId, mimeType) {
   const settings = await getSystemSettings();
   const { whatsappToken } = settings;
@@ -172,32 +173,27 @@ export async function downloadWhatsAppMedia(mediaId, mimeType) {
 
     const buffer = Buffer.from(await mediaFileResponse.arrayBuffer());
 
-    // 3. Define local filename & path
+    // 3. Define local filename
     const extension = getExtensionFromMimeType(mimeType);
     const filename = `${mediaId}${extension}`;
     
-    // Verifica se estamos no ambiente da Vercel ou se a pasta public não existe/não é gravável
-    const isVercel = process.env.VERCEL === '1' || !fs.existsSync(path.join(process.cwd(), 'public'));
-    
-    let filePath;
-    let fileUrl;
-    
-    if (isVercel) {
-      filePath = path.join('/tmp', filename);
-      fileUrl = `/api/uploads/${filename}`;
-    } else {
-      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
+    // Save to database
+    await prisma.upload.upsert({
+      where: { filename },
+      update: {
+        mimeType,
+        data: buffer
+      },
+      create: {
+        filename,
+        mimeType,
+        data: buffer
       }
-      filePath = path.join(uploadDir, filename);
-      fileUrl = `/uploads/${filename}`;
-    }
+    });
 
-    fs.writeFileSync(filePath, buffer);
-    console.log(`Saved media file at: ${filePath}`);
+    console.log(`Saved WhatsApp media to database: ${filename}`);
 
-    return fileUrl;
+    return `/api/uploads/${filename}`;
   } catch (error) {
     console.error('Error downloading WhatsApp media:', error);
     return '';

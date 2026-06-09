@@ -262,20 +262,21 @@ async function sendStepResponse(contactId, step) {
   // Send media first if present
   if (media && media.type && media.url) {
     try {
-      await logToDb('INFO', 'API', `Enviando mídia do tipo '${media.type}' para ${contactId} na etapa '${step.id}'`);
+      const absoluteMediaUrl = getAbsoluteUrl(media.url);
+      await logToDb('INFO', 'API', `Enviando mídia do tipo '${media.type}' para ${contactId} na etapa '${step.id}': ${absoluteMediaUrl}`);
       const caption = media.caption || '';
 
       if (media.type === 'image') {
-        await sendImage(contactId, media.url, caption);
+        await sendImage(contactId, absoluteMediaUrl, caption);
         await saveOutgoingMessage(`bot_${Date.now()}_media_img`, contactId, 'image', media.url, caption);
       } else if (media.type === 'video') {
-        await sendVideo(contactId, media.url, caption);
+        await sendVideo(contactId, absoluteMediaUrl, caption);
         await saveOutgoingMessage(`bot_${Date.now()}_media_vid`, contactId, 'video', media.url, caption);
       } else if (media.type === 'audio') {
-        await sendAudio(contactId, media.url);
+        await sendAudio(contactId, absoluteMediaUrl);
         await saveOutgoingMessage(`bot_${Date.now()}_media_aud`, contactId, 'audio', media.url, 'Áudio do fluxo');
       } else if (media.type === 'document') {
-        await sendDocument(contactId, media.url, 'documento', caption);
+        await sendDocument(contactId, absoluteMediaUrl, 'documento', caption);
         await saveOutgoingMessage(`bot_${Date.now()}_media_doc`, contactId, 'document', media.url, caption);
       } else if (media.type === 'link') {
         // For links, prepend to the text message
@@ -439,7 +440,8 @@ async function sendBotResponse(contactId, aiTextResponse) {
 
   if (imageUrlToSend) {
     try {
-      await sendImage(contactId, imageUrlToSend, textToSend);
+      const absoluteImgUrl = getAbsoluteUrl(imageUrlToSend);
+      await sendImage(contactId, absoluteImgUrl, textToSend);
       await saveOutgoingMessage(botMessageId + '_img', contactId, 'image', imageUrlToSend, textToSend);
       textToSend = '';
     } catch (err) {
@@ -449,7 +451,8 @@ async function sendBotResponse(contactId, aiTextResponse) {
 
   if (docUrlToSend) {
     try {
-      await sendDocument(contactId, docUrlToSend, 'documento', textToSend);
+      const absoluteDocUrl = getAbsoluteUrl(docUrlToSend);
+      await sendDocument(contactId, absoluteDocUrl, 'documento', textToSend);
       await saveOutgoingMessage(botMessageId + '_doc', contactId, 'document', docUrlToSend, textToSend);
       textToSend = '';
     } catch (err) {
@@ -484,4 +487,13 @@ async function saveOutgoingMessage(id, contactId, type, mediaUrl = '', content =
     where: { id: contactId },
     data: { lastInteraction: new Date() }
   });
+}
+
+function getAbsoluteUrl(urlPath) {
+  if (!urlPath) return '';
+  if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
+    return urlPath;
+  }
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://domain.com';
+  return `${baseUrl}${urlPath}`;
 }
