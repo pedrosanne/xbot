@@ -172,7 +172,21 @@ async function processSingleMessage(contact, messageData) {
             await executeFlowOption(freshContact, currentFlow, steps, matchedOption, text, mediaUrl, mimeType);
             return;
           } else {
-            // Entrada livre de texto no fluxo. Fallback para IA se configurado, senão repete a etapa.
+            // Se houver transição direta configurada para entrada livre / fallback
+            if (currentStep.nextStepId) {
+              const nextStep = steps.find(s => s.id === currentStep.nextStepId);
+              if (nextStep) {
+                await logToDb('INFO', 'FLOW', `Entrada de texto livre. Avançando contato para a próxima etapa configurada '${nextStep.id}'`);
+                await prisma.contact.update({
+                  where: { id: contactId },
+                  data: { currentStepId: nextStep.id }
+                });
+                await sendStepResponse(contactId, nextStep, steps);
+                return;
+              }
+            }
+
+            // Entrada livre de texto no fluxo (sem nextStepId). Fallback para IA se configurado, senão repete a etapa.
             const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
             if (activeAgent) {
               await logToDb('INFO', 'AI', `Entrada de texto livre no fluxo. Acionando fallback híbrido com Gemini AI.`);
@@ -184,12 +198,12 @@ async function processSingleMessage(contact, messageData) {
 
               // Repete o menu de opções
               await logToDb('INFO', 'FLOW', `Reenviando opções da etapa '${currentStep.id}' após resposta da IA.`);
-              await sendStepResponse(contactId, currentStep);
+              await sendStepResponse(contactId, currentStep, steps);
               return;
             } else {
               await logToDb('WARN', 'FLOW', `Entrada inválida. Nenhuma opção selecionada e nenhuma IA configurada. Repetindo etapa.`);
               await sendText(contactId, "Desculpe, opção inválida. Por favor, escolha uma das opções abaixo:");
-              await sendStepResponse(contactId, currentStep);
+              await sendStepResponse(contactId, currentStep, steps);
               return;
             }
           }
@@ -251,13 +265,23 @@ async function startFlowForContact(contact, flow) {
     }
   });
 
-  await sendStepResponse(contact.id, startStep);
+  await sendStepResponse(contact.id, startStep, steps);
 }
 
-async function sendStepResponse(contactId, step) {
+async function sendStepResponse(contactId, step, steps) {
   const text = step.text || '';
   const options = step.buttons || [];
   const media = step.media || null;
+
+  // Typing delay simulation
+  if (step.delaySeconds) {
+    try {
+      await logToDb('INFO', 'FLOW', `Simulando atraso de digitação de ${step.delaySeconds}s para o contato ${contactId} na etapa '${step.id}'`);
+      await new Promise(resolve => setTimeout(resolve, step.delaySeconds * 1000));
+    } catch (err) {
+      console.error('Error simulating typing delay:', err);
+    }
+  }
 
   // Send media first if present
   if (media && media.type && media.url) {
@@ -320,6 +344,19 @@ async function sendStepResponse(contactId, step) {
     await sendText(contactId, finalText);
     await saveOutgoingMessage(`bot_${Date.now()}_text`, contactId, 'text', '', finalText);
   }
+
+  // Auto-advance if this step has no buttons and has nextStepId (direct transition sequence)
+  if (options.length === 0 && step.nextStepId && steps) {
+    const nextStep = steps.find(s => s.id === step.nextStepId);
+    if (nextStep && nextStep.id !== step.id) {
+      await logToDb('INFO', 'FLOW', `Auto-avançando etapa sem botões de '${step.id}' para '${nextStep.id}'`);
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: { currentStepId: nextStep.id }
+      });
+      await sendStepResponse(contactId, nextStep, steps);
+    }
+  }
 }
 
 async function executeFlowOption(contact, flow, steps, option, groupedText, latestMediaUrl, latestMimeType) {
@@ -331,7 +368,7 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
         where: { id: contact.id },
         data: { currentStepId: nextStep.id }
       });
-      await sendStepResponse(contact.id, nextStep);
+      await sendStepResponse(contact.id, nextStep, steps);
     } else {
       await logToDb('WARN', 'FLOW', `A etapa de destino '${option.targetStepId}' não foi encontrada. Finalizando fluxo.`);
       await sendText(contact.id, "Fluxo finalizado.");
@@ -378,6 +415,12 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
       `Cliente solicitou atendimento humano no fluxo.`,
       `/chat?contactId=${contact.id}`
     );
+  } else if (option.action === 'end_flow') {
+    await logToDb('INFO', 'SYSTEM', `Finalizando fluxo para o contato ${contact.id}`);
+    const endMessage = option.text || "Atendimento finalizado. Obrigado!";
+    await sendText(contact.id, endMessage);
+    await saveOutgoingMessage(`bot_${Date.now()}_end_flow`, contact.id, 'text', '', endMessage);
+    await resetContactFlow(contact.id);
   }
 }
 

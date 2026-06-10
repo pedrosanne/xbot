@@ -58,6 +58,10 @@ export default function AgentsPage() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // States for visual drag-to-connect
+  const [connectingFrom, setConnectingFrom] = useState(null); // { nodeId, buttonId }
+  const [connectingMousePos, setConnectingMousePos] = useState(null); // { x, y }
+
   // Canvas state
   const canvasRef = useRef(null);
   const [canvasOffset, setCanvasOffset] = useState({ x: 60, y: 80 });
@@ -487,12 +491,58 @@ export default function AgentsPage() {
       const my = (e.clientY - wrapperRect.top - canvasOffset.y) / canvasZoom - dragNode.offsetY;
       updateNode(dragNode.id, { x: mx, y: my });
     }
-  }, [isPanning, panStart, dragNode, canvasOffset, canvasZoom]);
+    if (connectingFrom) {
+      const wrapperRect = canvasRef.current?.getBoundingClientRect();
+      if (!wrapperRect) return;
+      const mx = (e.clientX - wrapperRect.left - canvasOffset.x) / canvasZoom;
+      const my = (e.clientY - wrapperRect.top - canvasOffset.y) / canvasZoom;
+      setConnectingMousePos({ x: mx, y: my });
+    }
+  }, [isPanning, panStart, dragNode, canvasOffset, canvasZoom, connectingFrom]);
 
   const handleCanvasMouseUp = useCallback(() => {
     setIsPanning(false);
     setDragNode(null);
+    setConnectingFrom(null);
+    setConnectingMousePos(null);
   }, []);
+
+  const handlePortMouseDown = (e, nodeId, buttonId = null) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const wrapperRect = canvasRef.current?.getBoundingClientRect();
+    if (!wrapperRect) return;
+    const mx = (e.clientX - wrapperRect.left - canvasOffset.x) / canvasZoom;
+    const my = (e.clientY - wrapperRect.top - canvasOffset.y) / canvasZoom;
+    setConnectingFrom({ nodeId, buttonId });
+    setConnectingMousePos({ x: mx, y: my });
+  };
+
+  const handleNodeMouseUp = (e, targetNodeId) => {
+    if (!connectingFrom) return;
+    e.stopPropagation();
+
+    if (targetNodeId !== connectingFrom.nodeId) {
+      setNodes(prev => prev.map(n => {
+        if (n.id !== connectingFrom.nodeId) return n;
+
+        if (connectingFrom.buttonId) {
+          // Update button connection
+          const updatedButtons = (n.buttons || []).map(b => {
+            if (b.id !== connectingFrom.buttonId) return b;
+            return { ...b, action: 'go_to_step', targetStepId: targetNodeId };
+          });
+          return { ...n, buttons: updatedButtons };
+        } else {
+          // Update direct fallback connection
+          return { ...n, nextStepId: targetNodeId };
+        }
+      }));
+    }
+
+    setConnectingFrom(null);
+    setConnectingMousePos(null);
+  };
 
   useEffect(() => {
     window.addEventListener('mousemove', handleCanvasMouseMove);
@@ -537,22 +587,60 @@ export default function AgentsPage() {
     setCanvasOffset({ x: -minX * zoom + 40, y: -minY * zoom + 60 });
   };
 
-  // ==========================================
-  // CANVAS: Compute connection lines
-  // ==========================================
   const getConnections = () => {
     const conns = [];
     for (const node of nodes) {
-      for (const btn of (node.buttons || [])) {
+      // 1. Button connections
+      const btns = node.buttons || [];
+      btns.forEach((btn, bi) => {
         if (btn.action === 'go_to_step' && btn.targetStepId) {
           const target = nodes.find(n => n.id === btn.targetStepId);
           if (target) {
-            conns.push({ fromId: node.id, toId: target.id, fromX: node.x + 130, fromY: node.y + getNodeHeight(node), toX: target.x + 130, toY: target.y });
+            const h = getNodeHeight(node);
+            const btnY = node.y + (h - (btns.length - bi) * 28) + 14;
+            conns.push({
+              type: 'button',
+              fromId: node.id,
+              toId: target.id,
+              fromX: node.x + 260,
+              fromY: btnY,
+              toX: target.x + 130,
+              toY: target.y
+            });
           }
+        }
+      });
+      // 2. Direct/fallback connection
+      if (node.nextStepId) {
+        const target = nodes.find(n => n.id === node.nextStepId);
+        if (target) {
+          conns.push({
+            type: 'direct',
+            fromId: node.id,
+            toId: target.id,
+            fromX: node.x + 130,
+            fromY: node.y + getNodeHeight(node),
+            toX: target.x + 130,
+            toY: target.y
+          });
         }
       }
     }
     return conns;
+  };
+
+  const getPortPosition = (nodeId, buttonId = null) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return null;
+    if (buttonId) {
+      const bi = (node.buttons || []).findIndex(b => b.id === buttonId);
+      if (bi === -1) return null;
+      const h = getNodeHeight(node);
+      const btnY = node.y + (h - (node.buttons.length - bi) * 28) + 14;
+      return { x: node.x + 260, y: btnY };
+    } else {
+      return { x: node.x + 130, y: node.y + getNodeHeight(node) };
+    }
   };
 
   const getNodeHeight = (node) => {
@@ -730,15 +818,34 @@ export default function AgentsPage() {
                 const dx = conn.toX - conn.fromX;
                 const dy = conn.toY - conn.fromY;
                 const cp = Math.abs(dy) * 0.5 + 40;
-                const path = `M ${conn.fromX} ${conn.fromY} C ${conn.fromX} ${conn.fromY + cp}, ${conn.toX} ${conn.toY - cp}, ${conn.toX} ${conn.toY}`;
+                const path = conn.type === 'button'
+                  ? `M ${conn.fromX} ${conn.fromY} C ${conn.fromX + cp} ${conn.fromY}, ${conn.toX} ${conn.toY - cp}, ${conn.toX} ${conn.toY}`
+                  : `M ${conn.fromX} ${conn.fromY} C ${conn.fromX} ${conn.fromY + cp}, ${conn.toX} ${conn.toY - cp}, ${conn.toX} ${conn.toY}`;
                 const isHighlighted = selectedNodeId === conn.fromId || selectedNodeId === conn.toId;
                 return (
                   <g key={i}>
-                    <path d={path} className={`flow-connection-path animated ${isHighlighted ? 'highlighted' : ''}`} />
+                    <path 
+                      d={path} 
+                      className={`flow-connection-path animated ${isHighlighted ? 'highlighted' : ''}`} 
+                      style={conn.type === 'direct' ? { stroke: 'rgba(96,165,250,0.5)', strokeDasharray: '4 4' } : undefined}
+                    />
                     <circle cx={conn.toX} cy={conn.toY} r="3" fill={isHighlighted ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)'} />
                   </g>
                 );
               })}
+              {connectingFrom && connectingMousePos && (() => {
+                const startPos = getPortPosition(connectingFrom.nodeId, connectingFrom.buttonId);
+                if (!startPos) return null;
+                const dx = connectingMousePos.x - startPos.x;
+                const dy = connectingMousePos.y - startPos.y;
+                const cp = Math.abs(dy) * 0.5 + 40;
+                const path = connectingFrom.buttonId
+                  ? `M ${startPos.x} ${startPos.y} C ${startPos.x + cp} ${startPos.y}, ${connectingMousePos.x} ${connectingMousePos.y - cp}, ${connectingMousePos.x} ${connectingMousePos.y}`
+                  : `M ${startPos.x} ${startPos.y} C ${startPos.x} ${startPos.y + cp}, ${connectingMousePos.x} ${connectingMousePos.y - cp}, ${connectingMousePos.x} ${connectingMousePos.y}`;
+                return (
+                  <path d={path} className="flow-connection-path preview-connection" style={{ strokeDasharray: '4 4', stroke: '#4ade80', strokeWidth: 2, fill: 'none' }} />
+                );
+              })()}
             </svg>
 
             {/* Nodes */}
@@ -748,13 +855,14 @@ export default function AgentsPage() {
                 className={`flow-node ${selectedNodeId === node.id ? 'selected' : ''}`}
                 style={{ left: node.x, top: node.y }}
                 onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
+                onMouseUp={(e) => handleNodeMouseUp(e, node.id)}
                 onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
               >
                 {/* Input port */}
-                <div className="flow-port port-in" />
+                <div className="flow-port port-in" onMouseUp={(e) => handleNodeMouseUp(e, node.id)} />
 
                 {/* Header */}
-                <div className="flow-node-header">
+                <div className="flow-node-header" onMouseUp={(e) => handleNodeMouseUp(e, node.id)}>
                   <span className={`flow-node-type-badge ${idx === 0 ? 'type-start' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'type-ia' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'type-human' : 'type-message'}`}>
                     {idx === 0 ? 'Início' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'IA' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'Humano' : 'Msg'}
                   </span>
@@ -762,13 +870,13 @@ export default function AgentsPage() {
                 </div>
 
                 {/* Body text */}
-                <div className="flow-node-body">
+                <div className="flow-node-body" onMouseUp={(e) => handleNodeMouseUp(e, node.id)}>
                   {node.text || 'Sem texto...'}
                 </div>
 
                 {/* Media indicator */}
                 {node.media && node.media.type && (
-                  <div className="flow-node-media">
+                  <div className="flow-node-media" onMouseUp={(e) => handleNodeMouseUp(e, node.id)}>
                     {mediaIcons[node.media.type] || '📎'} {node.media.type.toUpperCase()}
                     {node.media.url && <span style={{ opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>• {node.media.url.substring(0, 30)}...</span>}
                   </div>
@@ -778,18 +886,37 @@ export default function AgentsPage() {
                 {(node.buttons || []).length > 0 && (
                   <div className="flow-node-buttons">
                     {(node.buttons || []).map((btn, bi) => (
-                      <div key={bi} className="flow-node-btn">
+                      <div key={bi} className="flow-node-btn" style={{ position: 'relative' }}>
                         {btn.title}
                         {btn.action === 'go_to_step' && btn.targetStepId && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → {btn.targetStepId}</span>}
                         {btn.action === 'transfer_to_ia' && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → IA</span>}
                         {btn.action === 'transfer_to_human' && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → Humano</span>}
+                        {btn.action === 'end_flow' && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → Encerrar</span>}
+                        
+                        <div 
+                          className="flow-port port-btn-out" 
+                          style={{
+                            position: 'absolute',
+                            right: '-6px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.4)',
+                            border: '1.5px solid rgba(255,255,255,0.6)',
+                            cursor: 'crosshair',
+                            zIndex: 10
+                          }}
+                          onMouseDown={(e) => handlePortMouseDown(e, node.id, btn.id)}
+                        />
                       </div>
                     ))}
                   </div>
                 )}
 
                 {/* Output port */}
-                <div className="flow-port port-out" />
+                <div className="flow-port port-out" onMouseDown={(e) => handlePortMouseDown(e, node.id)} />
               </div>
             ))}
           </div>
@@ -832,6 +959,37 @@ export default function AgentsPage() {
                   onChange={(e) => updateNode(selectedNodeId, { text: e.target.value })}
                   placeholder="Mensagem que o bot enviará..."
                 />
+              </div>
+
+              {/* Delay & Fallback Step */}
+              <div className="flow-sidebar-section" style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <h4>Delay (segundos)</h4>
+                  <input
+                    type="number"
+                    className="form-input"
+                    style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+                    min="0"
+                    max="10"
+                    placeholder="Sem delay"
+                    value={selectedNode.delaySeconds || ''}
+                    onChange={(e) => updateNode(selectedNodeId, { delaySeconds: parseInt(e.target.value) || null })}
+                  />
+                </div>
+                <div style={{ flex: 2 }}>
+                  <h4>Próxima Etapa (Fallback)</h4>
+                  <select
+                    className="form-select"
+                    style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+                    value={selectedNode.nextStepId || ''}
+                    onChange={(e) => updateNode(selectedNodeId, { nextStepId: e.target.value || null })}
+                  >
+                    <option value="">Nenhuma (Fim ou aguarda botão)</option>
+                    {nodes.filter(n => n.id !== selectedNodeId).map(n => (
+                      <option key={n.id} value={n.id}>{n.id}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Media */}
@@ -922,6 +1080,7 @@ export default function AgentsPage() {
                         <option value="go_to_step">Ir para Etapa</option>
                         <option value="transfer_to_ia">Ativar IA</option>
                         <option value="transfer_to_human">Transferir Humano</option>
+                        <option value="end_flow">Finalizar Fluxo</option>
                       </select>
                       {btn.action === 'go_to_step' && (
                         <select
