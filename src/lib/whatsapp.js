@@ -66,7 +66,10 @@ export async function sendAudio(to, audioUrl) {
     recipient_type: 'individual',
     to,
     type: 'audio',
-    audio: { link: audioUrl },
+    audio: { 
+      link: audioUrl,
+      ptt: true
+    },
   };
   return sendWhatsAppMessage(payload);
 }
