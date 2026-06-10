@@ -34,6 +34,9 @@ export default function ChatPage() {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [useVoiceChanger, setUseVoiceChanger] = useState(true);
   const [recorder, setRecorder] = useState(null);
+  const [nativeRecorder, setNativeRecorder] = useState(null);
+  const [mediaStream, setMediaStream] = useState(null);
+  const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
 
   useEffect(() => {
@@ -159,30 +162,118 @@ export default function ChatPage() {
 
   // Start recording audio
   const startRecording = async () => {
+    setIsRecording(true);
+    setRecordingSeconds(0);
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingSeconds((prev) => prev + 1);
+    }, 1000);
+
+    // Try native OGG Opus recording if supported
+    if (typeof window !== 'undefined' && window.MediaRecorder && window.MediaRecorder.isTypeSupported('audio/ogg; codecs=opus')) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setMediaStream(stream);
+        audioChunksRef.current = [];
+        const options = { mimeType: 'audio/ogg; codecs=opus' };
+        const mediaRec = new window.MediaRecorder(stream, options);
+        
+        mediaRec.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        mediaRec.start();
+        setNativeRecorder(mediaRec);
+        return;
+      } catch (err) {
+        console.error('Error starting native OGG recording, falling back:', err);
+      }
+    }
+
+    // Fallback to mic-recorder-to-mp3
     if (!recorder) {
       alert('Gravador de áudio não inicializado.');
+      setIsRecording(false);
+      clearInterval(recordingTimerRef.current);
       return;
     }
     try {
       await recorder.start();
-      setIsRecording(true);
-      setRecordingSeconds(0);
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingSeconds((prev) => prev + 1);
-      }, 1000);
     } catch (err) {
       console.error('Error starting audio recording:', err);
       alert('Não foi possível acessar o microfone.');
+      setIsRecording(false);
+      clearInterval(recordingTimerRef.current);
     }
   };
 
   // Stop recording audio
   const stopRecording = (shouldSend = true) => {
-    if (!recorder) return;
-    
     clearInterval(recordingTimerRef.current);
     setIsRecording(false);
 
+    if (nativeRecorder) {
+      const rec = nativeRecorder;
+      setNativeRecorder(null);
+      
+      rec.onstop = async () => {
+        // Stop all tracks on the stream to release the mic light
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(track => track.stop());
+          setMediaStream(null);
+        }
+
+        if (shouldSend) {
+          try {
+            setLoading(true);
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/ogg; codecs=opus' });
+            const audioFile = new File([audioBlob], 'recorded_voice.ogg', { type: 'audio/ogg' });
+            
+            const formData = new FormData();
+            formData.append('file', audioFile);
+
+            const uploadRes = await fetch('/api/uploads', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!uploadRes.ok) throw new Error('Upload failed');
+            const uploadData = await uploadRes.json();
+
+            const sendRes = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contactId: selectedContact.id,
+                type: 'audio',
+                mediaUrl: uploadData.url,
+                useVoiceChanger: useVoiceChanger,
+              }),
+            });
+
+            const data = await sendRes.json();
+            if (!sendRes.ok || data.sendError) {
+              alert(`Aviso: Ocorreu um erro ao enviar áudio para o WhatsApp: ${data.error || data.sendError || 'Erro desconhecido'}`);
+            }
+            
+            fetchMessages(selectedContact.id);
+            fetchContacts();
+          } catch (err) {
+            console.error('Error uploading/sending native audio:', err);
+            alert('Erro ao gravar ou enviar áudio.');
+          } finally {
+            setLoading(false);
+          }
+        }
+      };
+      rec.stop();
+      return;
+    }
+
+    // Fallback to mic-recorder-to-mp3 stop flow
+    if (!recorder) return;
+    
     if (shouldSend) {
       recorder.stop().getMp3().then(async ([buffer, blob]) => {
         const audioFile = new File(buffer, 'recorded_voice.mp3', { type: 'audio/mpeg' });

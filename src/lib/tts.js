@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getSystemSettings } from './settings';
+import { prisma } from './prisma';
 
 export async function textToSpeech(text) {
   const settings = await getSystemSettings();
@@ -12,7 +13,7 @@ export async function textToSpeech(text) {
   }
 
   const voiceId = elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM'; // Rachel fallback
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=opus_48000_64`;
 
   try {
     const response = await fetch(url, {
@@ -41,29 +42,19 @@ export async function textToSpeech(text) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const filename = `voice_${Date.now()}.mp3`;
+    const filename = `voice_${Date.now()}.ogg`;
     
-    // Verifica se estamos no ambiente da Vercel ou se a pasta public não existe/não é gravável
-    const isVercel = process.env.VERCEL === '1' || !fs.existsSync(path.join(process.cwd(), 'public'));
-    
-    let filePath;
-    let fileUrl;
-    
-    if (isVercel) {
-      filePath = path.join('/tmp', filename);
-      fileUrl = `/api/uploads/${filename}`;
-    } else {
-      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
+    // Save generated voice directly to database to support Vercel and serverless architectures safely
+    await prisma.upload.create({
+      data: {
+        filename,
+        mimeType: 'audio/ogg',
+        data: buffer
       }
-      filePath = path.join(uploadDir, filename);
-      fileUrl = `/uploads/${filename}`;
-    }
+    });
 
-    fs.writeFileSync(filePath, buffer);
-    console.log(`Saved TTS voice file at: ${filePath}`);
-    return fileUrl;
+    console.log(`Saved TTS voice file to database: ${filename}`);
+    return `/api/uploads/${filename}`;
   } catch (error) {
     console.error('Error generating TTS:', error);
     return null;
@@ -80,7 +71,7 @@ export async function voiceChanger(audioBuffer, mimeType = 'audio/mpeg') {
   }
 
   const voiceId = elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM';
-  const url = `https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}`;
+  const url = `https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}?output_format=opus_48000_64`;
 
   try {
     const formData = new FormData();

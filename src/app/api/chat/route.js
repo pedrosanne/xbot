@@ -93,11 +93,11 @@ export async function POST(request) {
           await logToDb('INFO', 'API', `Processando áudio com ElevenLabs Voice Changer para o arquivo: ${filename}`);
           const changedBuffer = await voiceChanger(uploadRecord.data, uploadRecord.mimeType);
           if (changedBuffer) {
-            const newFilename = `voice_changer_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.mp3`;
+            const newFilename = `voice_changer_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.ogg`;
             await prisma.upload.create({
               data: {
                 filename: newFilename,
-                mimeType: 'audio/mpeg',
+                mimeType: 'audio/ogg',
                 data: changedBuffer
               }
             });
