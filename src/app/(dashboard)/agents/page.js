@@ -742,37 +742,88 @@ export default function AgentsPage() {
       }}
     >
       {/* Builder Top Config */}
-      <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'end' }}>
-        <div className="form-group" style={{ margin: 0, flex: '1 1 200px' }}>
-          <label className="form-label" style={{ marginBottom: '4px' }}>Nome do Fluxo</label>
-          <input type="text" className="form-input" style={{ padding: '8px 12px' }} placeholder="Ex: Boas Vindas" value={flowName} onChange={(e) => setFlowName(e.target.value)} />
-        </div>
-        <div className="form-group" style={{ margin: 0, flex: '0 1 200px' }}>
-          <label className="form-label" style={{ marginBottom: '4px' }}>Ativação</label>
-          <select className="form-select" style={{ padding: '8px 12px' }} value={flowTrigger} onChange={(e) => setFlowTrigger(e.target.value)}>
-            <option value="keyword">Palavra-chave</option>
-            <option value="welcome">Welcome Flow</option>
-          </select>
-        </div>
-        {flowTrigger === 'keyword' && (
-          <div className="form-group" style={{ margin: 0, flex: '1 1 200px' }}>
-            <label className="form-label" style={{ marginBottom: '4px' }}>Palavras-chave</label>
-            <input type="text" className="form-input" style={{ padding: '8px 12px' }} placeholder="oi, menu, ajuda" value={flowKeywords} onChange={(e) => setFlowKeywords(e.target.value)} />
+      <div 
+        className="glass-panel" 
+        style={{ 
+          padding: '10px 16px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          gap: '16px', 
+          flexWrap: 'nowrap',
+          minHeight: '48px',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
+          {/* Flow Name */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 250px', minWidth: 0 }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Fluxo:</span>
+            <input 
+              type="text" 
+              className="form-input" 
+              style={{ padding: '6px 10px', fontSize: '0.82rem', height: '32px', margin: 0 }} 
+              placeholder="Ex: Boas Vindas" 
+              value={flowName} 
+              onChange={(e) => setFlowName(e.target.value)} 
+            />
           </div>
-        )}
-        <div style={{ display: 'flex', gap: '8px' }}>
+
+          {/* Trigger Select */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '0 1 180px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Ativação:</span>
+            <select 
+              className="form-select" 
+              style={{ padding: '6px 10px', fontSize: '0.82rem', height: '32px', margin: 0 }} 
+              value={flowTrigger} 
+              onChange={(e) => setFlowTrigger(e.target.value)}
+            >
+              <option value="keyword">Palavra-chave</option>
+              <option value="welcome">Welcome Flow</option>
+            </select>
+          </div>
+
+          {/* Keywords input (only if keyword activation is selected) */}
+          {flowTrigger === 'keyword' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 200px', minWidth: 0 }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Palavras:</span>
+              <input 
+                type="text" 
+                className="form-input" 
+                style={{ padding: '6px 10px', fontSize: '0.82rem', height: '32px', margin: 0 }} 
+                placeholder="oi, menu, ajuda" 
+                value={flowKeywords} 
+                onChange={(e) => setFlowKeywords(e.target.value)} 
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Buttons section */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <button 
             onClick={() => setIsFullScreen(!isFullScreen)} 
             className="btn btn-secondary" 
-            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            style={{ padding: '0 12px', height: '32px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
             title={isFullScreen ? "Sair da Tela Cheia" : "Modo Tela Cheia"}
           >
-            {isFullScreen ? '🗗 Sair Tela Cheia' : '🗖 Tela Cheia'}
+            {isFullScreen ? '🗗 Sair' : '🗖 Tela Cheia'}
           </button>
-          <button onClick={handleSaveFlow} className="btn btn-primary" style={{ padding: '8px 20px' }} disabled={flowLoading}>
-            {flowLoading ? 'Salvando...' : '💾 Salvar Fluxo'}
+          <button 
+            onClick={handleSaveFlow} 
+            className="btn btn-primary" 
+            style={{ padding: '0 16px', height: '32px', fontSize: '0.82rem', fontWeight: 600 }} 
+            disabled={flowLoading}
+          >
+            {flowLoading ? 'Salvando...' : '💾 Salvar'}
           </button>
-          <button onClick={closeBuilder} className="btn btn-secondary" style={{ padding: '8px 16px' }}>Fechar</button>
+          <button 
+            onClick={closeBuilder} 
+            className="btn btn-secondary" 
+            style={{ padding: '0 12px', height: '32px', fontSize: '0.82rem' }}
+          >
+            Fechar
+          </button>
         </div>
       </div>
 
