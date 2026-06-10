@@ -89,7 +89,7 @@ export default function LogsPage() {
       <div className="page-body animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
         {/* Statistics Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <div className="stats-grid">
           <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Registrado</span>
             <span style={{ fontSize: '1.75rem', fontWeight: 700 }}>{logs.length}</span>
@@ -158,17 +158,13 @@ export default function LogsPage() {
                 return (
                   <div
                     key={log.id}
+                    className="log-row-container"
                     style={{
-                      borderBottom: '1px solid var(--border-glass)',
-                      padding: '16px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px',
                       background: log.level === 'ERROR' ? 'rgba(239, 68, 68, 0.02)' : log.level === 'WARN' ? 'rgba(245, 158, 11, 0.01)' : 'transparent'
                     }}
                   >
                     {/* Log Row Main */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <div className="log-row-main">
                       <span className={`badge ${getLevelBadgeClass(log.level)}`} style={{ minWidth: '70px', justifyContent: 'center' }}>
                         {log.level}
                       </span>

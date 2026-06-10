@@ -629,7 +629,7 @@ export default function AgentsPage() {
     <div className="main-content">
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <h1 className="page-title">Gerenciador de Conexões e Fluxos</h1>
-        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', padding: '4px', borderRadius: '12px', gap: '4px' }}>
+        <div className="tabs-scrollable" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', padding: '4px', borderRadius: '12px' }}>
           <button onClick={() => { setActiveTab('whatsapp'); closeBuilder(); }} className={`btn ${activeTab === 'whatsapp' ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '8px 16px', fontSize: '0.85rem', border: activeTab === 'whatsapp' ? 'none' : undefined }}>
             Conexão WhatsApp &amp; APIs
           </button>
@@ -651,7 +651,7 @@ export default function AgentsPage() {
             TAB 1: WHATSAPP CONNECTION & APIS SETUP
             ===================================================================== */}
         {activeTab === 'whatsapp' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', alignItems: 'start' }}>
+          <div className="integration-grid" style={{ alignItems: 'start' }}>
             {/* Connection Form */}
             <div className="glass-panel" style={{ padding: '28px' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '6px' }}>Credenciais da API</h2>
@@ -779,7 +779,7 @@ export default function AgentsPage() {
                   <button onClick={resetAgentForm} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>Fechar</button>
                 </div>
 
-                <form onSubmit={handleAgentSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                <form onSubmit={handleAgentSubmit} className="integration-grid" style={{ gap: '16px' }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Nome do Agente</label>
                     <input type="text" value={agentName} onChange={(e) => setAgentName(e.target.value)} placeholder="Ex: Lara - Suporte Comercial" className="form-input" required />
@@ -839,7 +839,7 @@ export default function AgentsPage() {
                 <p style={{ fontSize: '0.85rem' }}>Crie seu primeiro agente de IA para começar a atender clientes automaticamente.</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
+              <div className="integration-grid" style={{ gap: '16px' }}>
                 {agents.map((agent) => (
                   <div key={agent.id} className={`agent-card-premium ${agent.isActive ? 'card-active' : ''}`}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '14px' }}>
@@ -917,7 +917,7 @@ export default function AgentsPage() {
                 <p style={{ fontSize: '0.85rem' }}>Crie seu primeiro fluxo de chatbot usando o editor visual.</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
+              <div className="integration-grid" style={{ gap: '16px' }}>
                 {flows.map((flow) => {
                   let parsedSteps = [];
                   try { parsedSteps = JSON.parse(flow.steps || '[]'); } catch { parsedSteps = []; }
@@ -1265,7 +1265,7 @@ export default function AgentsPage() {
             TAB 4: CENTRAL DE CHAMADAS
             ===================================================================== */}
         {activeTab === 'calls' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', alignItems: 'start' }}>
+          <div className="integration-grid" style={{ alignItems: 'start' }}>
 
             {/* Config Panel */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1383,7 +1383,7 @@ export default function AgentsPage() {
 
                     return (
                       <div key={call.id} style={{ padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', borderRadius: '12px', cursor: 'pointer', transition: 'var(--transition-smooth)' }} onClick={() => setExpandedCallId(isExpanded ? null : call.id)}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <div className="agent-avatar" style={{ width: '36px', height: '36px', fontSize: '1rem', borderRadius: '10px' }}>📞</div>
                             <div>

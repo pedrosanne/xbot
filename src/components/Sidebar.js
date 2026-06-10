@@ -85,6 +85,8 @@ export default function Sidebar() {
     },
   ];
 
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
   const getInitials = (name) => {
     if (!name) return '';
     return name
@@ -95,9 +97,9 @@ export default function Sidebar() {
       .toUpperCase();
   };
 
-  return (
-    <aside className="sidebar glass-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div className="logo-container">
+  const renderSidebarContent = (isMobile = false) => (
+    <>
+      <div className="logo-container" style={{ marginBottom: isMobile ? '24px' : '32px' }}>
         <div className="logo-icon">X</div>
         <div className="logo-text">X bot</div>
       </div>
@@ -111,6 +113,9 @@ export default function Sidebar() {
                 <Link 
                   href={item.href} 
                   className={`nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => {
+                    if (isMobile) setIsMobileOpen(false);
+                  }}
                 >
                   {item.icon}
                   <span>{item.name}</span>
@@ -184,6 +189,55 @@ export default function Sidebar() {
       <div style={{ padding: '8px 8px 0 8px', color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', borderTop: user ? 'none' : '1px solid var(--border-glass)' }}>
         X bot v1.0.0
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="sidebar glass-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {renderSidebarContent(false)}
+      </aside>
+
+      {/* Mobile Top Header Bar */}
+      <div className="mobile-header-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="logo-icon" style={{ width: '32px', height: '32px', fontSize: '16px' }}>X</div>
+          <span className="logo-text" style={{ display: 'block', fontSize: '1.1rem', fontWeight: 700 }}>X bot</span>
+        </div>
+        <button 
+          onClick={() => setIsMobileOpen(true)} 
+          className="hamburger-btn"
+          aria-label="Abrir menu"
+        >
+          <svg style={{ width: '20px', height: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Mobile Backdrop */}
+      <div 
+        className={`sidebar-backdrop ${isMobileOpen ? 'open' : ''}`}
+        onClick={() => setIsMobileOpen(false)}
+      />
+
+      {/* Mobile Nav Drawer */}
+      <div className={`sidebar-nav-drawer ${isMobileOpen ? 'open' : ''}`}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <button 
+            onClick={() => setIsMobileOpen(false)} 
+            className="hamburger-btn"
+            style={{ padding: '6px' }}
+            aria-label="Fechar menu"
+          >
+            <svg style={{ width: '18px', height: '18px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        {renderSidebarContent(true)}
+      </div>
+    </>
   );
 }

@@ -45,7 +45,7 @@ export default async function DashboardPage() {
       <div className="page-body animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
         {/* Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+        <div className="stats-grid">
           
           <div className="glass-panel glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Total de Conversas</span>
@@ -78,7 +78,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Configurations Checklist & Activity Split */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+        <div className="integration-grid">
           
           {/* Checklist Panel */}
           <div className="glass-panel" style={{ padding: '24px' }}>
@@ -152,27 +152,15 @@ export default async function DashboardPage() {
                 const isManual = contact.status === 'MANUAL';
                 const lastMsg = contact.messages[0];
                 return (
-                  <div 
-                    key={contact.id} 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'space-between', 
-                      padding: '12px 16px', 
-                      background: 'rgba(255,255,255,0.01)', 
-                      borderRadius: '12px', 
-                      border: '1px solid var(--border-glass)',
-                      transition: 'var(--transition-smooth)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div key={contact.id} className="conversation-row">
+                    <div className="conversation-left">
                       <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{contact.name}</span>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {lastMsg ? `${lastMsg.direction === 'OUTGOING' ? 'Você: ' : ''}${lastMsg.content}` : 'Nenhuma mensagem.'}
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div className="conversation-right">
                       <span className={`badge ${isManual ? 'badge-warning' : 'badge-success'}`}>
                         {isManual ? 'Manual (Pausado)' : 'Robô Ativo'}
                       </span>

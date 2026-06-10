@@ -1305,3 +1305,238 @@ input:checked + .slider:before {
   }
 }
 
+/* ==========================================================================
+   NEW RESPONSIVE SYSTEM (ZAPFLOW MOBILE OVERHAUL)
+   ========================================================================== */
+
+/* Mobile Header Bar - visible only on mobile */
+.mobile-header-bar {
+  display: none;
+}
+
+/* Sidebar Backdrop */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.sidebar-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Nav Drawer for Mobile */
+.sidebar-nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  background: rgba(8, 8, 8, 0.98);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-glass);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sidebar-nav-drawer.open {
+  transform: translateX(0);
+}
+
+/* Hamburger button */
+.hamburger-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  transition: var(--transition-smooth);
+}
+.hamburger-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Dashboard Metrics & Lists */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.integration-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+.conversation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  transition: var(--transition-smooth);
+}
+.conversation-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.conversation-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex-grow: 1;
+}
+.conversation-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+/* Horizontal tabs navigation */
+.tabs-scrollable {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 4px;
+  scrollbar-width: none; /* Firefox */
+}
+.tabs-scrollable::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* System Logs Row */
+.log-row-container {
+  border-bottom: 1px solid var(--border-glass);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.log-row-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Overlay Node Properties panel for Visual Flow Builder on Mobile */
+@media (max-width: 768px) {
+  /* Layout adjustments */
+  .app-container {
+    flex-direction: column !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    overflow: hidden !important;
+  }
+  
+  .sidebar {
+    display: none !important; /* Hide the standard desktop sidebar completely */
+  }
+  
+  .mobile-header-bar {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    padding: 0 16px;
+    background: rgba(4, 5, 8, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-glass);
+    flex-shrink: 0;
+    width: 100%;
+    z-index: 100;
+  }
+  
+  .main-content {
+    flex-grow: 1 !important;
+    width: 100% !important;
+    height: calc(100vh - 60px) !important;
+  }
+
+  .page-header {
+    padding: 12px 16px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+  
+  .page-body {
+    padding: 16px !important;
+  }
+
+  /* Dashboard Stats and grids */
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .integration-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .conversation-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+  .conversation-right {
+    width: 100% !important;
+    justify-content: space-between !important;
+    border-top: 1px solid var(--border-glass) !important;
+    padding-top: 10px !important;
+  }
+
+  /* Logs view stack */
+  .log-row-main {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+  .log-row-main > span:nth-child(3) {
+    font-weight: 500 !important;
+  }
+  .log-row-main > span:nth-child(4) {
+    align-self: flex-end !important;
+  }
+  .log-row-main > button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Adaptive Flow Builder */
+  .flow-builder-container {
+    flex-direction: column !important;
+    min-height: 450px !important;
+  }
+  .flow-sidebar {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 60vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-left: none !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+    z-index: 1000 !important;
+    box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.8) !important;
+  }
+}
+
