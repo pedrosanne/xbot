@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 // ==========================================
 // HELPER: Generate a unique short ID
@@ -55,6 +56,7 @@ export default function AgentsPage() {
   const [nodes, setNodes] = useState([]); // { id, x, y, text, media:{type,url,caption}, buttons:[] }
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Canvas state
   const canvasRef = useRef(null);
@@ -85,6 +87,7 @@ export default function AgentsPage() {
   // LIFECYCLE & DATA FETCHING
   // ==========================================
   useEffect(() => {
+    setMounted(true);
     if (typeof window !== 'undefined') {
       setCallbackUrl(`${window.location.protocol}//${window.location.host}/api/webhook`);
     }
@@ -625,6 +628,326 @@ export default function AgentsPage() {
   };
 
   // ==========================================
+  // FLOW BUILDER ELEMENT (For React Portal Fullscreen support)
+  // ==========================================
+  const flowBuilderEl = activeTab === 'flows' && builderOpen ? (
+    <div 
+      style={isFullScreen ? {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 99999,
+        background: '#0b0f19',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        boxSizing: 'border-box'
+      } : {
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 1,
+        gap: '16px',
+        minHeight: 0
+      }}
+    >
+      {/* Builder Top Config */}
+      <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'end' }}>
+        <div className="form-group" style={{ margin: 0, flex: '1 1 200px' }}>
+          <label className="form-label" style={{ marginBottom: '4px' }}>Nome do Fluxo</label>
+          <input type="text" className="form-input" style={{ padding: '8px 12px' }} placeholder="Ex: Boas Vindas" value={flowName} onChange={(e) => setFlowName(e.target.value)} />
+        </div>
+        <div className="form-group" style={{ margin: 0, flex: '0 1 200px' }}>
+          <label className="form-label" style={{ marginBottom: '4px' }}>Ativação</label>
+          <select className="form-select" style={{ padding: '8px 12px' }} value={flowTrigger} onChange={(e) => setFlowTrigger(e.target.value)}>
+            <option value="keyword">Palavra-chave</option>
+            <option value="welcome">Welcome Flow</option>
+          </select>
+        </div>
+        {flowTrigger === 'keyword' && (
+          <div className="form-group" style={{ margin: 0, flex: '1 1 200px' }}>
+            <label className="form-label" style={{ marginBottom: '4px' }}>Palavras-chave</label>
+            <input type="text" className="form-input" style={{ padding: '8px 12px' }} placeholder="oi, menu, ajuda" value={flowKeywords} onChange={(e) => setFlowKeywords(e.target.value)} />
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            onClick={() => setIsFullScreen(!isFullScreen)} 
+            className="btn btn-secondary" 
+            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            title={isFullScreen ? "Sair da Tela Cheia" : "Modo Tela Cheia"}
+          >
+            {isFullScreen ? '🗗 Sair Tela Cheia' : '🗖 Tela Cheia'}
+          </button>
+          <button onClick={handleSaveFlow} className="btn btn-primary" style={{ padding: '8px 20px' }} disabled={flowLoading}>
+            {flowLoading ? 'Salvando...' : '💾 Salvar Fluxo'}
+          </button>
+          <button onClick={closeBuilder} className="btn btn-secondary" style={{ padding: '8px 16px' }}>Fechar</button>
+        </div>
+      </div>
+
+      {/* Canvas + Sidebar */}
+      <div className="flow-builder-container" style={{ flex: 1 }}>
+        {/* Canvas Wrapper */}
+        <div
+          className="flow-canvas-wrapper"
+          ref={canvasRef}
+          onMouseDown={handleCanvasMouseDown}
+          onWheel={handleWheel}
+          onClick={(e) => { if (!e.target.closest('.flow-node')) setSelectedNodeId(null); }}
+        >
+          {/* Dot grid background */}
+          <div className="flow-canvas-bg" style={{
+            backgroundPosition: `${canvasOffset.x % (24 * canvasZoom)}px ${canvasOffset.y % (24 * canvasZoom)}px`,
+            backgroundSize: `${24 * canvasZoom}px ${24 * canvasZoom}px`,
+          }} />
+
+          {/* Toolbar */}
+          <div className="flow-toolbar">
+            <button className="tb-primary" onClick={addNode}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+              Nó
+            </button>
+            <div className="tb-sep" />
+            <button onClick={() => setCanvasZoom(z => Math.min(2, z + 0.15))}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6M11 8v6"/></svg>
+            </button>
+            <span className="zoom-label">{Math.round(canvasZoom * 100)}%</span>
+            <button onClick={() => setCanvasZoom(z => Math.max(0.3, z - 0.15))}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg>
+            </button>
+            <div className="tb-sep" />
+            <button onClick={fitAllNodes}>Encaixar</button>
+          </div>
+
+          {/* Transformed Canvas Layer */}
+          <div className="flow-canvas" style={{ transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})` }}>
+            {/* SVG Connections */}
+            <svg className="flow-connections-svg" width="6000" height="6000">
+              {getConnections().map((conn, i) => {
+                const dx = conn.toX - conn.fromX;
+                const dy = conn.toY - conn.fromY;
+                const cp = Math.abs(dy) * 0.5 + 40;
+                const path = `M ${conn.fromX} ${conn.fromY} C ${conn.fromX} ${conn.fromY + cp}, ${conn.toX} ${conn.toY - cp}, ${conn.toX} ${conn.toY}`;
+                const isHighlighted = selectedNodeId === conn.fromId || selectedNodeId === conn.toId;
+                return (
+                  <g key={i}>
+                    <path d={path} className={`flow-connection-path animated ${isHighlighted ? 'highlighted' : ''}`} />
+                    <circle cx={conn.toX} cy={conn.toY} r="3" fill={isHighlighted ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)'} />
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* Nodes */}
+            {nodes.map((node, idx) => (
+              <div
+                key={node.id}
+                className={`flow-node ${selectedNodeId === node.id ? 'selected' : ''}`}
+                style={{ left: node.x, top: node.y }}
+                onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
+                onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
+              >
+                {/* Input port */}
+                <div className="flow-port port-in" />
+
+                {/* Header */}
+                <div className="flow-node-header">
+                  <span className={`flow-node-type-badge ${idx === 0 ? 'type-start' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'type-ia' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'type-human' : 'type-message'}`}>
+                    {idx === 0 ? 'Início' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'IA' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'Humano' : 'Msg'}
+                  </span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.id}</span>
+                </div>
+
+                {/* Body text */}
+                <div className="flow-node-body">
+                  {node.text || 'Sem texto...'}
+                </div>
+
+                {/* Media indicator */}
+                {node.media && node.media.type && (
+                  <div className="flow-node-media">
+                    {mediaIcons[node.media.type] || '📎'} {node.media.type.toUpperCase()}
+                    {node.media.url && <span style={{ opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>• {node.media.url.substring(0, 30)}...</span>}
+                  </div>
+                )}
+
+                {/* Buttons preview */}
+                {(node.buttons || []).length > 0 && (
+                  <div className="flow-node-buttons">
+                    {(node.buttons || []).map((btn, bi) => (
+                      <div key={bi} className="flow-node-btn">
+                        {btn.title}
+                        {btn.action === 'go_to_step' && btn.targetStepId && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → {btn.targetStepId}</span>}
+                        {btn.action === 'transfer_to_ia' && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → IA</span>}
+                        {btn.action === 'transfer_to_human' && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → Humano</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Output port */}
+                <div className="flow-port port-out" />
+              </div>
+            ))}
+          </div>
+
+          {/* Minimap */}
+          {renderMinimap()}
+        </div>
+
+        {/* Properties Sidebar */}
+        {selectedNode && (
+          <div className="flow-sidebar" key={selectedNodeId}>
+            <div className="flow-sidebar-header">
+              <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Propriedades do Nó</h3>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button onClick={() => deleteNode(selectedNodeId)} className="btn btn-danger" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Excluir</button>
+                <button onClick={() => setSelectedNodeId(null)} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>✕</button>
+              </div>
+            </div>
+
+            <div className="flow-sidebar-body">
+              {/* Node ID */}
+              <div className="flow-sidebar-section">
+                <h4>Identificador</h4>
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+                  value={selectedNode.id}
+                  onChange={(e) => updateNodeId(selectedNodeId, e.target.value)}
+                />
+              </div>
+
+              {/* Message Text */}
+              <div className="flow-sidebar-section">
+                <h4>Mensagem de Texto</h4>
+                <textarea
+                  className="form-textarea"
+                  style={{ minHeight: '100px', fontSize: '0.85rem', padding: '10px' }}
+                  value={selectedNode.text}
+                  onChange={(e) => updateNode(selectedNodeId, { text: e.target.value })}
+                  placeholder="Mensagem que o bot enviará..."
+                />
+              </div>
+
+              {/* Media */}
+              <div className="flow-sidebar-section">
+                <h4>Mídia Anexada</h4>
+                <select
+                  className="form-select"
+                  style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+                  value={selectedNode.media?.type || ''}
+                  onChange={(e) => {
+                    if (!e.target.value) { updateNode(selectedNodeId, { media: null }); }
+                    else { updateNode(selectedNodeId, { media: { type: e.target.value, url: selectedNode.media?.url || '', caption: selectedNode.media?.caption || '' } }); }
+                  }}
+                >
+                  <option value="">Nenhuma mídia</option>
+                  <option value="image">🖼️ Imagem</option>
+                  <option value="video">🎬 Vídeo</option>
+                  <option value="audio">🔊 Áudio</option>
+                  <option value="document">📄 Documento</option>
+                  <option value="link">🔗 Link</option>
+                </select>
+
+                {selectedNode.media?.type && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ padding: '8px 12px', fontSize: '0.82rem' }}
+                      placeholder={selectedNode.media.type === 'link' ? 'https://...' : 'URL da mídia (https://...)'}
+                      value={selectedNode.media?.url || ''}
+                      onChange={(e) => updateNode(selectedNodeId, { media: { ...selectedNode.media, url: e.target.value } })}
+                    />
+                    {selectedNode.media.type !== 'audio' && (
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ padding: '8px 12px', fontSize: '0.82rem' }}
+                        placeholder="Legenda (opcional)"
+                        value={selectedNode.media?.caption || ''}
+                        onChange={(e) => updateNode(selectedNodeId, { media: { ...selectedNode.media, caption: e.target.value } })}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Buttons */}
+              <div className="flow-sidebar-section">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4>Botões Interativos (Máx. 3)</h4>
+                  <button
+                    onClick={() => addButtonToNode(selectedNodeId)}
+                    className="btn btn-secondary"
+                    style={{ padding: '3px 10px', fontSize: '0.7rem' }}
+                    disabled={(selectedNode.buttons || []).length >= 3}
+                  >
+                    + Botão
+                  </button>
+                </div>
+
+                {(selectedNode.buttons || []).length === 0 && (
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', padding: '12px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', border: '1px dashed var(--border-glass)' }}>
+                    Sem botões. O bot aguardará resposta aberta.
+                  </div>
+                )}
+
+                {(selectedNode.buttons || []).map((btn, bi) => (
+                  <div key={bi} style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ padding: '6px 10px', fontSize: '0.8rem', margin: 0, flex: 1 }}
+                        value={btn.title}
+                        onChange={(e) => updateButton(selectedNodeId, bi, 'title', e.target.value)}
+                        placeholder="Texto do botão"
+                        maxLength={20}
+                      />
+                      <button onClick={() => removeButton(selectedNodeId, bi)} style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '4px', fontSize: '1rem' }}>✕</button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <select
+                        className="form-select"
+                        style={{ padding: '6px 8px', fontSize: '0.78rem', margin: 0, flex: 1 }}
+                        value={btn.action}
+                        onChange={(e) => updateButton(selectedNodeId, bi, 'action', e.target.value)}
+                      >
+                        <option value="go_to_step">Ir para Etapa</option>
+                        <option value="transfer_to_ia">Ativar IA</option>
+                        <option value="transfer_to_human">Transferir Humano</option>
+                      </select>
+                      {btn.action === 'go_to_step' && (
+                        <select
+                          className="form-select"
+                          style={{ padding: '6px 8px', fontSize: '0.78rem', margin: 0, flex: 1 }}
+                          value={btn.targetStepId}
+                          onChange={(e) => updateButton(selectedNodeId, bi, 'targetStepId', e.target.value)}
+                        >
+                          <option value="">-- Selecione --</option>
+                          {nodes.filter(n => n.id !== selectedNodeId).map(n => (
+                            <option key={n.id} value={n.id}>{n.id}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  ) : null;
+
+  // ==========================================
   // RENDER
   // ==========================================
   return (
@@ -971,325 +1294,11 @@ export default function AgentsPage() {
         {/* =====================================================================
             VISUAL FLOW BUILDER CANVAS (Full-screen overlay within page)
             ===================================================================== */}
+        {/* =====================================================================
+            VISUAL FLOW BUILDER CANVAS (Full-screen overlay within page)
+            ===================================================================== */}
         {activeTab === 'flows' && builderOpen && (
-          <div 
-            style={isFullScreen ? {
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100vw',
-              height: '100vh',
-              zIndex: 99999,
-              background: '#0b0f19',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-              boxSizing: 'border-box'
-            } : {
-              display: 'flex',
-              flexDirection: 'column',
-              flex: 1,
-              gap: '16px',
-              minHeight: 0
-            }}
-          >
-
-            {/* Builder Top Config */}
-            <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'end' }}>
-              <div className="form-group" style={{ margin: 0, flex: '1 1 200px' }}>
-                <label className="form-label" style={{ marginBottom: '4px' }}>Nome do Fluxo</label>
-                <input type="text" className="form-input" style={{ padding: '8px 12px' }} placeholder="Ex: Boas Vindas" value={flowName} onChange={(e) => setFlowName(e.target.value)} />
-              </div>
-              <div className="form-group" style={{ margin: 0, flex: '0 1 200px' }}>
-                <label className="form-label" style={{ marginBottom: '4px' }}>Ativação</label>
-                <select className="form-select" style={{ padding: '8px 12px' }} value={flowTrigger} onChange={(e) => setFlowTrigger(e.target.value)}>
-                  <option value="keyword">Palavra-chave</option>
-                  <option value="welcome">Welcome Flow</option>
-                </select>
-              </div>
-              {flowTrigger === 'keyword' && (
-                <div className="form-group" style={{ margin: 0, flex: '1 1 200px' }}>
-                  <label className="form-label" style={{ marginBottom: '4px' }}>Palavras-chave</label>
-                  <input type="text" className="form-input" style={{ padding: '8px 12px' }} placeholder="oi, menu, ajuda" value={flowKeywords} onChange={(e) => setFlowKeywords(e.target.value)} />
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button 
-                  onClick={() => setIsFullScreen(!isFullScreen)} 
-                  className="btn btn-secondary" 
-                  style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  title={isFullScreen ? "Sair da Tela Cheia" : "Modo Tela Cheia"}
-                >
-                  {isFullScreen ? '🗗 Sair Tela Cheia' : '🗖 Tela Cheia'}
-                </button>
-                <button onClick={handleSaveFlow} className="btn btn-primary" style={{ padding: '8px 20px' }} disabled={flowLoading}>
-                  {flowLoading ? 'Salvando...' : '💾 Salvar Fluxo'}
-                </button>
-                <button onClick={closeBuilder} className="btn btn-secondary" style={{ padding: '8px 16px' }}>Fechar</button>
-              </div>
-            </div>
-
-            {/* Canvas + Sidebar */}
-            <div className="flow-builder-container" style={{ flex: 1 }}>
-
-              {/* Canvas Wrapper */}
-              <div
-                className="flow-canvas-wrapper"
-                ref={canvasRef}
-                onMouseDown={handleCanvasMouseDown}
-                onWheel={handleWheel}
-                onClick={(e) => { if (!e.target.closest('.flow-node')) setSelectedNodeId(null); }}
-              >
-                {/* Dot grid background */}
-                <div className="flow-canvas-bg" style={{
-                  backgroundPosition: `${canvasOffset.x % (24 * canvasZoom)}px ${canvasOffset.y % (24 * canvasZoom)}px`,
-                  backgroundSize: `${24 * canvasZoom}px ${24 * canvasZoom}px`,
-                }} />
-
-                {/* Toolbar */}
-                <div className="flow-toolbar">
-                  <button className="tb-primary" onClick={addNode}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
-                    Nó
-                  </button>
-                  <div className="tb-sep" />
-                  <button onClick={() => setCanvasZoom(z => Math.min(2, z + 0.15))}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6M11 8v6"/></svg>
-                  </button>
-                  <span className="zoom-label">{Math.round(canvasZoom * 100)}%</span>
-                  <button onClick={() => setCanvasZoom(z => Math.max(0.3, z - 0.15))}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg>
-                  </button>
-                  <div className="tb-sep" />
-                  <button onClick={fitAllNodes}>Encaixar</button>
-                </div>
-
-                {/* Transformed Canvas Layer */}
-                <div className="flow-canvas" style={{ transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})` }}>
-
-                  {/* SVG Connections */}
-                  <svg className="flow-connections-svg" width="6000" height="6000">
-                    {getConnections().map((conn, i) => {
-                      const dx = conn.toX - conn.fromX;
-                      const dy = conn.toY - conn.fromY;
-                      const cp = Math.abs(dy) * 0.5 + 40;
-                      const path = `M ${conn.fromX} ${conn.fromY} C ${conn.fromX} ${conn.fromY + cp}, ${conn.toX} ${conn.toY - cp}, ${conn.toX} ${conn.toY}`;
-                      const isHighlighted = selectedNodeId === conn.fromId || selectedNodeId === conn.toId;
-                      return (
-                        <g key={i}>
-                          <path d={path} className={`flow-connection-path animated ${isHighlighted ? 'highlighted' : ''}`} />
-                          {/* Arrow head */}
-                          <circle cx={conn.toX} cy={conn.toY} r="3" fill={isHighlighted ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)'} />
-                        </g>
-                      );
-                    })}
-                  </svg>
-
-                  {/* Nodes */}
-                  {nodes.map((node, idx) => (
-                    <div
-                      key={node.id}
-                      className={`flow-node ${selectedNodeId === node.id ? 'selected' : ''}`}
-                      style={{ left: node.x, top: node.y }}
-                      onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
-                      onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
-                    >
-                      {/* Input port */}
-                      <div className="flow-port port-in" />
-
-                      {/* Header */}
-                      <div className="flow-node-header">
-                        <span className={`flow-node-type-badge ${idx === 0 ? 'type-start' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'type-ia' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'type-human' : 'type-message'}`}>
-                          {idx === 0 ? 'Início' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'IA' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'Humano' : 'Msg'}
-                        </span>
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.id}</span>
-                      </div>
-
-                      {/* Body text */}
-                      <div className="flow-node-body">
-                        {node.text || 'Sem texto...'}
-                      </div>
-
-                      {/* Media indicator */}
-                      {node.media && node.media.type && (
-                        <div className="flow-node-media">
-                          {mediaIcons[node.media.type] || '📎'} {node.media.type.toUpperCase()}
-                          {node.media.url && <span style={{ opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>• {node.media.url.substring(0, 30)}...</span>}
-                        </div>
-                      )}
-
-                      {/* Buttons preview */}
-                      {(node.buttons || []).length > 0 && (
-                        <div className="flow-node-buttons">
-                          {(node.buttons || []).map((btn, bi) => (
-                            <div key={bi} className="flow-node-btn">
-                              {btn.title}
-                              {btn.action === 'go_to_step' && btn.targetStepId && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → {btn.targetStepId}</span>}
-                              {btn.action === 'transfer_to_ia' && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → IA</span>}
-                              {btn.action === 'transfer_to_human' && <span style={{ fontSize: '0.6rem', opacity: 0.5 }}> → Humano</span>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Output port */}
-                      <div className="flow-port port-out" />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Minimap */}
-                {renderMinimap()}
-              </div>
-
-              {/* Properties Sidebar */}
-              {selectedNode && (
-                <div className="flow-sidebar" key={selectedNodeId}>
-                  <div className="flow-sidebar-header">
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Propriedades do Nó</h3>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => deleteNode(selectedNodeId)} className="btn btn-danger" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Excluir</button>
-                      <button onClick={() => setSelectedNodeId(null)} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>✕</button>
-                    </div>
-                  </div>
-
-                  <div className="flow-sidebar-body">
-                    {/* Node ID */}
-                    <div className="flow-sidebar-section">
-                      <h4>Identificador</h4>
-                      <input
-                        type="text"
-                        className="form-input"
-                        style={{ padding: '8px 12px', fontSize: '0.85rem' }}
-                        value={selectedNode.id}
-                        onChange={(e) => updateNodeId(selectedNodeId, e.target.value)}
-                      />
-                    </div>
-
-                    {/* Message Text */}
-                    <div className="flow-sidebar-section">
-                      <h4>Mensagem de Texto</h4>
-                      <textarea
-                        className="form-textarea"
-                        style={{ minHeight: '100px', fontSize: '0.85rem', padding: '10px' }}
-                        value={selectedNode.text}
-                        onChange={(e) => updateNode(selectedNodeId, { text: e.target.value })}
-                        placeholder="Mensagem que o bot enviará..."
-                      />
-                    </div>
-
-                    {/* Media */}
-                    <div className="flow-sidebar-section">
-                      <h4>Mídia Anexada</h4>
-                      <select
-                        className="form-select"
-                        style={{ padding: '8px 12px', fontSize: '0.85rem' }}
-                        value={selectedNode.media?.type || ''}
-                        onChange={(e) => {
-                          if (!e.target.value) { updateNode(selectedNodeId, { media: null }); }
-                          else { updateNode(selectedNodeId, { media: { type: e.target.value, url: selectedNode.media?.url || '', caption: selectedNode.media?.caption || '' } }); }
-                        }}
-                      >
-                        <option value="">Nenhuma mídia</option>
-                        <option value="image">🖼️ Imagem</option>
-                        <option value="video">🎬 Vídeo</option>
-                        <option value="audio">🔊 Áudio</option>
-                        <option value="document">📄 Documento</option>
-                        <option value="link">🔗 Link</option>
-                      </select>
-
-                      {selectedNode.media?.type && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                          <input
-                            type="text"
-                            className="form-input"
-                            style={{ padding: '8px 12px', fontSize: '0.82rem' }}
-                            placeholder={selectedNode.media.type === 'link' ? 'https://...' : 'URL da mídia (https://...)'}
-                            value={selectedNode.media?.url || ''}
-                            onChange={(e) => updateNode(selectedNodeId, { media: { ...selectedNode.media, url: e.target.value } })}
-                          />
-                          {selectedNode.media.type !== 'audio' && (
-                            <input
-                              type="text"
-                              className="form-input"
-                              style={{ padding: '8px 12px', fontSize: '0.82rem' }}
-                              placeholder="Legenda (opcional)"
-                              value={selectedNode.media?.caption || ''}
-                              onChange={(e) => updateNode(selectedNodeId, { media: { ...selectedNode.media, caption: e.target.value } })}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Buttons */}
-                    <div className="flow-sidebar-section">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h4>Botões Interativos (Máx. 3)</h4>
-                        <button
-                          onClick={() => addButtonToNode(selectedNodeId)}
-                          className="btn btn-secondary"
-                          style={{ padding: '3px 10px', fontSize: '0.7rem' }}
-                          disabled={(selectedNode.buttons || []).length >= 3}
-                        >
-                          + Botão
-                        </button>
-                      </div>
-
-                      {(selectedNode.buttons || []).length === 0 && (
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', padding: '12px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', border: '1px dashed var(--border-glass)' }}>
-                          Sem botões. O bot aguardará resposta aberta.
-                        </div>
-                      )}
-
-                      {(selectedNode.buttons || []).map((btn, bi) => (
-                        <div key={bi} style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                            <input
-                              type="text"
-                              className="form-input"
-                              style={{ padding: '6px 10px', fontSize: '0.8rem', margin: 0, flex: 1 }}
-                              value={btn.title}
-                              onChange={(e) => updateButton(selectedNodeId, bi, 'title', e.target.value)}
-                              placeholder="Texto do botão"
-                              maxLength={20}
-                            />
-                            <button onClick={() => removeButton(selectedNodeId, bi)} style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '4px', fontSize: '1rem' }}>✕</button>
-                          </div>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <select
-                              className="form-select"
-                              style={{ padding: '6px 8px', fontSize: '0.78rem', margin: 0, flex: 1 }}
-                              value={btn.action}
-                              onChange={(e) => updateButton(selectedNodeId, bi, 'action', e.target.value)}
-                            >
-                              <option value="go_to_step">Ir para Etapa</option>
-                              <option value="transfer_to_ia">Ativar IA</option>
-                              <option value="transfer_to_human">Transferir Humano</option>
-                            </select>
-                            {btn.action === 'go_to_step' && (
-                              <select
-                                className="form-select"
-                                style={{ padding: '6px 8px', fontSize: '0.78rem', margin: 0, flex: 1 }}
-                                value={btn.targetStepId}
-                                onChange={(e) => updateButton(selectedNodeId, bi, 'targetStepId', e.target.value)}
-                              >
-                                <option value="">-- Selecione --</option>
-                                {nodes.filter(n => n.id !== selectedNodeId).map(n => (
-                                  <option key={n.id} value={n.id}>{n.id}</option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          isFullScreen && mounted ? createPortal(flowBuilderEl, document.body) : flowBuilderEl
         )}
 
         {/* =====================================================================
