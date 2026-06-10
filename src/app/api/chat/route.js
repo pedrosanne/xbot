@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendText, sendAudio, sendImage, sendDocument, sendVideo } from '@/lib/whatsapp';
 import { getSystemSettings } from '@/lib/settings';
 import { logToDb } from '@/lib/log';
+import { voiceChanger } from '@/lib/tts';
 
 // GET: Retrieve contacts list OR message history for a contact
 export async function GET(request) {
@@ -63,6 +64,7 @@ export async function POST(request) {
     type = body.type;
     content = body.content;
     mediaUrl = body.mediaUrl;
+    const useVoiceChanger = body.useVoiceChanger;
 
     if (!contactId || !type) {
       return NextResponse.json({ error: 'Missing contactId or type' }, { status: 400 });
@@ -72,11 +74,45 @@ export async function POST(request) {
 
     // Convert relative mediaUrl to absolute if needed for Meta WhatsApp API
     let absoluteMediaUrl = mediaUrl;
+    const requestUrl = new URL(request.url);
+    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
     if (mediaUrl && !mediaUrl.startsWith('http://') && !mediaUrl.startsWith('https://')) {
-      const requestUrl = new URL(request.url);
-      const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
       absoluteMediaUrl = `${baseUrl}${mediaUrl}`;
       await logToDb('INFO', 'API', `Convertendo URL de mídia relativa para absoluta: ${absoluteMediaUrl}`);
+    }
+
+    // Process Voice Changer if requested and type is audio
+    if (type === 'audio' && useVoiceChanger && mediaUrl) {
+      try {
+        const filename = mediaUrl.split('/').pop();
+        const uploadRecord = await prisma.upload.findUnique({
+          where: { filename }
+        });
+
+        if (uploadRecord) {
+          await logToDb('INFO', 'API', `Processando áudio com ElevenLabs Voice Changer para o arquivo: ${filename}`);
+          const changedBuffer = await voiceChanger(uploadRecord.data, uploadRecord.mimeType);
+          if (changedBuffer) {
+            const newFilename = `voice_changer_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.mp3`;
+            await prisma.upload.create({
+              data: {
+                filename: newFilename,
+                mimeType: 'audio/mpeg',
+                data: changedBuffer
+              }
+            });
+            
+            mediaUrl = `/api/uploads/${newFilename}`;
+            absoluteMediaUrl = `${baseUrl}${mediaUrl}`;
+            await logToDb('INFO', 'API', `Voz modulada com sucesso. Novo arquivo: ${newFilename}`);
+          } else {
+            await logToDb('WARN', 'API', `Falha ao converter áudio com Voice Changer. Prosseguindo com o original.`);
+          }
+        }
+      } catch (err) {
+        console.error('Error in Voice Changer route hook:', err);
+        await logToDb('ERROR', 'API', `Erro no Voice Changer: ${err.message}`);
+      }
     }
 
     // Fetch system settings to see if they are configured

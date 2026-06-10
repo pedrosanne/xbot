@@ -69,3 +69,55 @@ export async function textToSpeech(text) {
     return null;
   }
 }
+
+export async function voiceChanger(audioBuffer, mimeType = 'audio/mpeg') {
+  const settings = await getSystemSettings();
+  const { elevenLabsApiKey, elevenLabsVoiceId } = settings;
+
+  if (!elevenLabsApiKey || !elevenLabsVoiceId) {
+    console.warn('ElevenLabs API credentials not configured for Voice Changer.');
+    return null;
+  }
+
+  const voiceId = elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM';
+  const url = `https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}`;
+
+  try {
+    const formData = new FormData();
+    const blob = new Blob([audioBuffer], { type: mimeType });
+    
+    // Append the audio file as a Blob with a filename
+    formData.append('audio', blob, 'input.mp3');
+    formData.append('model_id', 'eleven_multilingual_sts_v2');
+    
+    // Voice settings configuration for consistent tone matching
+    formData.append('voice_settings', JSON.stringify({
+      stability: 0.5,
+      similarity_boost: 0.75,
+      style: 0.0,
+      use_speaker_boost: true
+    }));
+
+    console.log(`Sending audio to ElevenLabs Speech-to-Speech with Voice ID: ${voiceId}`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': elevenLabsApiKey,
+        // Let boundary be set automatically by not adding Content-Type manually
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('ElevenLabs Speech-to-Speech API Error:', errText);
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.error('Error in voiceChanger:', error);
+    return null;
+  }
+}

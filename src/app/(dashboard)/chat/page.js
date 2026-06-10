@@ -32,6 +32,7 @@ export default function ChatPage() {
   // Voice Recording states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [useVoiceChanger, setUseVoiceChanger] = useState(true);
   const [recorder, setRecorder] = useState(null);
   const recordingTimerRef = useRef(null);
 
@@ -206,6 +207,7 @@ export default function ChatPage() {
               contactId: selectedContact.id,
               type: 'audio',
               mediaUrl: uploadData.url,
+              useVoiceChanger: useVoiceChanger,
             }),
           });
 
@@ -850,6 +852,20 @@ export default function ChatPage() {
                 className="form-input"
                 disabled={loading || isRecording}
               />
+
+              {/* Voice Changer Toggle */}
+              {!isRecording && (
+                <button 
+                  type="button" 
+                  onClick={() => setUseVoiceChanger(!useVoiceChanger)}
+                  className={`btn ${useVoiceChanger ? 'btn-primary' : 'btn-secondary'}`} 
+                  style={{ padding: '10px 12px', margin: 0, fontSize: '0.9rem', borderRadius: 'var(--radius-md)' }}
+                  title={useVoiceChanger ? "Voice Changer ElevenLabs: ATIVO (Muda seu tom de voz ao gravar)" : "Voice Changer ElevenLabs: INATIVO (Envia áudio original)"}
+                  disabled={loading || uploadProgress}
+                >
+                  {useVoiceChanger ? '🎭' : '🗣️'}
+                </button>
+              )}
 
               {/* Microphone recorder */}
               {!isRecording ? (
