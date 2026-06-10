@@ -241,6 +241,33 @@ export default function ChatPage() {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Validate Meta WhatsApp API size limits
+    const mediaType = getMediaType(file.type);
+    let limitBytes = 100 * 1024 * 1024; // Default to document limit (100MB)
+    let limitLabel = "100 MB";
+
+    if (mediaType === 'image') {
+      limitBytes = 5 * 1024 * 1024; // 5MB
+      limitLabel = "5 MB";
+    } else if (mediaType === 'video') {
+      limitBytes = 16 * 1024 * 1024; // 16MB
+      limitLabel = "16 MB";
+    } else if (mediaType === 'audio') {
+      limitBytes = 16 * 1024 * 1024; // 16MB
+      limitLabel = "16 MB";
+    }
+
+    if (file.size > limitBytes) {
+      alert(`O arquivo selecionado (${(file.size / (1024 * 1024)).toFixed(2)} MB) excede o limite máximo permitido pelo WhatsApp para ${
+        mediaType === 'image' ? 'imagens' : mediaType === 'video' ? 'vídeos' : mediaType === 'audio' ? 'áudios' : 'documentos'
+      }, que é de ${limitLabel}. Por favor, selecione um arquivo menor.`);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""; // Clear file input
+      }
+      return;
+    }
+
     setUploadProgress(true);
 
     const formData = new FormData();
@@ -257,7 +284,7 @@ export default function ChatPage() {
         setUploadFile({
           name: file.name,
           url: data.url,
-          type: getMediaType(file.type)
+          type: mediaType
         });
       } else {
         alert('Falha ao fazer upload do arquivo.');
