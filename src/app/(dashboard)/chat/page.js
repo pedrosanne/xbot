@@ -32,9 +32,16 @@ export default function ChatPage() {
   // Voice Recording states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioChunks, setAudioChunks] = useState([]);
+  const [recorder, setRecorder] = useState(null);
   const recordingTimerRef = useRef(null);
+
+  useEffect(() => {
+    // Only load mic-recorder-to-mp3 on the client side
+    import('mic-recorder-to-mp3').then((module) => {
+      const MicRecorder = module.default;
+      setRecorder(new MicRecorder({ bitRate: 128 }));
+    }).catch(err => console.error('Failed to load mic-recorder-to-mp3', err));
+  }, []);
 
   // File Upload states
   const [uploadFile, setUploadFile] = useState(null);
@@ -151,18 +158,33 @@ export default function ChatPage() {
 
   // Start recording audio
   const startRecording = async () => {
+    if (!recorder) {
+      alert('Gravador de áudio não inicializado.');
+      return;
+    }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks = [];
+      await recorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Error starting audio recording:', err);
+      alert('Não foi possível acessar o microfone.');
+    }
+  };
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
+  // Stop recording audio
+  const stopRecording = (shouldSend = true) => {
+    if (!recorder) return;
+    
+    clearInterval(recordingTimerRef.current);
+    setIsRecording(false);
 
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: 'audio/ogg; codecs=opus' });
-        const audioFile = new File([audioBlob], 'recorded_voice.ogg', { type: 'audio/ogg' });
+    if (shouldSend) {
+      recorder.stop().getMp3().then(async ([buffer, blob]) => {
+        const audioFile = new File(buffer, 'recorded_voice.mp3', { type: 'audio/mpeg' });
         
         const formData = new FormData();
         formData.append('file', audioFile);
@@ -189,7 +211,7 @@ export default function ChatPage() {
 
           const data = await sendRes.json();
           if (!sendRes.ok || data.sendError) {
-            alert(`Aviso: Ocorreu um erro ao enviar áudio para o WhatsApp (gravado localmente): ${data.error || data.sendError || 'Erro desconhecido'}`);
+            alert(`Aviso: Ocorreu um erro ao enviar áudio para o WhatsApp: ${data.error || data.sendError || 'Erro desconhecido'}`);
           }
           
           fetchMessages(selectedContact.id);
@@ -199,38 +221,13 @@ export default function ChatPage() {
           alert('Erro ao gravar ou enviar áudio.');
         } finally {
           setLoading(false);
-          stream.getTracks().forEach(track => track.stop());
         }
-      };
-
-      setAudioChunks(chunks);
-      setMediaRecorder(recorder);
-      recorder.start();
-      setIsRecording(true);
-      setRecordingSeconds(0);
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingSeconds((prev) => prev + 1);
-      }, 1000);
-    } catch (err) {
-      console.error('Error starting audio recording:', err);
-      alert('Não foi possível acessar o microfone.');
-    }
-  };
-
-  // Stop recording audio
-  const stopRecording = (shouldSend = true) => {
-    if (!mediaRecorder) return;
-    
-    clearInterval(recordingTimerRef.current);
-    setIsRecording(false);
-
-    if (shouldSend) {
-      mediaRecorder.stop();
+      }).catch((err) => {
+        console.error('Error getting MP3 buffer:', err);
+        alert('Erro ao processar áudio gravado.');
+      });
     } else {
-      mediaRecorder.ondataavailable = null;
-      mediaRecorder.onstop = null;
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
-      setMediaRecorder(null);
+      recorder.stop();
     }
   };
 
