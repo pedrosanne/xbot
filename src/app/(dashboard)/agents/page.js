@@ -54,6 +54,7 @@ export default function AgentsPage() {
   const [flowKeywords, setFlowKeywords] = useState('');
   const [nodes, setNodes] = useState([]); // { id, x, y, text, media:{type,url,caption}, buttons:[] }
   const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   // Canvas state
   const canvasRef = useRef(null);
@@ -369,6 +370,7 @@ export default function AgentsPage() {
     setEditingFlowId(null);
     setNodes([]);
     setSelectedNodeId(null);
+    setIsFullScreen(false);
   };
 
   const handleSaveFlow = async () => {
@@ -970,7 +972,28 @@ export default function AgentsPage() {
             VISUAL FLOW BUILDER CANVAS (Full-screen overlay within page)
             ===================================================================== */}
         {activeTab === 'flows' && builderOpen && (
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '16px', minHeight: 0 }}>
+          <div 
+            style={isFullScreen ? {
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              zIndex: 99999,
+              background: '#0b0f19',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              boxSizing: 'border-box'
+            } : {
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+              gap: '16px',
+              minHeight: 0
+            }}
+          >
 
             {/* Builder Top Config */}
             <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'end' }}>
@@ -992,6 +1015,14 @@ export default function AgentsPage() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  onClick={() => setIsFullScreen(!isFullScreen)} 
+                  className="btn btn-secondary" 
+                  style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  title={isFullScreen ? "Sair da Tela Cheia" : "Modo Tela Cheia"}
+                >
+                  {isFullScreen ? '🗗 Sair Tela Cheia' : '🗖 Tela Cheia'}
+                </button>
                 <button onClick={handleSaveFlow} className="btn btn-primary" style={{ padding: '8px 20px' }} disabled={flowLoading}>
                   {flowLoading ? 'Salvando...' : '💾 Salvar Fluxo'}
                 </button>
