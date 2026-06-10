@@ -427,8 +427,7 @@ async function sendBotResponse(contactId, aiTextResponse) {
   const botMessageId = `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   if (audioUrlToSend) {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://domain.com';
-    const absoluteAudioUrl = `${baseUrl}${audioUrlToSend}`;
+    const absoluteAudioUrl = getAbsoluteUrl(audioUrlToSend);
     try {
       await sendAudio(contactId, absoluteAudioUrl);
       await saveOutgoingMessage(botMessageId, contactId, 'audio', audioUrlToSend, 'Mensagem de voz');
@@ -494,6 +493,9 @@ function getAbsoluteUrl(urlPath) {
   if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
     return urlPath;
   }
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://domain.com';
+  // Try NEXT_PUBLIC_BASE_URL first, then Vercel deployment URL, then fallback to domain.com
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL 
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+    || 'https://domain.com';
   return `${baseUrl}${urlPath}`;
 }
