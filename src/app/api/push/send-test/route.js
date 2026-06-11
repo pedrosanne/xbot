@@ -9,7 +9,7 @@ export async function POST(request) {
     await logToDb('INFO', 'API', 'Disparando notificação push de teste.');
     
     const result = await sendPushNotification(
-      title || 'Teste do ZapFlow ⚡',
+      title || 'Teste do Xbot ⚡',
       body || 'Sua notificação de teste nativa do PWA está funcionando perfeitamente!',
       '/chat'
     );

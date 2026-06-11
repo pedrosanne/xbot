@@ -1,6 +1,6 @@
 {
-  "name": "ZapFlow Bot",
-  "short_name": "ZapFlow",
+  "name": "Xbot Bot",
+  "short_name": "Xbot",
   "description": "Plataforma de Atendimento Híbrido e IA para WhatsApp",
   "start_url": "/",
   "display": "standalone",

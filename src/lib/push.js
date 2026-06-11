@@ -12,7 +12,7 @@ export async function sendPushNotification(title, body, url = '/chat') {
       return { success: false, reason: 'VAPID keys not configured' };
     }
 
-    const subject = process.env.NEXT_PUBLIC_BASE_URL || 'mailto:admin@zapflow.com';
+    const subject = process.env.NEXT_PUBLIC_BASE_URL || 'mailto:admin@xbot.com';
     webPush.setVapidDetails(
       subject,
       settings.vapidPublicKey,

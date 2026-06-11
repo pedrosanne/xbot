@@ -8,7 +8,7 @@ export const metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'ZapFlow',
+    title: 'Xbot',
   },
 };
 

@@ -67,10 +67,10 @@ export default function LoginPage() {
           fontSize: '28px',
           boxShadow: '0 8px 20px rgba(139, 92, 246, 0.3)'
         }}>
-          W
+          X
         </div>
         <h2 style={{ fontSize: '1.75rem', fontWeight: 700, background: 'linear-gradient(135deg, #fff, var(--text-secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          ZapFlow
+          Xbot
         </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
           Acesse sua conta para gerenciar seus atendimentos

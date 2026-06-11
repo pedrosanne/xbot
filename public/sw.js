@@ -3,7 +3,7 @@ self.addEventListener('push', function(event) {
     try {
       const payload = event.data.json();
       const options = {
-        body: payload.body || 'Nova mensagem recebida no ZapFlow.',
+        body: payload.body || 'Nova mensagem recebida no Xbot.',
         icon: payload.icon || '/icons/icon.svg',
         badge: payload.badge || '/icons/icon.svg',
         vibrate: [100, 50, 100],
@@ -13,12 +13,12 @@ self.addEventListener('push', function(event) {
       };
 
       event.waitUntil(
-        self.registration.showNotification(payload.title || 'ZapFlow Notificação', options)
+        self.registration.showNotification(payload.title || 'Xbot Notificação', options)
       );
     } catch (e) {
       const text = event.data.text();
       event.waitUntil(
-        self.registration.showNotification('ZapFlow Notificação', {
+        self.registration.showNotification('Xbot Notificação', {
           body: text || 'Você tem uma nova mensagem de atendimento.',
           icon: '/icons/icon.svg',
           data: { url: '/chat' }

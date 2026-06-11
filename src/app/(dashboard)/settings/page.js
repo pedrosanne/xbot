@@ -43,7 +43,7 @@ export default function SettingsPage() {
   const [subLoading, setSubLoading] = useState(false);
   
   // Test Push Customization
-  const [testTitle, setTestTitle] = useState('Mensagem do ZapFlow ⚡');
+  const [testTitle, setTestTitle] = useState('Mensagem do Xbot ⚡');
   const [testBody, setTestBody] = useState('Uma nova mensagem precisa de atendimento humano no painel!');
 
   // Fetch settings & check push status on mount
@@ -539,7 +539,7 @@ export default function SettingsPage() {
         </form>
 
         <div className="glass-panel" style={{ padding: '20px', marginTop: '24px', background: 'rgba(255,255,255,0.01)', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-          💡 <strong>Como funciona o PWA:</strong> Clique na barra de endereços do seu navegador (no botão de instalação "+" ou "Instalar aplicativo") para adicionar o ZapFlow à tela inicial do seu computador ou celular. Após salvar as chaves VAPID e clicar em "Ativar Notificações", você receberá notificações pop-up nativas mesmo se a aba do sistema estiver fechada!
+          💡 <strong>Como funciona o PWA:</strong> Clique na barra de endereços do seu navegador (no botão de instalação "+" ou "Instalar aplicativo") para adicionar o Xbot à tela inicial do seu computador ou celular. Após salvar as chaves VAPID e clicar em "Ativar Notificações", você receberá notificações pop-up nativas mesmo se a aba do sistema estiver fechada!
         </div>
 
       </div>

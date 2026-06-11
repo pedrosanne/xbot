@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'zapflow_super_secret_key_1234567890_change_me';
+const JWT_SECRET = process.env.JWT_SECRET || 'xbot_super_secret_key_1234567890_change_me';
 const SECRET_KEY = new TextEncoder().encode(JWT_SECRET);
 
 /**
