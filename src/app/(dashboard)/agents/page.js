@@ -424,6 +424,37 @@ export default function AgentsPage() {
     if (selectedNodeId === nodeId) setSelectedNodeId(null);
   };
 
+  const duplicateNode = (nodeId) => {
+    const nodeToDuplicate = nodes.find(n => n.id === nodeId);
+    if (!nodeToDuplicate) return;
+
+    const newId = `etapa_${uid()}`;
+
+    // Deep clone media if present
+    const duplicatedMedia = nodeToDuplicate.media 
+      ? { ...nodeToDuplicate.media }
+      : null;
+
+    // Deep clone buttons with new unique button IDs to avoid conflicts
+    const duplicatedButtons = (nodeToDuplicate.buttons || []).map(btn => ({
+      ...btn,
+      id: `btn_${uid()}` // Regenerate button IDs
+    }));
+
+    const duplicatedNode = {
+      ...nodeToDuplicate,
+      id: newId,
+      // Slightly offset coordinates to prevent perfect overlap
+      x: nodeToDuplicate.x + 50,
+      y: nodeToDuplicate.y + 50,
+      media: duplicatedMedia,
+      buttons: duplicatedButtons,
+    };
+
+    setNodes(prev => [...prev, duplicatedNode]);
+    setSelectedNodeId(newId);
+  };
+
   const updateNode = (nodeId, updates) => {
     setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, ...updates } : n));
   };
@@ -1039,6 +1070,7 @@ export default function AgentsPage() {
             <div className="flow-sidebar-header">
               <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Propriedades do Nó</h3>
               <div style={{ display: 'flex', gap: '6px' }}>
+                <button onClick={() => duplicateNode(selectedNodeId)} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>Duplicar</button>
                 <button onClick={() => deleteNode(selectedNodeId)} className="btn btn-danger" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Excluir</button>
                 <button onClick={() => setSelectedNodeId(null)} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>✕</button>
               </div>
