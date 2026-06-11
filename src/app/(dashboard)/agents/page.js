@@ -44,6 +44,7 @@ export default function AgentsPage() {
   // ==========================================
   const [flows, setFlows] = useState([]);
   const [flowLoading, setFlowLoading] = useState(false);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
 
   // ==========================================
   // STATE: Visual Flow Builder Canvas
@@ -485,6 +486,44 @@ export default function AgentsPage() {
       btns.splice(btnIndex, 1);
       return { ...n, buttons: btns };
     }));
+  };
+
+  const handleAudioUpload = async (e, nodeId) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingAudio(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/uploads', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error('Falha no upload');
+      }
+
+      const data = await res.json();
+      if (data.success && data.url) {
+        updateNode(nodeId, {
+          media: {
+            type: 'audio',
+            url: data.url,
+            caption: ''
+          }
+        });
+      } else {
+        alert('Erro ao realizar upload do arquivo.');
+      }
+    } catch (err) {
+      console.error('Error uploading audio:', err);
+      alert('Ocorreu um erro ao enviar o arquivo de áudio.');
+    } finally {
+      setUploadingAudio(false);
+    }
   };
 
   // ==========================================
@@ -1082,6 +1121,35 @@ export default function AgentsPage() {
 
                 {selectedNode.media?.type && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                    {selectedNode.media.type === 'audio' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label className="btn btn-secondary" style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '8px', 
+                          cursor: 'pointer',
+                          padding: '8px 12px',
+                          fontSize: '0.82rem',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          border: '1px dashed rgba(255, 255, 255, 0.2)',
+                          borderRadius: '6px',
+                          textAlign: 'center'
+                        }}>
+                          {uploadingAudio ? '📤 Enviando...' : '📁 Escolher Áudio do Dispositivo'}
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            style={{ display: 'none' }}
+                            disabled={uploadingAudio}
+                            onChange={(e) => handleAudioUpload(e, selectedNodeId)}
+                          />
+                        </label>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '2px 0 4px 0', lineHeight: '1.3' }}>
+                          ⚠️ <strong>Dica Xbot:</strong> Para o áudio chegar como gravação nativa (humana), use arquivos no formato <strong>.ogg (codec Opus)</strong>.
+                        </p>
+                      </div>
+                    )}
                     <input
                       type="text"
                       className="form-input"
