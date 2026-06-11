@@ -44,7 +44,7 @@ export default function AgentsPage() {
   // ==========================================
   const [flows, setFlows] = useState([]);
   const [flowLoading, setFlowLoading] = useState(false);
-  const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
 
   // ==========================================
   // STATE: Visual Flow Builder Canvas
@@ -488,11 +488,11 @@ export default function AgentsPage() {
     }));
   };
 
-  const handleAudioUpload = async (e, nodeId) => {
+  const handleMediaUpload = async (e, nodeId, mediaType) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadingAudio(true);
+    setUploadingMedia(true);
     const formData = new FormData();
     formData.append('file', file);
 
@@ -508,21 +508,22 @@ export default function AgentsPage() {
 
       const data = await res.json();
       if (data.success && data.url) {
+        const currentNode = nodes.find(n => n.id === nodeId);
         updateNode(nodeId, {
           media: {
-            type: 'audio',
+            type: mediaType,
             url: data.url,
-            caption: ''
+            caption: currentNode?.media?.caption || ''
           }
         });
       } else {
         alert('Erro ao realizar upload do arquivo.');
       }
     } catch (err) {
-      console.error('Error uploading audio:', err);
-      alert('Ocorreu um erro ao enviar o arquivo de áudio.');
+      console.error('Error uploading file:', err);
+      alert('Ocorreu um erro ao enviar o arquivo.');
     } finally {
-      setUploadingAudio(false);
+      setUploadingMedia(false);
     }
   };
 
@@ -1121,7 +1122,7 @@ export default function AgentsPage() {
 
                 {selectedNode.media?.type && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                    {selectedNode.media.type === 'audio' && (
+                    {['image', 'video', 'audio', 'document'].includes(selectedNode.media.type) && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <label className="btn btn-secondary" style={{ 
                           display: 'flex', 
@@ -1136,18 +1137,20 @@ export default function AgentsPage() {
                           borderRadius: '6px',
                           textAlign: 'center'
                         }}>
-                          {uploadingAudio ? '📤 Enviando...' : '📁 Escolher Áudio do Dispositivo'}
+                          {uploadingMedia ? '📤 Enviando...' : `📁 Escolher ${selectedNode.media.type === 'image' ? 'Imagem' : selectedNode.media.type === 'video' ? 'Vídeo' : selectedNode.media.type === 'audio' ? 'Áudio' : 'Documento'} do Dispositivo`}
                           <input
                             type="file"
-                            accept="audio/*"
+                            accept={selectedNode.media.type === 'image' ? 'image/*' : selectedNode.media.type === 'video' ? 'video/*' : selectedNode.media.type === 'audio' ? 'audio/*' : undefined}
                             style={{ display: 'none' }}
-                            disabled={uploadingAudio}
-                            onChange={(e) => handleAudioUpload(e, selectedNodeId)}
+                            disabled={uploadingMedia}
+                            onChange={(e) => handleMediaUpload(e, selectedNodeId, selectedNode.media.type)}
                           />
                         </label>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '2px 0 4px 0', lineHeight: '1.3' }}>
-                          ⚠️ <strong>Dica Xbot:</strong> Para o áudio chegar como gravação nativa (humana), use arquivos no formato <strong>.ogg (codec Opus)</strong>.
-                        </p>
+                        {selectedNode.media.type === 'audio' && (
+                          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '2px 0 4px 0', lineHeight: '1.3' }}>
+                            ⚠️ <strong>Dica Xbot:</strong> Para o áudio chegar como gravação nativa (humana), use arquivos no formato <strong>.ogg (codec Opus)</strong>.
+                          </p>
+                        )}
                       </div>
                     )}
                     <input
