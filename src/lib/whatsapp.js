@@ -141,6 +141,28 @@ export async function sendButtons(to, bodyText, buttons) {
   return sendWhatsAppMessage(payload);
 }
 
+export async function sendCTAUrlButton(to, bodyText, buttonTitle, url) {
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'cta_url',
+      body: { text: bodyText },
+      action: {
+        name: 'cta_url',
+        parameters: {
+          display_text: buttonTitle.substring(0, 20),
+          url: url
+        }
+      }
+    }
+  };
+  return sendWhatsAppMessage(payload);
+}
+
+
 // Downloads media from Meta Servers to database storage
 export async function downloadWhatsAppMedia(mediaId, mimeType) {
   const settings = await getSystemSettings();

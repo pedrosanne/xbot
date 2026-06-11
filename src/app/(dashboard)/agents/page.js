@@ -447,8 +447,13 @@ export default function AgentsPage() {
   const addButtonToNode = (nodeId) => {
     setNodes(prev => prev.map(n => {
       if (n.id !== nodeId) return n;
-      if ((n.buttons || []).length >= 3) { alert('Máximo 3 botões por mensagem.'); return n; }
-      return { ...n, buttons: [...(n.buttons || []), { id: `btn_${uid()}`, title: 'Novo Botão', action: 'go_to_step', targetStepId: '' }] };
+      const btns = n.buttons || [];
+      if (btns.some(b => b.action === 'open_url')) {
+        alert('Mensagens com botão de link (URL) podem conter apenas 1 botão.');
+        return n;
+      }
+      if (btns.length >= 3) { alert('Máximo 3 botões por mensagem.'); return n; }
+      return { ...n, buttons: [...btns, { id: `btn_${uid()}`, title: 'Novo Botão', action: 'go_to_step', targetStepId: '' }] };
     }));
   };
 
@@ -456,7 +461,19 @@ export default function AgentsPage() {
     setNodes(prev => prev.map(n => {
       if (n.id !== nodeId) return n;
       const btns = [...(n.buttons || [])];
+      
+      if (field === 'action' && value === 'open_url' && btns.length > 1) {
+        alert('O WhatsApp permite apenas 1 botão de link por mensagem. Remova os outros botões para usar esta ação.');
+        return n;
+      }
+      
       btns[btnIndex] = { ...btns[btnIndex], [field]: value };
+      
+      if (field === 'action' && value === 'open_url') {
+        btns[btnIndex].url = btns[btnIndex].url || '';
+        btns[btnIndex].targetStepId = ''; // Clear targetStepId for link button
+      }
+      
       return { ...n, buttons: btns };
     }));
   };
@@ -1121,30 +1138,49 @@ export default function AgentsPage() {
                       />
                       <button onClick={() => removeButton(selectedNodeId, bi)} style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '4px', fontSize: '1rem' }}>✕</button>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <select
-                        className="form-select"
-                        style={{ padding: '6px 8px', fontSize: '0.78rem', margin: 0, flex: 1 }}
-                        value={btn.action}
-                        onChange={(e) => updateButton(selectedNodeId, bi, 'action', e.target.value)}
-                      >
-                        <option value="go_to_step">Ir para Etapa</option>
-                        <option value="transfer_to_ia">Ativar IA</option>
-                        <option value="transfer_to_human">Transferir Humano</option>
-                        <option value="end_flow">Finalizar Fluxo</option>
-                      </select>
-                      {btn.action === 'go_to_step' && (
+                    <div style={{ display: 'flex', gap: '6px', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', gap: '6px' }}>
                         <select
                           className="form-select"
                           style={{ padding: '6px 8px', fontSize: '0.78rem', margin: 0, flex: 1 }}
-                          value={btn.targetStepId}
-                          onChange={(e) => updateButton(selectedNodeId, bi, 'targetStepId', e.target.value)}
+                          value={btn.action}
+                          onChange={(e) => updateButton(selectedNodeId, bi, 'action', e.target.value)}
                         >
-                          <option value="">-- Selecione --</option>
-                          {nodes.filter(n => n.id !== selectedNodeId).map(n => (
-                            <option key={n.id} value={n.id}>{n.id}</option>
-                          ))}
+                          <option value="go_to_step">Ir para Etapa</option>
+                          <option value="open_url">Abrir Link (URL)</option>
+                          <option value="transfer_to_ia">Ativar IA</option>
+                          <option value="transfer_to_human">Transferir Humano</option>
+                          <option value="end_flow">Finalizar Fluxo</option>
                         </select>
+                        {btn.action === 'go_to_step' && (
+                          <select
+                            className="form-select"
+                            style={{ padding: '6px 8px', fontSize: '0.78rem', margin: 0, flex: 1 }}
+                            value={btn.targetStepId}
+                            onChange={(e) => updateButton(selectedNodeId, bi, 'targetStepId', e.target.value)}
+                          >
+                            <option value="">-- Selecione --</option>
+                            {nodes.filter(n => n.id !== selectedNodeId).map(n => (
+                              <option key={n.id} value={n.id}>{n.id}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      
+                      {btn.action === 'open_url' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ padding: '6px 10px', fontSize: '0.8rem', margin: 0 }}
+                            value={btn.url || ''}
+                            onChange={(e) => updateButton(selectedNodeId, bi, 'url', e.target.value)}
+                            placeholder="Link (ex: https://exemplo.com)"
+                          />
+                          <div style={{ fontSize: '0.7rem', color: '#ffb020', background: 'rgba(255, 176, 32, 0.05)', padding: '6px 8px', borderRadius: '4px', borderLeft: '2px solid #ffb020', marginTop: '2px', lineHeight: '1.2' }}>
+                            ⚠️ O WhatsApp permite apenas 1 botão de link por mensagem, sem outros botões concomitantes.
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

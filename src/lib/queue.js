@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { generateAIResponse } from './gemini';
-import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons } from './whatsapp';
+import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton } from './whatsapp';
 import { textToSpeech } from './tts';
 import { logToDb } from './log';
 import { sendPushNotification } from './push';
@@ -320,7 +320,20 @@ async function sendStepResponse(contactId, step, steps) {
     finalText = text ? `🔗 ${media.url}\n\n${text}` : `🔗 ${media.url}`;
   }
 
-  if (options.length > 0) {
+  const urlButton = options.find(opt => opt.action === 'open_url');
+
+  if (urlButton) {
+    try {
+      await logToDb('INFO', 'API', `Enviando botão de link para ${contactId} na etapa '${step.id}'`);
+      await sendCTAUrlButton(contactId, finalText, urlButton.title, urlButton.url || '');
+      await saveOutgoingMessage(`bot_${Date.now()}_cta`, contactId, 'text', '', `${finalText} [Link: ${urlButton.title} - ${urlButton.url}]`);
+    } catch (err) {
+      console.error('Failed to send CTA URL button, falling back to text link', err);
+      const fallbackText = `${finalText}\n\n🔗 *${urlButton.title}*: ${urlButton.url}`;
+      await sendText(contactId, fallbackText);
+      await saveOutgoingMessage(`bot_${Date.now()}_text_fallback`, contactId, 'text', '', fallbackText);
+    }
+  } else if (options.length > 0) {
     const formattedButtons = options.slice(0, 3).map(opt => ({
       id: opt.id,
       title: opt.title
