@@ -8,6 +8,20 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    if (saved === 'true') {
+      setIsCollapsed(true);
+    }
+  }, []);
+
+  const toggleCollapse = () => {
+    const nextState = !isCollapsed;
+    setIsCollapsed(nextState);
+    localStorage.setItem('sidebar-collapsed', String(nextState));
+  };
 
   useEffect(() => {
     async function fetchUser() {
@@ -116,9 +130,10 @@ export default function Sidebar() {
                   onClick={() => {
                     if (isMobile) setIsMobileOpen(false);
                   }}
+                  title={(!isMobile && isCollapsed) ? item.name : undefined}
                 >
                   {item.icon}
-                  <span>{item.name}</span>
+                  <span className="nav-link-text">{item.name}</span>
                 </Link>
               </li>
             );
@@ -128,36 +143,16 @@ export default function Sidebar() {
 
       {/* User profile & Logout */}
       {user && (
-        <div style={{
-          padding: '12px 8px',
-          borderTop: '1px solid var(--border-glass)',
-          marginTop: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              background: 'var(--color-primary)',
-              color: 'var(--bg-primary)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              boxShadow: '0 4px 10px rgba(255, 255, 255, 0.05)',
-              flexShrink: 0
-            }}>
+        <div className="user-profile-container">
+          <div className="user-info-row">
+            <div className="avatar-circle">
               {getInitials(user.name)}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+            <div className="user-details-wrapper">
+              <span className="user-name-text">
                 {user.name}
               </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              <span className="user-email-text">
                 {user.email}
               </span>
             </div>
@@ -165,29 +160,21 @@ export default function Sidebar() {
           
           <button 
             onClick={handleLogout}
-            className="btn btn-secondary"
-            style={{ 
-              width: '100%', 
-              padding: '8px 12px', 
-              fontSize: '0.8rem', 
-              justifyContent: 'center',
-              borderColor: 'rgba(239, 68, 68, 0.2)',
-              color: '#f87171',
-              background: 'rgba(255, 255, 255, 0.02)',
-              cursor: 'pointer',
-              transition: 'var(--transition-smooth)'
-            }}
+            className="btn btn-secondary logout-btn"
           >
             <svg style={{ width: '16px', height: '16px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            Sair
+            <span className="logout-text">Sair</span>
           </button>
         </div>
       )}
       
-      <div style={{ padding: '8px 8px 0 8px', color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', borderTop: user ? 'none' : '1px solid var(--border-glass)' }}>
-        X bot v1.0.0
+      <div 
+        className="version-text"
+        style={{ borderTop: user ? 'none' : '1px solid var(--border-glass)' }}
+      >
+        {(!isMobile && isCollapsed) ? 'v1.0.0' : 'X bot v1.0.0'}
       </div>
     </>
   );
@@ -195,7 +182,16 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="sidebar glass-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <aside className={`sidebar glass-panel ${isCollapsed ? 'collapsed' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <button 
+          onClick={toggleCollapse} 
+          className="collapse-btn"
+          aria-label={isCollapsed ? "Expandir menu" : "Recolher menu"}
+        >
+          <svg style={{ width: '12px', height: '12px', transform: isCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s ease' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+          </svg>
+        </button>
         {renderSidebarContent(false)}
       </aside>
 
