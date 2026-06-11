@@ -18,8 +18,11 @@ export async function sendWhatsAppMessage(payload) {
 
   const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${whatsappPhoneId}/messages`;
 
+  const targetLogRecipient = payload.to || 'status/indicator';
+  const targetLogType = payload.type || payload.status || 'unknown';
+
   try {
-    await logToDb('INFO', 'API', `Enviando mensagem WhatsApp para o número ${payload.to}`, { type: payload.type });
+    await logToDb('INFO', 'API', `Enviando mensagem WhatsApp para o número ${targetLogRecipient}`, { type: targetLogType });
 
     const response = await fetch(url, {
       method: 'POST',
@@ -37,7 +40,7 @@ export async function sendWhatsAppMessage(payload) {
       throw new Error(data.error?.message || 'Error sending message via WhatsApp API');
     }
     
-    await logToDb('INFO', 'API', `Mensagem WhatsApp enviada com sucesso para ${payload.to}. ID: ${data.messages?.[0]?.id || 'N/A'}`);
+    await logToDb('INFO', 'API', `Mensagem WhatsApp enviada com sucesso para ${targetLogRecipient}. ID: ${data.messages?.[0]?.id || 'N/A'}`);
     return data;
   } catch (error) {
     await logToDb('ERROR', 'API', `Exceção de rede ao enviar mensagem via WhatsApp: ${error.message}`, {
@@ -49,23 +52,25 @@ export async function sendWhatsAppMessage(payload) {
   }
 }
 
-export async function sendText(to, text) {
+export async function sendText(to, text, contextMessageId = null) {
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
+    ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'text',
     text: { body: text },
   };
   return sendWhatsAppMessage(payload);
 }
 
-export async function sendAudio(to, audioUrl) {
+export async function sendAudio(to, audioUrl, contextMessageId = null) {
   const isOgg = audioUrl && audioUrl.split('?')[0].toLowerCase().endsWith('.ogg');
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
+    ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'audio',
     audio: { 
       link: audioUrl,
@@ -75,11 +80,12 @@ export async function sendAudio(to, audioUrl) {
   return sendWhatsAppMessage(payload);
 }
 
-export async function sendImage(to, imageUrl, caption = '') {
+export async function sendImage(to, imageUrl, caption = '', contextMessageId = null) {
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
+    ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'image',
     image: {
       link: imageUrl,
@@ -89,11 +95,12 @@ export async function sendImage(to, imageUrl, caption = '') {
   return sendWhatsAppMessage(payload);
 }
 
-export async function sendDocument(to, docUrl, filename = 'document', caption = '') {
+export async function sendDocument(to, docUrl, filename = 'document', caption = '', contextMessageId = null) {
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
+    ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'document',
     document: {
       link: docUrl,
@@ -104,11 +111,12 @@ export async function sendDocument(to, docUrl, filename = 'document', caption = 
   return sendWhatsAppMessage(payload);
 }
 
-export async function sendVideo(to, videoUrl, caption = '') {
+export async function sendVideo(to, videoUrl, caption = '', contextMessageId = null) {
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
+    ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'video',
     video: {
       link: videoUrl,
@@ -118,11 +126,12 @@ export async function sendVideo(to, videoUrl, caption = '') {
   return sendWhatsAppMessage(payload);
 }
 
-export async function sendButtons(to, bodyText, buttons) {
+export async function sendButtons(to, bodyText, buttons, contextMessageId = null) {
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
+    ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'interactive',
     interactive: {
       type: 'button',
@@ -141,11 +150,12 @@ export async function sendButtons(to, bodyText, buttons) {
   return sendWhatsAppMessage(payload);
 }
 
-export async function sendCTAUrlButton(to, bodyText, buttonTitle, url) {
+export async function sendCTAUrlButton(to, bodyText, buttonTitle, url, contextMessageId = null) {
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
+    ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'interactive',
     interactive: {
       type: 'cta_url',
@@ -161,6 +171,20 @@ export async function sendCTAUrlButton(to, bodyText, buttonTitle, url) {
   };
   return sendWhatsAppMessage(payload);
 }
+
+export async function sendTypingIndicator(incomingMessageId) {
+  if (!incomingMessageId) return null;
+  const payload = {
+    messaging_product: 'whatsapp',
+    status: 'read',
+    message_id: incomingMessageId,
+    typing_indicator: {
+      type: 'text'
+    }
+  };
+  return sendWhatsAppMessage(payload);
+}
+
 
 
 // Downloads media from Meta Servers to database storage

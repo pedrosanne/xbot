@@ -1,9 +1,21 @@
 import { prisma } from './prisma';
 import { generateAIResponse } from './gemini';
-import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton } from './whatsapp';
+import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton, sendTypingIndicator } from './whatsapp';
 import { textToSpeech } from './tts';
 import { logToDb } from './log';
 import { sendPushNotification } from './push';
+
+function getFilenameFromUrl(urlPath, defaultName = 'documento') {
+  if (!urlPath) return defaultName;
+  try {
+    const cleanUrl = urlPath.split('?')[0];
+    const decodedUrl = decodeURIComponent(cleanUrl);
+    const base = decodedUrl.substring(decodedUrl.lastIndexOf('/') + 1);
+    return base || defaultName;
+  } catch (err) {
+    return defaultName;
+  }
+}
 
 // Removida a fila de debounce em memória que causava timeouts e instabilidade na Vercel
 
@@ -140,7 +152,7 @@ async function processSingleMessage(contact, messageData) {
 
     if (triggeredFlow) {
       await logToDb('INFO', 'FLOW', `Fluxo '${triggeredFlow.name}' disparado por palavra-chave para o contato ${contactId}`);
-      await startFlowForContact(freshContact, triggeredFlow);
+      await startFlowForContact(freshContact, triggeredFlow, messageData.id);
       return;
     }
 
@@ -169,7 +181,7 @@ async function processSingleMessage(contact, messageData) {
 
           if (matchedOption) {
             await logToDb('INFO', 'FLOW', `Opção de botão correspondente encontrada: '${matchedOption.title}'. Executando ação: ${matchedOption.action}`);
-            await executeFlowOption(freshContact, currentFlow, steps, matchedOption, text, mediaUrl, mimeType);
+            await executeFlowOption(freshContact, currentFlow, steps, matchedOption, text, mediaUrl, mimeType, messageData.id);
             return;
           } else {
             // Se houver transição direta configurada para entrada livre / fallback
@@ -181,7 +193,7 @@ async function processSingleMessage(contact, messageData) {
                   where: { id: contactId },
                   data: { currentStepId: nextStep.id }
                 });
-                await sendStepResponse(contactId, nextStep, steps);
+                await sendStepResponse(contactId, nextStep, steps, messageData.id);
                 return;
               }
             }
@@ -190,20 +202,23 @@ async function processSingleMessage(contact, messageData) {
             const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
             if (activeAgent) {
               await logToDb('INFO', 'AI', `Entrada de texto livre no fluxo. Acionando fallback híbrido com Gemini AI.`);
+              if (messageData.id) {
+                await sendTypingIndicator(messageData.id);
+              }
               const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType);
               
               // Envia resposta da IA
-              await sendText(contactId, aiTextResponse);
+              await sendText(contactId, aiTextResponse, messageData.id);
               await saveOutgoingMessage(`bot_${Date.now()}_ai_hybrid`, contactId, 'text', '', aiTextResponse);
 
               // Repete o menu de opções
               await logToDb('INFO', 'FLOW', `Reenviando opções da etapa '${currentStep.id}' após resposta da IA.`);
-              await sendStepResponse(contactId, currentStep, steps);
+              await sendStepResponse(contactId, currentStep, steps, messageData.id);
               return;
             } else {
               await logToDb('WARN', 'FLOW', `Entrada inválida. Nenhuma opção selecionada e nenhuma IA configurada. Repetindo etapa.`);
-              await sendText(contactId, "Desculpe, opção inválida. Por favor, escolha uma das opções abaixo:");
-              await sendStepResponse(contactId, currentStep, steps);
+              await sendText(contactId, "Desculpe, opção inválida. Por favor, escolha uma das opções abaixo:", messageData.id);
+              await sendStepResponse(contactId, currentStep, steps, messageData.id);
               return;
             }
           }
@@ -215,8 +230,11 @@ async function processSingleMessage(contact, messageData) {
     const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
     if (freshContact.botMode === 'IA' && activeAgent) {
       await logToDb('INFO', 'AI', `Contato está em modo IA puro. Chamando Gemini...`);
+      if (messageData.id) {
+        await sendTypingIndicator(messageData.id);
+      }
       const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType);
-      await sendBotResponse(contactId, aiTextResponse);
+      await sendBotResponse(contactId, aiTextResponse, messageData.id);
       return;
     }
 
@@ -224,7 +242,7 @@ async function processSingleMessage(contact, messageData) {
     const welcomeFlow = activeFlows.find(f => f.trigger === 'welcome');
     if (welcomeFlow) {
       await logToDb('INFO', 'FLOW', `Disparando fluxo de boas-vindas padrão (Welcome Flow) para o contato ${contactId}`);
-      await startFlowForContact(freshContact, welcomeFlow);
+      await startFlowForContact(freshContact, welcomeFlow, messageData.id);
       return;
     }
 
@@ -235,8 +253,11 @@ async function processSingleMessage(contact, messageData) {
         where: { id: contactId },
         data: { botMode: 'IA' }
       });
+      if (messageData.id) {
+        await sendTypingIndicator(messageData.id);
+      }
       const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType);
-      await sendBotResponse(contactId, aiTextResponse);
+      await sendBotResponse(contactId, aiTextResponse, messageData.id);
     } else {
       await logToDb('WARN', 'SYSTEM', 'Nenhuma persona de IA ativa ou fluxo de chatbot encontrado para responder à mensagem.');
     }
@@ -249,7 +270,7 @@ async function processSingleMessage(contact, messageData) {
   }
 }
 
-async function startFlowForContact(contact, flow) {
+async function startFlowForContact(contact, flow, incomingMessageId = null) {
   const steps = JSON.parse(flow.steps || '[]');
   if (steps.length === 0) return;
 
@@ -265,13 +286,18 @@ async function startFlowForContact(contact, flow) {
     }
   });
 
-  await sendStepResponse(contact.id, startStep, steps);
+  await sendStepResponse(contact.id, startStep, steps, incomingMessageId);
 }
 
-async function sendStepResponse(contactId, step, steps) {
+async function sendStepResponse(contactId, step, steps, incomingMessageId = null) {
   const text = step.text || '';
   const options = step.buttons || [];
   const media = step.media || null;
+
+  // Start typing indicator immediately if incomingMessageId is provided
+  if (incomingMessageId) {
+    await sendTypingIndicator(incomingMessageId);
+  }
 
   // Typing delay simulation
   if (step.delaySeconds) {
@@ -291,16 +317,17 @@ async function sendStepResponse(contactId, step, steps) {
       const caption = media.caption || '';
 
       if (media.type === 'image') {
-        await sendImage(contactId, absoluteMediaUrl, caption);
+        await sendImage(contactId, absoluteMediaUrl, caption, incomingMessageId);
         await saveOutgoingMessage(`bot_${Date.now()}_media_img`, contactId, 'image', media.url, caption);
       } else if (media.type === 'video') {
-        await sendVideo(contactId, absoluteMediaUrl, caption);
+        await sendVideo(contactId, absoluteMediaUrl, caption, incomingMessageId);
         await saveOutgoingMessage(`bot_${Date.now()}_media_vid`, contactId, 'video', media.url, caption);
       } else if (media.type === 'audio') {
-        await sendAudio(contactId, absoluteMediaUrl);
+        await sendAudio(contactId, absoluteMediaUrl, incomingMessageId);
         await saveOutgoingMessage(`bot_${Date.now()}_media_aud`, contactId, 'audio', media.url, 'Áudio do fluxo');
       } else if (media.type === 'document') {
-        await sendDocument(contactId, absoluteMediaUrl, 'documento', caption);
+        const originalFilename = getFilenameFromUrl(media.url, 'documento');
+        await sendDocument(contactId, absoluteMediaUrl, originalFilename, caption, incomingMessageId);
         await saveOutgoingMessage(`bot_${Date.now()}_media_doc`, contactId, 'document', media.url, caption);
       } else if (media.type === 'link') {
         // For links, prepend to the text message
@@ -325,12 +352,12 @@ async function sendStepResponse(contactId, step, steps) {
   if (urlButton) {
     try {
       await logToDb('INFO', 'API', `Enviando botão de link para ${contactId} na etapa '${step.id}'`);
-      await sendCTAUrlButton(contactId, finalText, urlButton.title, urlButton.url || '');
+      await sendCTAUrlButton(contactId, finalText, urlButton.title, urlButton.url || '', incomingMessageId);
       await saveOutgoingMessage(`bot_${Date.now()}_cta`, contactId, 'text', '', `${finalText} [Link: ${urlButton.title} - ${urlButton.url}]`);
     } catch (err) {
       console.error('Failed to send CTA URL button, falling back to text link', err);
       const fallbackText = `${finalText}\n\n🔗 *${urlButton.title}*: ${urlButton.url}`;
-      await sendText(contactId, fallbackText);
+      await sendText(contactId, fallbackText, incomingMessageId);
       await saveOutgoingMessage(`bot_${Date.now()}_text_fallback`, contactId, 'text', '', fallbackText);
     }
   } else if (options.length > 0) {
@@ -341,7 +368,7 @@ async function sendStepResponse(contactId, step, steps) {
 
     try {
       await logToDb('INFO', 'API', `Enviando botões interativos para ${contactId} na etapa '${step.id}'`);
-      await sendButtons(contactId, finalText, formattedButtons);
+      await sendButtons(contactId, finalText, formattedButtons, incomingMessageId);
       await saveOutgoingMessage(`bot_${Date.now()}_buttons`, contactId, 'text', '', `${finalText} [Botões: ${formattedButtons.map(b => b.title).join(', ')}]`);
     } catch (err) {
       console.error('Failed to send WhatsApp buttons, falling back to text options', err);
@@ -349,12 +376,12 @@ async function sendStepResponse(contactId, step, steps) {
       formattedButtons.forEach((btn, idx) => {
         fallbackText += `*${idx + 1}*. ${btn.title}\n`;
       });
-      await sendText(contactId, fallbackText);
+      await sendText(contactId, fallbackText, incomingMessageId);
       await saveOutgoingMessage(`bot_${Date.now()}_text_fallback`, contactId, 'text', '', fallbackText);
     }
   } else if (finalText) {
     await logToDb('INFO', 'API', `Enviando texto simples para ${contactId} na etapa '${step.id}'`);
-    await sendText(contactId, finalText);
+    await sendText(contactId, finalText, incomingMessageId);
     await saveOutgoingMessage(`bot_${Date.now()}_text`, contactId, 'text', '', finalText);
   }
 
@@ -367,12 +394,12 @@ async function sendStepResponse(contactId, step, steps) {
         where: { id: contactId },
         data: { currentStepId: nextStep.id }
       });
-      await sendStepResponse(contactId, nextStep, steps);
+      await sendStepResponse(contactId, nextStep, steps, incomingMessageId);
     }
   }
 }
 
-async function executeFlowOption(contact, flow, steps, option, groupedText, latestMediaUrl, latestMimeType) {
+async function executeFlowOption(contact, flow, steps, option, groupedText, latestMediaUrl, latestMimeType, incomingMessageId = null) {
   if (option.action === 'go_to_step') {
     const nextStep = steps.find(s => s.id === option.targetStepId);
     if (nextStep) {
@@ -381,10 +408,10 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
         where: { id: contact.id },
         data: { currentStepId: nextStep.id }
       });
-      await sendStepResponse(contact.id, nextStep, steps);
+      await sendStepResponse(contact.id, nextStep, steps, incomingMessageId);
     } else {
       await logToDb('WARN', 'FLOW', `A etapa de destino '${option.targetStepId}' não foi encontrada. Finalizando fluxo.`);
-      await sendText(contact.id, "Fluxo finalizado.");
+      await sendText(contact.id, "Fluxo finalizado.", incomingMessageId);
       await resetContactFlow(contact.id);
     }
   } else if (option.action === 'transfer_to_ia') {
@@ -400,10 +427,13 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
 
     const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
     if (activeAgent) {
+      if (incomingMessageId) {
+        await sendTypingIndicator(incomingMessageId);
+      }
       const aiTextResponse = await generateAIResponse(contact.id, groupedText, latestMediaUrl, latestMimeType);
-      await sendBotResponse(contact.id, aiTextResponse);
+      await sendBotResponse(contact.id, aiTextResponse, incomingMessageId);
     } else {
-      await sendText(contact.id, "Nossa assistente virtual está offline no momento. Como posso te ajudar?");
+      await sendText(contact.id, "Nossa assistente virtual está offline no momento. Como posso te ajudar?", incomingMessageId);
     }
   } else if (option.action === 'transfer_to_human') {
     await logToDb('INFO', 'SYSTEM', `Efetuando transbordo do contato ${contact.id} para modo HUMAN (atendimento humano manual).`);
@@ -418,7 +448,7 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
     });
 
     const transferMessage = option.text || "Entendido. Estou transferindo sua conversa para um atendente humano. Aguarde um instante.";
-    await sendText(contact.id, transferMessage);
+    await sendText(contact.id, transferMessage, incomingMessageId);
     await saveOutgoingMessage(`bot_${Date.now()}_human_transfer`, contact.id, 'text', '', transferMessage);
 
     // Envia notificação push para os operadores indicando o transbordo
@@ -431,7 +461,7 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
   } else if (option.action === 'end_flow') {
     await logToDb('INFO', 'SYSTEM', `Finalizando fluxo para o contato ${contact.id}`);
     const endMessage = option.text || "Atendimento finalizado. Obrigado!";
-    await sendText(contact.id, endMessage);
+    await sendText(contact.id, endMessage, incomingMessageId);
     await saveOutgoingMessage(`bot_${Date.now()}_end_flow`, contact.id, 'text', '', endMessage);
     await resetContactFlow(contact.id);
   }
@@ -448,7 +478,7 @@ async function resetContactFlow(contactId) {
   });
 }
 
-async function sendBotResponse(contactId, aiTextResponse) {
+async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = null) {
   let textToSend = aiTextResponse;
   let audioUrlToSend = null;
   let imageUrlToSend = null;
@@ -485,7 +515,7 @@ async function sendBotResponse(contactId, aiTextResponse) {
   if (audioUrlToSend) {
     const absoluteAudioUrl = getAbsoluteUrl(audioUrlToSend);
     try {
-      await sendAudio(contactId, absoluteAudioUrl);
+      await sendAudio(contactId, absoluteAudioUrl, incomingMessageId);
       await saveOutgoingMessage(botMessageId, contactId, 'audio', audioUrlToSend, 'Mensagem de voz');
     } catch (err) {
       console.error('Failed to send audio to WhatsApp:', err);
@@ -496,7 +526,7 @@ async function sendBotResponse(contactId, aiTextResponse) {
   if (imageUrlToSend) {
     try {
       const absoluteImgUrl = getAbsoluteUrl(imageUrlToSend);
-      await sendImage(contactId, absoluteImgUrl, textToSend);
+      await sendImage(contactId, absoluteImgUrl, textToSend, incomingMessageId);
       await saveOutgoingMessage(botMessageId + '_img', contactId, 'image', imageUrlToSend, textToSend);
       textToSend = '';
     } catch (err) {
@@ -507,7 +537,8 @@ async function sendBotResponse(contactId, aiTextResponse) {
   if (docUrlToSend) {
     try {
       const absoluteDocUrl = getAbsoluteUrl(docUrlToSend);
-      await sendDocument(contactId, absoluteDocUrl, 'documento', textToSend);
+      const originalFilename = getFilenameFromUrl(docUrlToSend, 'documento');
+      await sendDocument(contactId, absoluteDocUrl, originalFilename, textToSend, incomingMessageId);
       await saveOutgoingMessage(botMessageId + '_doc', contactId, 'document', docUrlToSend, textToSend);
       textToSend = '';
     } catch (err) {
@@ -517,7 +548,7 @@ async function sendBotResponse(contactId, aiTextResponse) {
 
   if (textToSend) {
     try {
-      await sendText(contactId, textToSend);
+      await sendText(contactId, textToSend, incomingMessageId);
       await saveOutgoingMessage(botMessageId, contactId, 'text', '', textToSend);
     } catch (err) {
       console.error('Failed to send text to WhatsApp:', err);
