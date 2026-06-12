@@ -33,6 +33,7 @@ model Agent {
   temperature  Float    @default(0.7)
   isActive     Boolean  @default(false)
   createdAt    DateTime @default(now())
+  flows        Flow[]
 }
 
 model Contact {
@@ -55,8 +56,9 @@ model Contact {
   // Scoping fields for multi-number support
   phoneNumberId   String    @default("")
   clientPhone     String    @default("")
-  connectionId    String?
-  connection      WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connectionId      String?
+  connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  designatedAgentId String?
 }
 
 model WhatsAppConnection {
@@ -108,6 +110,10 @@ model Flow {
   steps     String   @default("[]")      // JSON string of steps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  // Designate an AI Agent to this Chatbot Flow
+  agentId   String?
+  agent     Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
 }
 
 model Log {

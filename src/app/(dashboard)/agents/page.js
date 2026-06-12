@@ -54,6 +54,7 @@ export default function AgentsPage() {
   const [flowName, setFlowName] = useState('');
   const [flowTrigger, setFlowTrigger] = useState('keyword');
   const [flowKeywords, setFlowKeywords] = useState('');
+  const [flowAgentId, setFlowAgentId] = useState(null);
   const [nodes, setNodes] = useState([]); // { id, x, y, text, media:{type,url,caption}, buttons:[] }
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -457,6 +458,7 @@ export default function AgentsPage() {
     setFlowName('');
     setFlowTrigger('keyword');
     setFlowKeywords('');
+    setFlowAgentId(null);
     const startNode = {
       id: 'boas_vindas',
       x: 300,
@@ -480,6 +482,7 @@ export default function AgentsPage() {
     setFlowName(flow.name);
     setFlowTrigger(flow.trigger);
     setFlowKeywords(flow.keywords);
+    setFlowAgentId(flow.agentId || null);
     let parsed = [];
     try { parsed = JSON.parse(flow.steps || '[]'); } catch { parsed = []; }
     // Add default x/y if missing
@@ -545,6 +548,7 @@ export default function AgentsPage() {
       keywords: flowKeywords,
       steps: nodes,
       isActive: true,
+      agentId: flowAgentId
     };
 
     try {
@@ -1038,6 +1042,24 @@ export default function AgentsPage() {
               />
             </div>
           )}
+
+          {/* AI Agent Selection */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '0 1 220px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Agente IA:</span>
+            <select 
+              className="form-select" 
+              style={{ padding: '6px 10px', fontSize: '0.82rem', height: '32px', margin: 0 }} 
+              value={flowAgentId || ''} 
+              onChange={(e) => setFlowAgentId(e.target.value || null)}
+            >
+              <option value="">Nenhum (Sem IA)</option>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Buttons section */}
@@ -1897,13 +1919,22 @@ export default function AgentsPage() {
                           <div className="agent-avatar">🔀</div>
                           <div>
                             <h3 style={{ fontWeight: 600, fontSize: '1rem' }}>{flow.name}</h3>
-                            <div style={{ display: 'flex', gap: '6px', marginTop: '4px', fontSize: '0.72rem' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px', fontSize: '0.72rem' }}>
                               <span className={`badge ${flow.trigger === 'welcome' ? 'badge-success' : 'badge-warning'}`}>
                                 {flow.trigger === 'welcome' ? 'Entrada Principal' : 'Por Palavra-chave'}
                               </span>
                               <span className="badge" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
                                 {parsedSteps.length} etapas
                               </span>
+                              {agents.find(a => a.id === flow.agentId) ? (
+                                <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                                  🤖 IA: {agents.find(a => a.id === flow.agentId).name}
+                                </span>
+                              ) : (
+                                <span className="badge" style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--text-muted)' }}>
+                                  Sem IA
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

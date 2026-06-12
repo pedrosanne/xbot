@@ -18,7 +18,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const data = await request.json();
-    const { name, trigger, keywords, steps, isActive } = data;
+    const { name, trigger, keywords, steps, isActive, agentId } = data;
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -30,7 +30,8 @@ export async function POST(request) {
         trigger: trigger || 'keyword',
         keywords: keywords || '',
         steps: steps ? JSON.stringify(steps) : '[]',
-        isActive: isActive !== undefined ? isActive : true
+        isActive: isActive !== undefined ? isActive : true,
+        agentId: agentId || null
       }
     });
 
@@ -45,7 +46,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const data = await request.json();
-    const { id, name, trigger, keywords, steps, isActive } = data;
+    const { id, name, trigger, keywords, steps, isActive, agentId } = data;
 
     if (!id) {
       return NextResponse.json({ error: 'Flow ID is required' }, { status: 400 });
@@ -58,7 +59,8 @@ export async function PUT(request) {
         ...(trigger !== undefined && { trigger }),
         ...(keywords !== undefined && { keywords }),
         ...(steps !== undefined && { steps: JSON.stringify(steps) }),
-        ...(isActive !== undefined && { isActive })
+        ...(isActive !== undefined && { isActive }),
+        ...(agentId !== undefined && { agentId: agentId || null })
       }
     });
 

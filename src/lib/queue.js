@@ -219,14 +219,13 @@ async function processSingleMessage(contact, messageData) {
               }
             }
 
-            // Entrada livre de texto no fluxo (sem nextStepId). Fallback para IA se configurado, senão repete a etapa.
-            const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
-            if (activeAgent) {
-              await logToDb('INFO', 'AI', `Entrada de texto livre no fluxo. Acionando fallback híbrido com Gemini AI.`);
+            // Entrada livre de texto no fluxo (sem nextStepId). Fallback para IA se o fluxo tiver um agente de IA designado.
+            if (freshContact.designatedAgentId) {
+              await logToDb('INFO', 'AI', `Entrada de texto livre no fluxo. Acionando fallback híbrido com Gemini AI usando agente designado.`);
               if (messageData.id) {
                 await sendTypingIndicator(messageData.id, freshContact.connection);
               }
-              const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType);
+              const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, freshContact.designatedAgentId);
               
               // Envia resposta da IA
               await sendText(contactId, aiTextResponse, messageData.id, freshContact.connection);
@@ -237,8 +236,8 @@ async function processSingleMessage(contact, messageData) {
               await sendStepResponse(contactId, currentStep, steps, messageData.id, freshContact.connection);
               return;
             } else {
-              await logToDb('WARN', 'FLOW', `Entrada inválida. Nenhuma opção selecionada e nenhuma IA configurada. Repetindo etapa.`);
-              await sendText(contactId, "Desculpe, opção inválida. Por favor, escolha uma das opções abaixo:", messageData.id, freshContact.connection);
+              await logToDb('WARN', 'FLOW', `Entrada inválida. Nenhuma opção selecionada e nenhum Agente IA designado para este fluxo. Repetindo etapa.`);
+              await sendText(contactId, "Desculpe, não entendi. Por favor, escolha uma das opções abaixo:", messageData.id, freshContact.connection);
               await sendStepResponse(contactId, currentStep, steps, messageData.id, freshContact.connection);
               return;
             }
@@ -248,15 +247,25 @@ async function processSingleMessage(contact, messageData) {
     }
 
     // 5. Modo IA Puro
-    const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
-    if (freshContact.botMode === 'IA' && activeAgent) {
-      await logToDb('INFO', 'AI', `Contato está em modo IA puro. Chamando Gemini...`);
-      if (messageData.id) {
-        await sendTypingIndicator(messageData.id, freshContact.connection);
+    if (freshContact.botMode === 'IA') {
+      const agentIdToUse = freshContact.designatedAgentId;
+      let agent = null;
+      if (agentIdToUse) {
+        agent = await prisma.agent.findUnique({ where: { id: agentIdToUse } });
       }
-      const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType);
-      await sendBotResponse(contactId, aiTextResponse, messageData.id, freshContact.connection);
-      return;
+      if (!agent) {
+        agent = await prisma.agent.findFirst({ where: { isActive: true } });
+      }
+
+      if (agent) {
+        await logToDb('INFO', 'AI', `Contato está em modo IA puro com o agente '${agent.name}'. Chamando Gemini...`);
+        if (messageData.id) {
+          await sendTypingIndicator(messageData.id, freshContact.connection);
+        }
+        const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, agent.id);
+        await sendBotResponse(contactId, aiTextResponse, messageData.id, freshContact.connection);
+        return;
+      }
     }
 
     // 6. Verifica se existe um fluxo de "boas-vindas" padrão
@@ -268,16 +277,20 @@ async function processSingleMessage(contact, messageData) {
     }
 
     // 7. Último Fallback: roteia para o Agente de IA
+    const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
     if (activeAgent) {
-      await logToDb('INFO', 'AI', `Sem fluxo ativo. Definindo contato ${contactId} para modo IA e chamando Gemini.`);
+      await logToDb('INFO', 'AI', `Sem fluxo ativo. Definindo contato ${contactId} para modo IA com agente '${activeAgent.name}' e chamando Gemini.`);
       await prisma.contact.update({
         where: { id: contactId },
-        data: { botMode: 'IA' }
+        data: { 
+          botMode: 'IA',
+          designatedAgentId: activeAgent.id
+        }
       });
       if (messageData.id) {
         await sendTypingIndicator(messageData.id, freshContact.connection);
       }
-      const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType);
+      const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, activeAgent.id);
       await sendBotResponse(contactId, aiTextResponse, messageData.id, freshContact.connection);
     } else {
       await logToDb('WARN', 'SYSTEM', 'Nenhuma persona de IA ativa ou fluxo de chatbot encontrado para responder à mensagem.');
@@ -303,7 +316,8 @@ async function startFlowForContact(contact, flow, incomingMessageId = null) {
     data: {
       botMode: 'FLOW',
       activeFlowId: flow.id,
-      currentStepId: startStep.id
+      currentStepId: startStep.id,
+      designatedAgentId: flow.agentId || null
     }
   });
 
@@ -446,12 +460,20 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
       }
     });
 
-    const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
-    if (activeAgent) {
+    const agentIdToUse = contact.designatedAgentId;
+    let agent = null;
+    if (agentIdToUse) {
+      agent = await prisma.agent.findUnique({ where: { id: agentIdToUse } });
+    }
+    if (!agent) {
+      agent = await prisma.agent.findFirst({ where: { isActive: true } });
+    }
+
+    if (agent) {
       if (incomingMessageId) {
         await sendTypingIndicator(incomingMessageId, contact.connection);
       }
-      const aiTextResponse = await generateAIResponse(contact.id, groupedText, latestMediaUrl, latestMimeType);
+      const aiTextResponse = await generateAIResponse(contact.id, groupedText, latestMediaUrl, latestMimeType, agent.id);
       await sendBotResponse(contact.id, aiTextResponse, incomingMessageId, contact.connection);
     } else {
       await sendText(contact.id, "Nossa assistente virtual está offline no momento. Como posso te ajudar?", incomingMessageId, contact.connection);

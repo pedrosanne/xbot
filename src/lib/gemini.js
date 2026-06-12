@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from './prisma';
 import { getSystemSettings } from './settings';
 
-export async function generateAIResponse(contactId, incomingText = '', mediaUrl = '', mimeType = '') {
+export async function generateAIResponse(contactId, incomingText = '', mediaUrl = '', mimeType = '', customAgentId = null) {
   const settings = await getSystemSettings();
   const { geminiApiKey } = settings;
 
@@ -13,10 +13,19 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
     return 'Desculpe, o sistema de IA não está configurado. Insira a chave da API nas configurações.';
   }
 
-  // 1. Fetch active agent
-  let agent = await prisma.agent.findFirst({
-    where: { isActive: true }
-  });
+  // 1. Fetch designated agent or globally active agent
+  let agent = null;
+  if (customAgentId) {
+    agent = await prisma.agent.findUnique({
+      where: { id: customAgentId }
+    });
+  }
+
+  if (!agent) {
+    agent = await prisma.agent.findFirst({
+      where: { isActive: true }
+    });
+  }
 
   if (!agent) {
     // Fallback agent if none is active
