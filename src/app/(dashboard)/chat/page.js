@@ -21,6 +21,7 @@ export default function ChatPage() {
   const [simText, setSimText] = useState('Olá, gostaria de saber se vocês têm o produto em estoque?');
   const [simType, setSimType] = useState('text');
   const [simMediaId, setSimMediaId] = useState('wamid_test_media_123');
+  const [simConnectionPhoneId, setSimConnectionPhoneId] = useState('sim_phone_id');
 
   // Simulator Drawer and Contact Search/Filters
   const [showSimulator, setShowSimulator] = useState(false);
@@ -61,10 +62,26 @@ export default function ChatPage() {
   const [profileNotesInput, setProfileNotesInput] = useState('');
   const [profileAvatarInput, setProfileAvatarInput] = useState('');
 
-  // 1. Fetch Contact List
-  const fetchContacts = async () => {
+  const [connections, setConnections] = useState([]);
+  const [selectedConnectionId, setSelectedConnectionId] = useState('all');
+
+  // Fetch all WhatsApp Connections
+  const fetchConnections = async () => {
     try {
-      const res = await fetch('/api/chat');
+      const res = await fetch('/api/connections');
+      if (res.ok) {
+        setConnections(await res.json());
+      }
+    } catch (err) {
+      console.error('Error fetching connections:', err);
+    }
+  };
+
+  // 1. Fetch Contact List (with connection scoping filter)
+  const fetchContacts = async (connId = selectedConnectionId) => {
+    try {
+      const url = connId && connId !== 'all' ? `/api/chat?connectionId=${connId}` : '/api/chat';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setContacts(data);
@@ -99,6 +116,14 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
+    fetchConnections();
+  }, []);
+
+  useEffect(() => {
+    fetchContacts(selectedConnectionId);
+  }, [selectedConnectionId]);
+
+  useEffect(() => {
     if (selectedContact) {
       setProfileNameInput(selectedContact.name || '');
       setProfileEmailInput(selectedContact.email || '');
@@ -112,11 +137,11 @@ export default function ChatPage() {
 
   useEffect(() => {
     const load = async () => {
-      await fetchContacts();
+      await fetchContacts(selectedConnectionId);
     };
     load();
     const interval = setInterval(async () => {
-      await fetchContacts();
+      await fetchContacts(selectedConnectionId);
       if (selectedContact) {
         await fetchMessages(selectedContact.id);
       }
@@ -126,7 +151,7 @@ export default function ChatPage() {
       clearInterval(interval);
       clearInterval(recordingTimerRef.current);
     };
-  }, [selectedContact?.id]);
+  }, [selectedContact?.id, selectedConnectionId]);
 
   // Scroll to bottom when messages load
   useEffect(() => {
@@ -519,7 +544,7 @@ export default function ChatPage() {
             {
               value: {
                 messaging_product: 'whatsapp',
-                metadata: { display_phone_number: '5511999999999', phone_number_id: 'sim_phone_id' },
+                metadata: { display_phone_number: '5511999999999', phone_number_id: simConnectionPhoneId },
                 contacts: [
                   {
                     profile: { name: simName },
@@ -555,7 +580,10 @@ export default function ChatPage() {
       if (res.ok) {
         alert('Simulação enviada com sucesso ao Webhook! Aguarde a IA responder na fila em 2.5s.');
         // Select simulated contact automatically
-        const checkContact = { id: simPhone, name: simName, status: 'AUTO' };
+        const formattedContactId = simConnectionPhoneId !== 'sim_phone_id' 
+          ? `${simConnectionPhoneId}:${simPhone}` 
+          : simPhone;
+        const checkContact = { id: formattedContactId, name: simName, status: 'AUTO' };
         setSelectedContact(checkContact);
         fetchContacts();
       }
@@ -601,6 +629,23 @@ export default function ChatPage() {
             >
               🧪 Simulador
             </button>
+          </div>
+
+          {/* WhatsApp Connection Scoping Filter */}
+          <div style={{ margin: '12px 0 6px 0' }}>
+            <select
+              value={selectedConnectionId}
+              onChange={(e) => setSelectedConnectionId(e.target.value)}
+              className="form-select"
+              style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem', margin: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-glass)' }}
+            >
+              <option value="all">📞 Todos os Números</option>
+              {connections.map((conn) => (
+                <option key={conn.id} value={conn.id}>
+                  {conn.name} ({conn.phoneNumber || conn.whatsappPhoneId})
+                </option>
+              ))}
+            </select>
           </div>
           
           {/* Search bar */}
@@ -1209,6 +1254,22 @@ export default function ChatPage() {
                   className="form-input" 
                   required
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Recebido por (Número/Conexão)</label>
+                <select
+                  value={simConnectionPhoneId}
+                  onChange={(e) => setSimConnectionPhoneId(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="sim_phone_id">Padrão do Sistema (Single-Number)</option>
+                  {connections.map((conn) => (
+                    <option key={conn.id} value={conn.whatsappPhoneId}>
+                      {conn.name} ({conn.phoneNumber || conn.whatsappPhoneId})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">

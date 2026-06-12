@@ -51,6 +51,25 @@ model Contact {
   messages        Message[]
   calls           Call[]
   createdAt       DateTime  @default(now())
+  
+  // Scoping fields for multi-number support
+  phoneNumberId   String    @default("")
+  clientPhone     String    @default("")
+  connectionId    String?
+  connection      WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+}
+
+model WhatsAppConnection {
+  id                  String    @id @default(uuid())
+  name                String    // Ex: "Vendas", "Suporte"
+  phoneNumber         String    @default("") // Ex: +5511999999999
+  whatsappToken       String    @default("")
+  whatsappPhoneId     String    @unique
+  whatsappVerifyToken String    @default("antigravity_token_123")
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  contacts            Contact[]
 }
 
 model Message {

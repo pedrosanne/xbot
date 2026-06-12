@@ -9,6 +9,7 @@ import { voiceChanger } from '@/lib/tts';
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const contactId = searchParams.get('contactId');
+  const connectionId = searchParams.get('connectionId');
 
   try {
     if (contactId) {
@@ -18,13 +19,21 @@ export async function GET(request) {
         orderBy: { timestamp: 'asc' }
       });
       const contact = await prisma.contact.findUnique({
-        where: { id: contactId }
+        where: { id: contactId },
+        include: { connection: true }
       });
       return NextResponse.json({ messages, contact });
     }
 
+    // Filter by connectionId if provided
+    const where = {};
+    if (connectionId && connectionId !== 'all') {
+      where.connectionId = connectionId;
+    }
+
     // Return list of all contacts with their last message
     const contacts = await prisma.contact.findMany({
+      where,
       orderBy: { lastInteraction: 'desc' },
       include: {
         messages: {
@@ -115,26 +124,43 @@ export async function POST(request) {
       }
     }
 
-    // Fetch system settings to see if they are configured
-    const settings = await getSystemSettings();
+    // Fetch contact to get its connection details
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      include: { connection: true }
+    });
+
+    let connectionToUse = null;
+    let hasCredentials = false;
+
+    if (contact?.connection?.whatsappToken && contact?.connection?.whatsappPhoneId) {
+      connectionToUse = contact.connection;
+      hasCredentials = true;
+    } else {
+      const settings = await getSystemSettings();
+      if (settings.whatsappToken && settings.whatsappPhoneId) {
+        hasCredentials = true;
+      }
+    }
+
     let result = null;
     let sendError = '';
 
-    if (!settings.whatsappToken || !settings.whatsappPhoneId) {
+    if (!hasCredentials) {
       sendError = 'WhatsApp credentials not set';
       await logToDb('WARN', 'API', `WhatsApp não está configurado para envio real. Salvando mensagem localmente de forma simulada.`);
     } else {
       try {
         if (type === 'text') {
-          result = await sendText(contactId, content);
+          result = await sendText(contactId, content, null, connectionToUse);
         } else if (type === 'audio') {
-          result = await sendAudio(contactId, absoluteMediaUrl);
+          result = await sendAudio(contactId, absoluteMediaUrl, null, connectionToUse);
         } else if (type === 'image') {
-          result = await sendImage(contactId, absoluteMediaUrl, content);
+          result = await sendImage(contactId, absoluteMediaUrl, content, null, connectionToUse);
         } else if (type === 'document') {
-          result = await sendDocument(contactId, absoluteMediaUrl, 'documento', content);
+          result = await sendDocument(contactId, absoluteMediaUrl, 'documento', content, null, connectionToUse);
         } else if (type === 'video') {
-          result = await sendVideo(contactId, absoluteMediaUrl, content);
+          result = await sendVideo(contactId, absoluteMediaUrl, content, null, connectionToUse);
         }
       } catch (apiError) {
         sendError = apiError.message || 'Meta WhatsApp API Error';

@@ -14,17 +14,33 @@ export async function GET(request) {
   const challenge = searchParams.get('hub.challenge');
 
   const settings = await getSystemSettings();
-  const verifyToken = settings.whatsappVerifyToken || 'antigravity_token_123';
+  const systemVerifyToken = settings.whatsappVerifyToken || 'antigravity_token_123';
+
+  // Retrieve verify tokens from system settings and all active connections
+  const verifyTokens = [systemVerifyToken];
+  try {
+    const activeConnections = await prisma.whatsAppConnection.findMany({
+      where: { isActive: true },
+      select: { whatsappVerifyToken: true }
+    });
+    activeConnections.forEach(c => {
+      if (c.whatsappVerifyToken) verifyTokens.push(c.whatsappVerifyToken);
+    });
+  } catch (err) {
+    console.error('Error fetching verify tokens from connections:', err);
+  }
+
+  const isValidToken = verifyTokens.includes(token);
 
   if (mode && token) {
-    if (mode === 'subscribe' && token === verifyToken) {
+    if (mode === 'subscribe' && isValidToken) {
       await logToDb('INFO', 'WEBHOOK', 'Webhook verificado com sucesso pelo Meta Developer Console.');
       console.log('Webhook WhatsApp verificado com sucesso!');
       return new Response(challenge, { status: 200 });
     }
     await logToDb('WARN', 'WEBHOOK', 'Falha na verificação do Webhook: Token inválido.', {
       tokenRecebido: token,
-      tokenEsperado: verifyToken
+      tokensValidos: verifyTokens
     });
     console.warn('Falha na verificação do Webhook: Token inválido.');
     return new Response('Forbidden', { status: 403 });
@@ -92,8 +108,23 @@ export async function POST(request) {
     });
 
     // 2. Extract details
-    const contactId = message.from;
+    const systemSettings = await getSystemSettings();
+    const receiverPhoneId = value?.metadata?.phone_number_id || systemSettings.whatsappPhoneId || 'system';
+    const contactId = `${receiverPhoneId}:${message.from}`;
     const profileName = value?.contacts?.[0]?.profile?.name || '';
+
+    // Find connection to use its token for downloading media
+    let connection = null;
+    if (receiverPhoneId && receiverPhoneId !== 'system') {
+      try {
+        connection = await prisma.whatsAppConnection.findUnique({
+          where: { whatsappPhoneId: receiverPhoneId }
+        });
+      } catch (err) {
+        console.error('Error finding connection in webhook POST:', err);
+      }
+    }
+    const tokenToUse = connection?.whatsappToken || systemSettings.whatsappToken;
     
     // 3. Process media
     const type = message.type;
@@ -112,25 +143,25 @@ export async function POST(request) {
       const mediaId = message.audio?.id;
       const mimeType = message.audio?.mime_type || 'audio/ogg';
       await logToDb('INFO', 'WEBHOOK', `Baixando arquivo de áudio. ID: ${mediaId}`);
-      mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType);
+      mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType, tokenToUse);
       content = '[Mensagem de voz]';
     } else if (type === 'image') {
       const mediaId = message.image?.id;
       const mimeType = message.image?.mime_type || 'image/jpeg';
       await logToDb('INFO', 'WEBHOOK', `Baixando arquivo de imagem. ID: ${mediaId}`);
-      mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType);
+      mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType, tokenToUse);
       content = message.image?.caption || '[Imagem]';
     } else if (type === 'video') {
       const mediaId = message.video?.id;
       const mimeType = message.video?.mime_type || 'video/mp4';
       await logToDb('INFO', 'WEBHOOK', `Baixando arquivo de vídeo. ID: ${mediaId}`);
-      mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType);
+      mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType, tokenToUse);
       content = message.video?.caption || '[Vídeo]';
     } else if (type === 'document') {
       const mediaId = message.document?.id;
       const mimeType = message.document?.mime_type || 'application/pdf';
       await logToDb('INFO', 'WEBHOOK', `Baixando arquivo de documento. ID: ${mediaId}`);
-      mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType);
+      mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType, tokenToUse);
       content = message.document?.caption || message.document?.filename || '[Documento]';
     } else {
       content = `[Mídia não suportada: ${type}]`;

@@ -17,7 +17,8 @@ export default async function DashboardPage() {
 
   // 3. Fetch Settings for Checklist
   const settings = await getSystemSettings();
-  const hasWhatsApp = !!(settings.whatsappToken && settings.whatsappPhoneId);
+  const activeConnectionsCount = await prisma.whatsAppConnection.count({ where: { isActive: true } });
+  const hasWhatsApp = !!(settings.whatsappToken && settings.whatsappPhoneId) || activeConnectionsCount > 0;
   const hasGemini = !!settings.geminiApiKey;
   const hasTTS = !!settings.elevenLabsApiKey;
 

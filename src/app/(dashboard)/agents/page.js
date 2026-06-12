@@ -89,6 +89,22 @@ export default function AgentsPage() {
   const [expandedCallId, setExpandedCallId] = useState(null);
 
   // ==========================================
+  // STATE: WhatsApp Connections
+  // ==========================================
+  const [connections, setConnections] = useState([]);
+  const [connectionName, setConnectionName] = useState('');
+  const [connectionPhoneNumber, setConnectionPhoneNumber] = useState('');
+  const [connectionToken, setConnectionToken] = useState('');
+  const [connectionPhoneId, setConnectionPhoneId] = useState('');
+  const [connectionVerifyToken, setConnectionVerifyToken] = useState('antigravity_token_123');
+  const [connectionIsActive, setConnectionIsActive] = useState(true);
+  const [editingConnectionId, setEditingConnectionId] = useState(null);
+  const [showConnectionForm, setShowConnectionForm] = useState(false);
+  const [connectionLoading, setConnectionLoading] = useState(false);
+  const [testingConnectionId, setTestingConnectionId] = useState(null);
+  const [testResults, setTestResults] = useState({});
+
+  // ==========================================
   // LIFECYCLE & DATA FETCHING
   // ==========================================
   useEffect(() => {
@@ -97,6 +113,7 @@ export default function AgentsPage() {
       setCallbackUrl(`${window.location.protocol}//${window.location.host}/api/webhook`);
     }
     fetchSettings();
+    fetchConnections();
     fetchAgents();
     fetchFlows();
     fetchCalls();
@@ -119,6 +136,142 @@ export default function AgentsPage() {
       }
     } catch (err) {
       console.error('Error fetching settings:', err);
+    }
+  };
+
+  const fetchConnections = async () => {
+    try {
+      const res = await fetch('/api/connections');
+      if (res.ok) setConnections(await res.json());
+    } catch (err) {
+      console.error('Error fetching connections:', err);
+    }
+  };
+
+  const resetConnectionForm = () => {
+    setEditingConnectionId(null);
+    setConnectionName('');
+    setConnectionPhoneNumber('');
+    setConnectionToken('');
+    setConnectionPhoneId('');
+    setConnectionVerifyToken('antigravity_token_123');
+    setConnectionIsActive(true);
+    setShowConnectionForm(false);
+  };
+
+  const handleConnectionSubmit = async (e) => {
+    e.preventDefault();
+    if (!connectionName.trim() || !connectionPhoneId.trim()) return;
+    setConnectionLoading(true);
+    const payload = {
+      name: connectionName,
+      phoneNumber: connectionPhoneNumber,
+      whatsappToken: connectionToken,
+      whatsappPhoneId: connectionPhoneId,
+      whatsappVerifyToken: connectionVerifyToken,
+      isActive: connectionIsActive
+    };
+    try {
+      let res;
+      if (editingConnectionId) {
+        res = await fetch('/api/connections', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingConnectionId, ...payload })
+        });
+      } else {
+        res = await fetch('/api/connections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+      if (res.ok) {
+        resetConnectionForm();
+        fetchConnections();
+      }
+    } catch (err) {
+      console.error('Error saving connection:', err);
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
+  const handleToggleConnectionActive = async (conn) => {
+    try {
+      const res = await fetch('/api/connections', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: conn.id,
+          name: conn.name,
+          phoneNumber: conn.phoneNumber,
+          whatsappToken: conn.whatsappToken,
+          whatsappPhoneId: conn.whatsappPhoneId,
+          whatsappVerifyToken: conn.whatsappVerifyToken,
+          isActive: !conn.isActive
+        })
+      });
+      if (res.ok) fetchConnections();
+    } catch (err) {
+      console.error('Error toggling connection active state:', err);
+    }
+  };
+
+  const handleEditConnection = (conn) => {
+    setEditingConnectionId(conn.id);
+    setConnectionName(conn.name);
+    setConnectionPhoneNumber(conn.phoneNumber);
+    setConnectionToken(conn.whatsappToken);
+    setConnectionPhoneId(conn.whatsappPhoneId);
+    setConnectionVerifyToken(conn.whatsappVerifyToken);
+    setConnectionIsActive(conn.isActive);
+    setShowConnectionForm(true);
+  };
+
+  const handleDeleteConnection = async (id) => {
+    if (!confirm('Deseja realmente excluir esta conexão?')) return;
+    try {
+      const res = await fetch(`/api/connections?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchConnections();
+        if (editingConnectionId === id) resetConnectionForm();
+      }
+    } catch (err) {
+      console.error('Error deleting connection:', err);
+    }
+  };
+
+  const handleTestConnection = async (conn) => {
+    setTestingConnectionId(conn.id);
+    setTestResults(prev => ({ ...prev, [conn.id]: { loading: true } }));
+    try {
+      const res = await fetch('/api/connections/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          whatsappPhoneId: conn.whatsappPhoneId,
+          whatsappToken: conn.whatsappToken
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTestResults(prev => ({ ...prev, [conn.id]: { success: true, message: 'Conectado!' } }));
+      } else {
+        setTestResults(prev => ({ ...prev, [conn.id]: { success: false, message: data.error || 'Erro na verificação' } }));
+      }
+    } catch (err) {
+      setTestResults(prev => ({ ...prev, [conn.id]: { success: false, message: 'Erro de conexão' } }));
+    } finally {
+      setTestingConnectionId(null);
+      // clear after 5s
+      setTimeout(() => {
+        setTestResults(prev => {
+          const next = { ...prev };
+          delete next[conn.id];
+          return next;
+        });
+      }, 5000);
     }
   };
 
@@ -1326,55 +1479,161 @@ export default function AgentsPage() {
             ===================================================================== */}
         {activeTab === 'whatsapp' && (
           <div className="integration-grid" style={{ alignItems: 'start' }}>
-            {/* Connection Form */}
-            <div className="glass-panel" style={{ padding: '28px' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '6px' }}>Credenciais da API</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '24px' }}>
-                Preencha os dados oficiais do Meta Developer Console e outras chaves de IA.
-              </p>
-              {settingsSuccess && (
-                <div style={{ padding: '12px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 500 }}>✓ Configurações salvas com sucesso!</div>
-              )}
-              {settingsError && (
-                <div style={{ padding: '12px', background: 'var(--color-error-bg)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 500 }}>✗ {settingsError}</div>
-              )}
-              <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ borderBottom: '1px solid var(--border-glass)', paddingBottom: '16px' }}>
-                  <div className="section-title-line"><h3>WhatsApp Cloud API</h3></div>
-                  <div className="form-group" style={{ marginBottom: '12px' }}>
-                    <label className="form-label">Phone Number ID</label>
-                    <input type="text" className="form-input" placeholder="Ex: 34892401824901" value={whatsappPhoneId} onChange={(e) => setWhatsappPhoneId(e.target.value)} />
+            {/* WhatsApp Connections and Global Settings Panel */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* WhatsApp Connections CRUD */}
+              <div className="glass-panel" style={{ padding: '28px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Conexões WhatsApp</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+                      Gerencie múltiplos números e conexões da API Oficial do WhatsApp.
+                    </p>
                   </div>
-                  <div className="form-group" style={{ marginBottom: '12px' }}>
-                    <label className="form-label">Access Token</label>
-                    <input type="password" className="form-input" placeholder="EAAGz..." value={whatsappToken} onChange={(e) => setWhatsappToken(e.target.value)} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: '0' }}>
-                    <label className="form-label">Webhook Verify Token</label>
-                    <input type="text" className="form-input" value={whatsappVerifyToken} onChange={(e) => setWhatsappVerifyToken(e.target.value)} />
-                  </div>
+                  {!showConnectionForm && (
+                    <button onClick={() => { resetConnectionForm(); setShowConnectionForm(true); }} className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+                      + Nova Conexão
+                    </button>
+                  )}
                 </div>
 
-                <div>
-                  <div className="section-title-line"><h3>Inteligência Artificial</h3></div>
-                  <div className="form-group" style={{ marginBottom: '12px' }}>
-                    <label className="form-label">Google Gemini API Key</label>
-                    <input type="password" className="form-input" placeholder="AIzaSy..." value={geminiApiKey} onChange={(e) => setGeminiApiKey(e.target.value)} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: '12px' }}>
-                    <label className="form-label">ElevenLabs API Key (Voz)</label>
-                    <input type="password" className="form-input" placeholder="Sua chave ElevenLabs" value={elevenLabsApiKey} onChange={(e) => setElevenLabsApiKey(e.target.value)} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: '0' }}>
-                    <label className="form-label">ElevenLabs Voice ID</label>
-                    <input type="text" className="form-input" value={elevenLabsVoiceId} onChange={(e) => setElevenLabsVoiceId(e.target.value)} />
-                  </div>
-                </div>
+                {/* Connection Add/Edit Form */}
+                {showConnectionForm && (
+                  <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-glass)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>
+                        {editingConnectionId ? '✏️ Editar Conexão' : '📞 Nova Conexão WhatsApp'}
+                      </h3>
+                      <button onClick={resetConnectionForm} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>Fechar</button>
+                    </div>
 
-                <button type="submit" className="btn btn-primary" style={{ padding: '12px', justifyContent: 'center', fontWeight: 600, fontSize: '0.95rem', marginTop: '10px' }} disabled={settingsLoading}>
-                  {settingsLoading ? 'Salvando...' : 'Salvar Configurações'}
-                </button>
-              </form>
+                    <form onSubmit={handleConnectionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Nome da Conexão</label>
+                        <input type="text" className="form-input" placeholder="Ex: Comercial, Suporte, Filial SP" value={connectionName} onChange={(e) => setConnectionName(e.target.value)} required />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Número de Telefone</label>
+                        <input type="text" className="form-input" placeholder="Ex: +5511999999999" value={connectionPhoneNumber} onChange={(e) => setConnectionPhoneNumber(e.target.value)} />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Phone Number ID (Meta)</label>
+                        <input type="text" className="form-input" placeholder="Ex: 34892401824901" value={connectionPhoneId} onChange={(e) => setConnectionPhoneId(e.target.value)} required />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Access Token (Meta)</label>
+                        <input type="password" className="form-input" placeholder="EAAGz..." value={connectionToken} onChange={(e) => setConnectionToken(e.target.value)} />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Webhook Verify Token</label>
+                        <input type="text" className="form-input" value={connectionVerifyToken} onChange={(e) => setConnectionVerifyToken(e.target.value)} />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <label className="switch">
+                          <input type="checkbox" checked={connectionIsActive} onChange={(e) => setConnectionIsActive(e.target.checked)} />
+                          <span className="slider"></span>
+                        </label>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Ativar esta conexão</span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                        <button type="button" onClick={resetConnectionForm} className="btn btn-secondary" style={{ flex: 1, padding: '10px' }}>
+                          Cancelar
+                        </button>
+                        <button type="submit" className="btn btn-primary" style={{ flex: 1, padding: '10px', justifyContent: 'center' }} disabled={connectionLoading}>
+                          {connectionLoading ? 'Salvando...' : editingConnectionId ? 'Salvar Alterações' : 'Adicionar'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {/* Connections List */}
+                {connections.length === 0 ? (
+                  <div style={{ padding: '32px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-glass)', borderRadius: '12px' }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '12px' }}>Nenhuma conexão WhatsApp configurada.</p>
+                    <button onClick={() => { resetConnectionForm(); setShowConnectionForm(true); }} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+                      Configurar Primeira Conexão
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {connections.map((conn) => (
+                      <div key={conn.id} className="glass-panel" style={{ padding: '16px', border: '1px solid var(--border-glass)', background: 'rgba(255, 255, 255, 0.01)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <h4 style={{ fontWeight: 600, fontSize: '0.95rem', margin: 0 }}>{conn.name}</h4>
+                            <span className={`badge ${conn.isActive ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                              {conn.isActive ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            {conn.phoneNumber && <span style={{ marginRight: '12px' }}>📞 {conn.phoneNumber}</span>}
+                            <span>ID: {conn.whatsappPhoneId}</span>
+                          </div>
+                          {testResults[conn.id] && (
+                            <div style={{ fontSize: '0.78rem', marginTop: '6px', fontWeight: 500, color: testResults[conn.id].success ? '#4ade80' : 'var(--color-error)' }}>
+                              {testResults[conn.id].loading ? '⌛ Testando...' : `${testResults[conn.id].success ? '✓' : '✗'} ${testResults[conn.id].message}`}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button onClick={() => handleTestConnection(conn)} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} disabled={testingConnectionId === conn.id}>
+                            Testar
+                          </button>
+                          <button onClick={() => handleEditConnection(conn)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+                            ✏️
+                          </button>
+                          <button onClick={() => handleDeleteConnection(conn.id)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', color: 'var(--color-error)' }}>
+                            🗑️
+                          </button>
+                          <label className="switch" style={{ marginLeft: '4px' }}>
+                            <input type="checkbox" checked={conn.isActive} onChange={() => handleToggleConnectionActive(conn)} />
+                            <span className="slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Global AI & Speech Settings */}
+              <div className="glass-panel" style={{ padding: '28px' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '6px' }}>Configurações Globais de IA</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '24px' }}>
+                  Configure chaves de API globais para inteligência artificial e modulação de voz.
+                </p>
+                {settingsSuccess && (
+                  <div style={{ padding: '12px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 500 }}>✓ Configurações salvas com sucesso!</div>
+                )}
+                {settingsError && (
+                  <div style={{ padding: '12px', background: 'var(--color-error-bg)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 500 }}>✗ {settingsError}</div>
+                )}
+                <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label">Google Gemini API Key</label>
+                      <input type="password" className="form-input" placeholder="AIzaSy..." value={geminiApiKey} onChange={(e) => setGeminiApiKey(e.target.value)} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label">ElevenLabs API Key (Voz)</label>
+                      <input type="password" className="form-input" placeholder="Sua chave ElevenLabs" value={elevenLabsApiKey} onChange={(e) => setElevenLabsApiKey(e.target.value)} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label className="form-label">ElevenLabs Voice ID</label>
+                      <input type="text" className="form-input" value={elevenLabsVoiceId} onChange={(e) => setElevenLabsVoiceId(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="btn btn-primary" style={{ padding: '12px', justifyContent: 'center', fontWeight: 600, fontSize: '0.95rem', marginTop: '10px' }} disabled={settingsLoading}>
+                    {settingsLoading ? 'Salvando...' : 'Salvar Configurações'}
+                  </button>
+                </form>
+              </div>
+
             </div>
 
             {/* Info Panel */}
@@ -1391,11 +1650,14 @@ export default function AgentsPage() {
                     </div>
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '6px' }}>Token de Verificação:</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '6px' }}>Token de Verificação (Padrão):</span>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <input type="text" className="form-input" value={whatsappVerifyToken} readOnly style={{ fontFamily: 'monospace', fontSize: '0.85rem', background: 'rgba(0,0,0,0.3)' }} />
                       <button onClick={() => copyToClipboard(whatsappVerifyToken)} className="btn btn-secondary" style={{ padding: '0 12px' }}>Copiar</button>
                     </div>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '6px', lineHeight: '1.4' }}>
+                      💡 Nota: Se configurou múltiplos números, utilize o <strong>Webhook Verify Token</strong> cadastrado em cada respectiva conexão.
+                    </p>
                   </div>
                 </div>
                 <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-glass)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
@@ -1407,11 +1669,12 @@ export default function AgentsPage() {
                 <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px' }}>Status das APIs</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {[
-                    { label: 'WhatsApp', ok: whatsappToken && whatsappPhoneId },
+                    { label: 'Fallback WhatsApp', ok: whatsappToken && whatsappPhoneId },
+                    ...connections.map(c => ({ label: `WhatsApp: ${c.name}`, ok: c.isActive && c.whatsappToken && c.whatsappPhoneId })),
                     { label: 'Gemini AI', ok: !!geminiApiKey },
                     { label: 'ElevenLabs Voz', ok: !!elevenLabsApiKey },
-                  ].map((item) => (
-                    <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-glass)', borderRadius: '8px' }}>
+                  ].map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-glass)', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span className={`led-indicator ${item.ok ? 'active' : 'inactive'}`} />
                         <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{item.label}</span>
