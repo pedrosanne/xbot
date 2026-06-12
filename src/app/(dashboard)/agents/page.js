@@ -1549,8 +1549,8 @@ export default function AgentsPage() {
                   </div>
                 )}
 
-                {/* Connections List */}
-                {connections.length === 0 ? (
+                 {/* Connections List */}
+                {connections.length === 0 && !whatsappPhoneId ? (
                   <div style={{ padding: '32px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-glass)', borderRadius: '12px' }}>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '12px' }}>Nenhuma conexão WhatsApp configurada.</p>
                     <button onClick={() => { resetConnectionForm(); setShowConnectionForm(true); }} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
@@ -1559,6 +1559,38 @@ export default function AgentsPage() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Render Fallback System Connection if configured */}
+                    {whatsappPhoneId && (
+                      <div className="glass-panel" style={{ padding: '16px', border: '1px solid var(--border-glass)', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <h4 style={{ fontWeight: 600, fontSize: '0.95rem', margin: 0 }}>Padrão do Sistema (Configurações Gerais)</h4>
+                            <span className="badge badge-success" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                              Ativo
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            <span>ID: {whatsappPhoneId}</span>
+                          </div>
+                          {testResults['system'] && (
+                            <div style={{ fontSize: '0.78rem', marginTop: '6px', fontWeight: 500, color: testResults['system'].success ? '#4ade80' : 'var(--color-error)' }}>
+                              {testResults['system'].loading ? '⌛ Testando...' : `${testResults['system'].success ? '✓' : '✗'} ${testResults['system'].message}`}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button onClick={() => handleTestConnection({ id: 'system', whatsappPhoneId, whatsappToken })} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} disabled={testingConnectionId === 'system'}>
+                            Testar
+                          </button>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '12px' }}>
+                            ℹ️ Editar nas Configurações Gerais
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Render Custom Connections */}
                     {connections.map((conn) => (
                       <div key={conn.id} className="glass-panel" style={{ padding: '16px', border: '1px solid var(--border-glass)', background: 'rgba(255, 255, 255, 0.01)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                         <div>

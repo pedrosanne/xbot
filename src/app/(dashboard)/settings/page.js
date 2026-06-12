@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 // Helper function to convert VAPID public key
 function urlBase64ToUint8Array(base64String) {
@@ -284,48 +285,22 @@ export default function SettingsPage() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* 1. Meta / WhatsApp Credentials */}
+          {/* 1. Meta / WhatsApp Credentials Redirect */}
           <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ marginBottom: '16px', fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ marginBottom: '12px', fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ background: '#25d366', color: 'white', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>W</span>
-              WhatsApp Cloud API (Meta Developer)
+              WhatsApp Cloud API
             </h3>
-            
-            <div className="form-group">
-              <label className="form-label">Token de Acesso Temporário ou Permanente</label>
-              <input
-                type="password"
-                value={whatsappToken}
-                onChange={(e) => setWhatsappToken(e.target.value)}
-                placeholder="EAAGz..."
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">ID do Número de Telefone (Phone Number ID)</label>
-              <input
-                type="text"
-                value={whatsappPhoneId}
-                onChange={(e) => setWhatsappPhoneId(e.target.value)}
-                placeholder="Ex: 10565856236589"
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Token de Verificação do Webhook (Verify Token)</label>
-              <input
-                type="text"
-                value={whatsappVerifyToken}
-                onChange={(e) => setWhatsappVerifyToken(e.target.value)}
-                placeholder="Digite o token usado para validar o webhook"
-                className="form-input"
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
-                Insira este mesmo token na configuração de Webhook do portal do Meta for Developers.
-              </span>
-            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: '1.6', margin: '0 0 16px 0' }}>
+              As configurações de WhatsApp agora foram centralizadas. Você pode gerenciar múltiplos números, testar o status de integração e ativar/desativar conexões em tempo real.
+            </p>
+            <Link 
+              href="/agents" 
+              className="btn btn-primary" 
+              style={{ display: 'inline-flex', alignSelf: 'flex-start', padding: '8px 16px', fontSize: '0.85rem', textDecoration: 'none' }}
+            >
+              Gerenciar Conexões WhatsApp →
+            </Link>
           </div>
 
           {/* 2. Google Gemini API */}
