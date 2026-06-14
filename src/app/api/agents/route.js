@@ -17,15 +17,16 @@ export async function GET() {
 // POST: Create a new agent
 export async function POST(request) {
   try {
-    const { name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId } = await request.json();
+    const { name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId, connectionId } = await request.json();
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    // If making this active, deactivate all other agents first
+    // If making this active, deactivate all other agents first for the same connection
     if (isActive) {
       await prisma.agent.updateMany({
+        where: { connectionId: connectionId || null },
         data: { isActive: false }
       });
     }
@@ -40,7 +41,8 @@ export async function POST(request) {
         isActive: isActive || false,
         geminiApiKey: geminiApiKey || '',
         elevenLabsApiKey: elevenLabsApiKey || '',
-        elevenLabsVoiceId: elevenLabsVoiceId || ''
+        elevenLabsVoiceId: elevenLabsVoiceId || '',
+        connectionId: connectionId || null
       }
     });
 
@@ -54,16 +56,19 @@ export async function POST(request) {
 // PUT: Update an existing agent
 export async function PUT(request) {
   try {
-    const { id, name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId } = await request.json();
+    const { id, name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId, connectionId } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 });
     }
 
-    // If making this active, deactivate all other agents first
+    // If making this active, deactivate all other agents first for the same connection
     if (isActive) {
       await prisma.agent.updateMany({
-        where: { id: { not: id } },
+        where: { 
+          id: { not: id },
+          connectionId: connectionId || null
+        },
         data: { isActive: false }
       });
     }
@@ -79,7 +84,8 @@ export async function PUT(request) {
         isActive,
         geminiApiKey: geminiApiKey !== undefined ? geminiApiKey : undefined,
         elevenLabsApiKey: elevenLabsApiKey !== undefined ? elevenLabsApiKey : undefined,
-        elevenLabsVoiceId: elevenLabsVoiceId !== undefined ? elevenLabsVoiceId : undefined
+        elevenLabsVoiceId: elevenLabsVoiceId !== undefined ? elevenLabsVoiceId : undefined,
+        connectionId: connectionId !== undefined ? (connectionId || null) : undefined
       }
     });
 

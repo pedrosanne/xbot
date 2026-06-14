@@ -37,6 +37,9 @@ model Agent {
   elevenLabsVoiceId String   @default("")
   createdAt         DateTime @default(now())
   flows             Flow[]
+
+  connectionId      String?
+  connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
 }
 
 model Contact {
@@ -75,6 +78,8 @@ model WhatsAppConnection {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   contacts            Contact[]
+  agents              Agent[]
+  flows               Flow[]
 }
 
 model Message {
@@ -117,6 +122,9 @@ model Flow {
   // Designate an AI Agent to this Chatbot Flow
   agentId   String?
   agent     Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  connectionId      String?
+  connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
 }
 
 model Log {

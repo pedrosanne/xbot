@@ -38,6 +38,7 @@ export default function AgentsPage() {
   const [agentGeminiApiKey, setAgentGeminiApiKey] = useState('');
   const [agentElevenLabsApiKey, setAgentElevenLabsApiKey] = useState('');
   const [agentElevenLabsVoiceId, setAgentElevenLabsVoiceId] = useState('');
+  const [agentConnectionId, setAgentConnectionId] = useState('');
   const [editingAgentId, setEditingAgentId] = useState(null);
   const [agentLoading, setAgentLoading] = useState(false);
   const [showAgentForm, setShowAgentForm] = useState(false);
@@ -58,6 +59,7 @@ export default function AgentsPage() {
   const [flowTrigger, setFlowTrigger] = useState('keyword');
   const [flowKeywords, setFlowKeywords] = useState('');
   const [flowAgentId, setFlowAgentId] = useState(null);
+  const [flowConnectionId, setFlowConnectionId] = useState('');
   const [nodes, setNodes] = useState([]); // { id, x, y, text, media:{type,url,caption}, buttons:[] }
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -327,7 +329,8 @@ export default function AgentsPage() {
       isActive: agentIsActive,
       geminiApiKey: agentGeminiApiKey,
       elevenLabsApiKey: agentElevenLabsApiKey,
-      elevenLabsVoiceId: agentElevenLabsVoiceId
+      elevenLabsVoiceId: agentElevenLabsVoiceId,
+      connectionId: agentConnectionId || null
     };
     try {
       let res;
@@ -343,7 +346,7 @@ export default function AgentsPage() {
 
   const handleToggleAgentActive = async (agent) => {
     try {
-      const res = await fetch('/api/agents', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: agent.id, name: agent.name, description: agent.description, systemPrompt: agent.systemPrompt, model: agent.model, temperature: agent.temperature, isActive: !agent.isActive }) });
+      const res = await fetch('/api/agents', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: agent.id, name: agent.name, description: agent.description, systemPrompt: agent.systemPrompt, model: agent.model, temperature: agent.temperature, isActive: !agent.isActive, connectionId: agent.connectionId }) });
       if (res.ok) fetchAgents();
     } catch (err) { console.error('Error toggling agent:', err); }
   };
@@ -359,6 +362,7 @@ export default function AgentsPage() {
     setAgentGeminiApiKey(agent.geminiApiKey || '');
     setAgentElevenLabsApiKey(agent.elevenLabsApiKey || '');
     setAgentElevenLabsVoiceId(agent.elevenLabsVoiceId || '');
+    setAgentConnectionId(agent.connectionId || '');
     setShowAgentForm(true);
   };
 
@@ -381,6 +385,7 @@ export default function AgentsPage() {
     setAgentGeminiApiKey('');
     setAgentElevenLabsApiKey('');
     setAgentElevenLabsVoiceId('');
+    setAgentConnectionId('');
     setShowAgentForm(false);
   };
 
@@ -478,6 +483,7 @@ export default function AgentsPage() {
     setFlowTrigger('keyword');
     setFlowKeywords('');
     setFlowAgentId(null);
+    setFlowConnectionId('');
     const startNode = {
       id: 'boas_vindas',
       x: 300,
@@ -502,6 +508,7 @@ export default function AgentsPage() {
     setFlowTrigger(flow.trigger);
     setFlowKeywords(flow.keywords);
     setFlowAgentId(flow.agentId || null);
+    setFlowConnectionId(flow.connectionId || '');
     let parsed = [];
     try { parsed = JSON.parse(flow.steps || '[]'); } catch { parsed = []; }
     // Add default x/y if missing
@@ -567,7 +574,8 @@ export default function AgentsPage() {
       keywords: flowKeywords,
       steps: nodes,
       isActive: true,
-      agentId: flowAgentId
+      agentId: flowAgentId,
+      connectionId: flowConnectionId || null
     };
 
     try {
@@ -1075,6 +1083,24 @@ export default function AgentsPage() {
               {agents.map((agent) => (
                 <option key={agent.id} value={agent.id}>
                   {agent.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* WhatsApp Connection Selection */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '0 1 220px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Conexão WhatsApp:</span>
+            <select 
+              className="form-select" 
+              style={{ padding: '6px 10px', fontSize: '0.82rem', height: '32px', margin: 0 }} 
+              value={flowConnectionId} 
+              onChange={(e) => setFlowConnectionId(e.target.value)}
+            >
+              <option value="">Qualquer Conexão (Global)</option>
+              {connections.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -1808,6 +1834,15 @@ export default function AgentsPage() {
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Conexão WhatsApp (Escopo)</label>
+                    <select value={agentConnectionId} onChange={(e) => setAgentConnectionId(e.target.value)} className="form-select">
+                      <option value="">Qualquer Conexão (Global)</option>
+                      {connections.map(c => (
+                        <option key={c.id} value={c.id}>{c.name} ({c.phoneNumber || 'Sem número'})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <label className="form-label" style={{ margin: 0 }}>Temperatura</label>
                       <span style={{ fontSize: '0.85rem', color: '#4ade80' }}>{agentTemperature}</span>
@@ -1922,6 +1957,15 @@ export default function AgentsPage() {
                         <span style={{ padding: '3px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid var(--border-glass)' }}>
                           T: {agent.temperature}
                         </span>
+                        {connections.find(c => c.id === agent.connectionId) ? (
+                          <span style={{ padding: '3px 8px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.3)' }} title={`Conectado a: ${connections.find(c => c.id === agent.connectionId).name}`}>
+                            📞 {connections.find(c => c.id === agent.connectionId).name}
+                          </span>
+                        ) : (
+                          <span style={{ padding: '3px 8px', background: 'rgba(255,255,255,0.02)', color: 'var(--text-muted)', borderRadius: '6px', border: '1px solid var(--border-glass)' }} title="Disponível globalmente para todas conexões">
+                            🌐 Global
+                          </span>
+                        )}
                         {agent.geminiApiKey && (
                           <span style={{ padding: '3px 8px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', borderRadius: '6px', border: '1px solid rgba(52, 211, 153, 0.3)' }} title="Gemini customizado">
                             🔑 Gemini
@@ -1995,6 +2039,15 @@ export default function AgentsPage() {
                               <span className="badge" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
                                 {parsedSteps.length} etapas
                               </span>
+                              {connections.find(c => c.id === flow.connectionId) ? (
+                                <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                                  📞 {connections.find(c => c.id === flow.connectionId).name}
+                                </span>
+                              ) : (
+                                <span className="badge" style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--text-muted)' }}>
+                                  🌐 Global
+                                </span>
+                              )}
                               {agents.find(a => a.id === flow.agentId) ? (
                                 <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
                                   🤖 IA: {agents.find(a => a.id === flow.agentId).name}

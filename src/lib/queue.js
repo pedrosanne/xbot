@@ -158,8 +158,16 @@ async function processSingleMessage(contact, messageData) {
 
     const normalizedInput = text.trim().toLowerCase();
 
-    // 2. Carrega os fluxos ativos
-    const activeFlows = await prisma.flow.findMany({ where: { isActive: true } });
+    // 2. Carrega os fluxos ativos (escopados por conexão do WhatsApp ou globais)
+    const activeFlows = await prisma.flow.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { connectionId: null },
+          { connectionId: freshContact.connectionId || null }
+        ]
+      }
+    });
 
     // 3. Verifica se o usuário digitou uma palavra-chave para iniciar um NOVO fluxo
     let triggeredFlow = null;
@@ -254,7 +262,16 @@ async function processSingleMessage(contact, messageData) {
         agent = await prisma.agent.findUnique({ where: { id: agentIdToUse } });
       }
       if (!agent) {
-        agent = await prisma.agent.findFirst({ where: { isActive: true } });
+        // Prioritize active agent linked to this connection
+        agent = await prisma.agent.findFirst({
+          where: { isActive: true, connectionId: freshContact.connectionId || null }
+        });
+        // Fallback to global active agent
+        if (!agent) {
+          agent = await prisma.agent.findFirst({
+            where: { isActive: true, connectionId: null }
+          });
+        }
       }
 
       if (agent) {
@@ -276,8 +293,15 @@ async function processSingleMessage(contact, messageData) {
       return;
     }
 
-    // 7. Último Fallback: roteia para o Agente de IA
-    const activeAgent = await prisma.agent.findFirst({ where: { isActive: true } });
+    // 7. Último Fallback: roteia para o Agente de IA (específico ou global)
+    let activeAgent = await prisma.agent.findFirst({
+      where: { isActive: true, connectionId: freshContact.connectionId || null }
+    });
+    if (!activeAgent) {
+      activeAgent = await prisma.agent.findFirst({
+        where: { isActive: true, connectionId: null }
+      });
+    }
     if (activeAgent) {
       await logToDb('INFO', 'AI', `Sem fluxo ativo. Definindo contato ${contactId} para modo IA com agente '${activeAgent.name}' e chamando Gemini.`);
       await prisma.contact.update({
