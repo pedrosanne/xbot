@@ -35,6 +35,9 @@ export default function AgentsPage() {
   const [agentModel, setAgentModel] = useState('gemini-2.5-flash');
   const [agentTemperature, setAgentTemperature] = useState(0.7);
   const [agentIsActive, setAgentIsActive] = useState(false);
+  const [agentGeminiApiKey, setAgentGeminiApiKey] = useState('');
+  const [agentElevenLabsApiKey, setAgentElevenLabsApiKey] = useState('');
+  const [agentElevenLabsVoiceId, setAgentElevenLabsVoiceId] = useState('');
   const [editingAgentId, setEditingAgentId] = useState(null);
   const [agentLoading, setAgentLoading] = useState(false);
   const [showAgentForm, setShowAgentForm] = useState(false);
@@ -315,7 +318,17 @@ export default function AgentsPage() {
     e.preventDefault();
     if (!agentName.trim()) return;
     setAgentLoading(true);
-    const payload = { name: agentName, description: agentDescription, systemPrompt: agentSystemPrompt, model: agentModel, temperature: parseFloat(agentTemperature), isActive: agentIsActive };
+    const payload = {
+      name: agentName,
+      description: agentDescription,
+      systemPrompt: agentSystemPrompt,
+      model: agentModel,
+      temperature: parseFloat(agentTemperature),
+      isActive: agentIsActive,
+      geminiApiKey: agentGeminiApiKey,
+      elevenLabsApiKey: agentElevenLabsApiKey,
+      elevenLabsVoiceId: agentElevenLabsVoiceId
+    };
     try {
       let res;
       if (editingAgentId) {
@@ -343,6 +356,9 @@ export default function AgentsPage() {
     setAgentModel(agent.model);
     setAgentTemperature(agent.temperature);
     setAgentIsActive(agent.isActive);
+    setAgentGeminiApiKey(agent.geminiApiKey || '');
+    setAgentElevenLabsApiKey(agent.elevenLabsApiKey || '');
+    setAgentElevenLabsVoiceId(agent.elevenLabsVoiceId || '');
     setShowAgentForm(true);
   };
 
@@ -362,6 +378,9 @@ export default function AgentsPage() {
     setAgentModel('gemini-2.5-flash');
     setAgentTemperature(0.7);
     setAgentIsActive(false);
+    setAgentGeminiApiKey('');
+    setAgentElevenLabsApiKey('');
+    setAgentElevenLabsVoiceId('');
     setShowAgentForm(false);
   };
 
@@ -1803,6 +1822,46 @@ export default function AgentsPage() {
                     <textarea value={agentSystemPrompt} onChange={(e) => setAgentSystemPrompt(e.target.value)} placeholder="Defina o comportamento da IA..." className="form-textarea" style={{ minHeight: '120px' }} required />
                   </div>
 
+                  {/* Credentials settings section */}
+                  <div style={{ gridColumn: '1 / -1', marginTop: '8px', paddingTop: '16px', borderTop: '1px dashed var(--border-glass)' }}>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      🔑 Credenciais Específicas do Agente <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>(Opcional - Substitui as configurações globais)</span>
+                    </h4>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Chave de API do Gemini (Google)</label>
+                        <input 
+                          type="password" 
+                          value={agentGeminiApiKey} 
+                          onChange={(e) => setAgentGeminiApiKey(e.target.value)} 
+                          placeholder="Usar chave global..." 
+                          className="form-input" 
+                        />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Chave de API ElevenLabs</label>
+                        <input 
+                          type="password" 
+                          value={agentElevenLabsApiKey} 
+                          onChange={(e) => setAgentElevenLabsApiKey(e.target.value)} 
+                          placeholder="Usar chave global..." 
+                          className="form-input" 
+                        />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Voice ID da ElevenLabs</label>
+                        <input 
+                          type="text" 
+                          value={agentElevenLabsVoiceId} 
+                          onChange={(e) => setAgentElevenLabsVoiceId(e.target.value)} 
+                          placeholder="Usar voz global..." 
+                          className="form-input" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid var(--border-glass)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <label className="switch">
@@ -1856,13 +1915,23 @@ export default function AgentsPage() {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-glass)' }}>
-                      <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
                         <span style={{ padding: '3px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid var(--border-glass)' }}>
                           {agent.model}
                         </span>
                         <span style={{ padding: '3px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid var(--border-glass)' }}>
                           T: {agent.temperature}
                         </span>
+                        {agent.geminiApiKey && (
+                          <span style={{ padding: '3px 8px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', borderRadius: '6px', border: '1px solid rgba(52, 211, 153, 0.3)' }} title="Gemini customizado">
+                            🔑 Gemini
+                          </span>
+                        )}
+                        {(agent.elevenLabsApiKey || agent.elevenLabsVoiceId) && (
+                          <span style={{ padding: '3px 8px', background: 'rgba(96, 165, 250, 0.15)', color: '#60a5fa', borderRadius: '6px', border: '1px solid rgba(96, 165, 250, 0.3)' }} title="ElevenLabs customizado">
+                            🗣️ TTS
+                          </span>
+                        )}
                       </div>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button onClick={() => handleEditAgent(agent)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.75rem' }}>Editar</button>

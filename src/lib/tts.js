@@ -3,23 +3,34 @@ import path from 'path';
 import { getSystemSettings } from './settings';
 import { prisma } from './prisma';
 
-export async function textToSpeech(text) {
+export async function textToSpeech(text, customAgentId = null) {
   const settings = await getSystemSettings();
-  const { elevenLabsApiKey, elevenLabsVoiceId } = settings;
+  let apiKey = settings.elevenLabsApiKey;
+  let voiceId = settings.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM'; // Rachel fallback
 
-  if (!elevenLabsApiKey || !elevenLabsVoiceId) {
+  if (customAgentId) {
+    const agent = await prisma.agent.findUnique({
+      where: { id: customAgentId }
+    });
+    if (agent) {
+      if (agent.elevenLabsApiKey) apiKey = agent.elevenLabsApiKey;
+      if (agent.elevenLabsVoiceId) voiceId = agent.elevenLabsVoiceId;
+    }
+  }
+
+  if (!apiKey || !voiceId) {
     console.warn('ElevenLabs TTS not configured. Skipping voice generation.');
     return null;
   }
 
-  const voiceId = elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM'; // Rachel fallback
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=opus_48000_64`;
+  const voiceIdToUse = voiceId;
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceIdToUse}?output_format=opus_48000_64`;
 
   try {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'xi-api-key': elevenLabsApiKey,
+        'xi-api-key': apiKey,
         'Content-Type': 'application/json',
         'accept': 'audio/mpeg'
       },
@@ -61,17 +72,28 @@ export async function textToSpeech(text) {
   }
 }
 
-export async function voiceChanger(audioBuffer, mimeType = 'audio/mpeg') {
+export async function voiceChanger(audioBuffer, mimeType = 'audio/mpeg', customAgentId = null) {
   const settings = await getSystemSettings();
-  const { elevenLabsApiKey, elevenLabsVoiceId } = settings;
+  let apiKey = settings.elevenLabsApiKey;
+  let voiceId = settings.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM';
 
-  if (!elevenLabsApiKey || !elevenLabsVoiceId) {
+  if (customAgentId) {
+    const agent = await prisma.agent.findUnique({
+      where: { id: customAgentId }
+    });
+    if (agent) {
+      if (agent.elevenLabsApiKey) apiKey = agent.elevenLabsApiKey;
+      if (agent.elevenLabsVoiceId) voiceId = agent.elevenLabsVoiceId;
+    }
+  }
+
+  if (!apiKey || !voiceId) {
     console.warn('ElevenLabs API credentials not configured for Voice Changer.');
     return null;
   }
 
-  const voiceId = elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM';
-  const url = `https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}?output_format=opus_48000_64`;
+  const voiceIdToUse = voiceId;
+  const url = `https://api.elevenlabs.io/v1/speech-to-speech/${voiceIdToUse}?output_format=opus_48000_64`;
 
   try {
     const formData = new FormData();
@@ -89,11 +111,11 @@ export async function voiceChanger(audioBuffer, mimeType = 'audio/mpeg') {
       use_speaker_boost: true
     }));
 
-    console.log(`Sending audio to ElevenLabs Speech-to-Speech with Voice ID: ${voiceId}`);
+    console.log(`Sending audio to ElevenLabs Speech-to-Speech with Voice ID: ${voiceIdToUse}`);
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'xi-api-key': elevenLabsApiKey,
+        'xi-api-key': apiKey,
         // Let boundary be set automatically by not adding Content-Type manually
       },
       body: formData

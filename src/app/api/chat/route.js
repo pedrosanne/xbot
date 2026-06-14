@@ -79,6 +79,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing contactId or type' }, { status: 400 });
     }
 
+    // Fetch contact to get its connection and designated agent details
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      include: { connection: true }
+    });
+
     await logToDb('INFO', 'API', `Solicitação de envio de mensagem manual para o contato ${contactId}. Tipo: ${type}`, { content });
 
     // Convert relative mediaUrl to absolute if needed for Meta WhatsApp API
@@ -100,7 +106,7 @@ export async function POST(request) {
 
         if (uploadRecord) {
           await logToDb('INFO', 'API', `Processando áudio com ElevenLabs Voice Changer para o arquivo: ${filename}`);
-          const changedBuffer = await voiceChanger(uploadRecord.data, uploadRecord.mimeType);
+          const changedBuffer = await voiceChanger(uploadRecord.data, uploadRecord.mimeType, contact?.designatedAgentId);
           if (changedBuffer) {
             const newFilename = `voice_changer_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.ogg`;
             await prisma.upload.create({
@@ -123,12 +129,6 @@ export async function POST(request) {
         await logToDb('ERROR', 'API', `Erro no Voice Changer: ${err.message}`);
       }
     }
-
-    // Fetch contact to get its connection details
-    const contact = await prisma.contact.findUnique({
-      where: { id: contactId },
-      include: { connection: true }
-    });
 
     let connectionToUse = null;
     let hasCredentials = false;

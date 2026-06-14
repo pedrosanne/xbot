@@ -25,15 +25,18 @@ model Setting {
 }
 
 model Agent {
-  id           String   @id @default(uuid())
-  name         String
-  description  String   @default("")
-  systemPrompt String   @default("Você é um atendente virtual simpático da nossa empresa. Responda de maneira clara, prestativa e natural, simulando um contato humano.")
-  model        String   @default("gemini-1.5-flash")
-  temperature  Float    @default(0.7)
-  isActive     Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  flows        Flow[]
+  id                String   @id @default(uuid())
+  name              String
+  description       String   @default("")
+  systemPrompt      String   @default("Você é um atendente virtual simpático da nossa empresa. Responda de maneira clara, prestativa e natural, simulando um contato humano.")
+  model             String   @default("gemini-1.5-flash")
+  temperature       Float    @default(0.7)
+  isActive          Boolean  @default(false)
+  geminiApiKey      String   @default("")
+  elevenLabsApiKey  String   @default("")
+  elevenLabsVoiceId String   @default("")
+  createdAt         DateTime @default(now())
+  flows             Flow[]
 }
 
 model Contact {

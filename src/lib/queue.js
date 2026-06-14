@@ -531,7 +531,10 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
   const audioMatch = textToSend.match(audioRegex);
   if (audioMatch) {
     const audioScript = audioMatch[1].trim();
-    audioUrlToSend = await textToSpeech(audioScript);
+    // Resolve designated agent to use specific TTS credentials
+    const contactObj = await prisma.contact.findUnique({ where: { id: contactId } });
+    const agentId = contactObj?.designatedAgentId || null;
+    audioUrlToSend = await textToSpeech(audioScript, agentId);
     textToSend = textToSend.replace(audioRegex, '').trim();
     if (!audioUrlToSend) {
       textToSend = (textToSend ? textToSend + '\n\n' : '') + audioScript;

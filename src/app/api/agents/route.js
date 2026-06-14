@@ -17,7 +17,7 @@ export async function GET() {
 // POST: Create a new agent
 export async function POST(request) {
   try {
-    const { name, description, systemPrompt, model, temperature, isActive } = await request.json();
+    const { name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId } = await request.json();
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -37,7 +37,10 @@ export async function POST(request) {
         systemPrompt: systemPrompt || 'Você é um atendente simpático.',
         model: model || 'gemini-1.5-flash',
         temperature: parseFloat(temperature) || 0.7,
-        isActive: isActive || false
+        isActive: isActive || false,
+        geminiApiKey: geminiApiKey || '',
+        elevenLabsApiKey: elevenLabsApiKey || '',
+        elevenLabsVoiceId: elevenLabsVoiceId || ''
       }
     });
 
@@ -51,7 +54,7 @@ export async function POST(request) {
 // PUT: Update an existing agent
 export async function PUT(request) {
   try {
-    const { id, name, description, systemPrompt, model, temperature, isActive } = await request.json();
+    const { id, name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 });
@@ -73,7 +76,10 @@ export async function PUT(request) {
         systemPrompt,
         model,
         temperature: parseFloat(temperature),
-        isActive
+        isActive,
+        geminiApiKey: geminiApiKey !== undefined ? geminiApiKey : undefined,
+        elevenLabsApiKey: elevenLabsApiKey !== undefined ? elevenLabsApiKey : undefined,
+        elevenLabsVoiceId: elevenLabsVoiceId !== undefined ? elevenLabsVoiceId : undefined
       }
     });
 

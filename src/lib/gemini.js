@@ -5,14 +5,6 @@ import { prisma } from './prisma';
 import { getSystemSettings } from './settings';
 
 export async function generateAIResponse(contactId, incomingText = '', mediaUrl = '', mimeType = '', customAgentId = null) {
-  const settings = await getSystemSettings();
-  const { geminiApiKey } = settings;
-
-  if (!geminiApiKey) {
-    console.error('Gemini API key is not configured.');
-    return 'Desculpe, o sistema de IA não está configurado. Insira a chave da API nas configurações.';
-  }
-
   // 1. Fetch designated agent or globally active agent
   let agent = null;
   if (customAgentId) {
@@ -37,6 +29,14 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
     };
   }
 
+  const settings = await getSystemSettings();
+  const apiKeyToUse = agent?.geminiApiKey || settings.geminiApiKey;
+
+  if (!apiKeyToUse) {
+    console.error('Gemini API key is not configured.');
+    return 'Desculpe, o sistema de IA não está configurado. Insira a chave da API nas configurações.';
+  }
+
   // Mapeia modelos legados/indisponíveis para equivalentes modernos válidos na API
   let modelName = agent.model || 'gemini-2.5-flash';
   if (modelName === 'gemini-1.5-flash') {
@@ -46,7 +46,7 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
   }
 
   // 2. Initialize Gemini
-  const genAI = new GoogleGenerativeAI(geminiApiKey);
+  const genAI = new GoogleGenerativeAI(apiKeyToUse);
   const model = genAI.getGenerativeModel({
     model: modelName,
     generationConfig: {
