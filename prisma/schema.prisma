@@ -65,6 +65,7 @@ model Contact {
   connectionId      String?
   connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   designatedAgentId String?
+  typingState       String              @default("IDLE")
 }
 
 model WhatsAppConnection {
@@ -92,6 +93,7 @@ model Message {
   content     String   // Texto ou legenda da mídia
   mediaUrl    String   @default("") // Caminho local do arquivo salvo no Next.js public
   sendError   String   @default("") // Erro de entrega se falhar
+  status      String   @default("sent")
   timestamp   DateTime @default(now())
 }
 

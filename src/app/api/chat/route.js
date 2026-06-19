@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendText, sendAudio, sendImage, sendDocument, sendVideo } from '@/lib/whatsapp';
+import { sendText, sendAudio, sendImage, sendDocument, sendVideo, markWhatsAppMessageAsRead } from '@/lib/whatsapp';
 import { getSystemSettings } from '@/lib/settings';
 import { logToDb } from '@/lib/log';
 import { voiceChanger } from '@/lib/tts';
@@ -13,14 +13,41 @@ export async function GET(request) {
 
   try {
     if (contactId) {
+      // Return profile details first to get the connection details
+      const contact = await prisma.contact.findUnique({
+        where: { id: contactId },
+        include: { connection: true }
+      });
+
+      // Find unread incoming messages and mark them as read
+      const unreadIncoming = await prisma.message.findMany({
+        where: {
+          contactId,
+          direction: 'INCOMING',
+          status: { not: 'read' }
+        }
+      });
+
+      if (unreadIncoming.length > 0) {
+        await prisma.message.updateMany({
+          where: {
+            id: { in: unreadIncoming.map(m => m.id) }
+          },
+          data: { status: 'read' }
+        });
+
+        // Trigger read receipts asynchronously to avoid blocking the client request
+        for (const msg of unreadIncoming) {
+          markWhatsAppMessageAsRead(msg.id, contact?.connection).catch(err => {
+            console.error(`Failed to send read receipt to Meta for message ${msg.id}:`, err);
+          });
+        }
+      }
+
       // Return message history and profile details for a specific contact
       const messages = await prisma.message.findMany({
         where: { contactId },
         orderBy: { timestamp: 'asc' }
-      });
-      const contact = await prisma.contact.findUnique({
-        where: { id: contactId },
-        include: { connection: true }
       });
       return NextResponse.json({ messages, contact });
     }
@@ -181,7 +208,8 @@ export async function POST(request) {
         type,
         content: content || '',
         mediaUrl: mediaUrl || '',
-        sendError: sendError || ''
+        sendError: sendError || '',
+        status: sendError ? 'failed' : 'sent'
       }
     });
 
@@ -206,10 +234,10 @@ export async function POST(request) {
   }
 }
 
-// PUT: Update contact details (status, name, email, notes, tags, avatarUrl)
+// PUT: Update contact details (status, name, email, notes, tags, avatarUrl, typingState)
 export async function PUT(request) {
   try {
-    const { contactId, status, name, email, notes, tags, avatarUrl } = await request.json();
+    const { contactId, status, name, email, notes, tags, avatarUrl, typingState } = await request.json();
 
     if (!contactId) {
       return NextResponse.json({ error: 'Missing contactId' }, { status: 400 });
@@ -222,6 +250,31 @@ export async function PUT(request) {
     if (notes !== undefined) dataToUpdate.notes = notes;
     if (tags !== undefined) dataToUpdate.tags = tags;
     if (avatarUrl !== undefined) dataToUpdate.avatarUrl = avatarUrl;
+    if (typingState !== undefined) dataToUpdate.typingState = typingState;
+
+    const existing = await prisma.contact.findUnique({
+      where: { id: contactId }
+    });
+
+    if (!existing) {
+      if (typingState !== undefined || status !== undefined || name !== undefined) {
+        const isMultiNumber = contactId.includes(':');
+        const [phoneId, clientPhone] = isMultiNumber ? contactId.split(':') : ['', contactId];
+        
+        const newContact = await prisma.contact.create({
+          data: {
+            id: contactId,
+            name: name || 'Cliente WhatsApp',
+            status: status || 'AUTO',
+            phoneNumberId: phoneId || '',
+            clientPhone: clientPhone || contactId,
+            typingState: typingState || 'IDLE'
+          }
+        });
+        return NextResponse.json(newContact);
+      }
+      return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    }
 
     const updatedContact = await prisma.contact.update({
       where: { id: contactId },

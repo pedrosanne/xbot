@@ -68,18 +68,21 @@ export async function POST(request) {
       
       // Update delivery/error status in database
       for (const status of value.statuses) {
+        let updateData = { status: status.status };
+        
         if (status.status === 'failed') {
           const errorCode = status.errors?.[0]?.code || 'N/A';
           const errorMsg = status.errors?.[0]?.error_data?.details || status.errors?.[0]?.message || 'Erro desconhecido';
           const fullError = `(#${errorCode}) ${errorMsg}`;
-          
-          await prisma.message.updateMany({
-            where: { id: status.id },
-            data: { sendError: fullError }
-          });
+          updateData.sendError = fullError;
           
           await logToDb('WARN', 'WEBHOOK', `Mensagem ${status.id} falhou ao ser entregue: ${fullError}`);
         }
+        
+        await prisma.message.updateMany({
+          where: { id: status.id },
+          data: updateData
+        });
       }
       
       return NextResponse.json({ status: 'success' });

@@ -12,6 +12,20 @@ export async function sendWhatsAppMessage(payload, connection = null) {
     payload.to = payload.to.split(':').pop();
   }
 
+  // Check if this payload is simulated (starts with wamid_simulated_ or is sent to simulated numbers)
+  const isSimulatedMsg = 
+    (payload.message_id && String(payload.message_id).includes('simulated')) ||
+    (payload.to && (String(payload.to).includes('simulated') || String(payload.to).includes('999999999') || String(payload.to).includes('88887777')));
+
+  if (isSimulatedMsg) {
+    await logToDb('INFO', 'API', `[SIMULADOR] Mensagem/ação simulada registrada localmente. Evitando chamada à API do WhatsApp.`);
+    return {
+      messaging_product: 'whatsapp',
+      contacts: [{ input: payload.to || 'simulated', wa_id: payload.to || 'simulated' }],
+      messages: [{ id: payload.message_id || `simulated_msg_${Date.now()}` }]
+    };
+  }
+
   let whatsappToken, whatsappPhoneId;
 
   if (connection) {
@@ -290,4 +304,14 @@ function getExtensionFromMimeType(mimeType) {
   // Strip parameters like ;codecs=opus
   const baseMime = mimeType.split(';')[0].trim();
   return mimeMap[baseMime] || mimeMap[mimeType] || '.bin';
+}
+
+export async function markWhatsAppMessageAsRead(messageId, connection = null) {
+  if (!messageId) return null;
+  const payload = {
+    messaging_product: 'whatsapp',
+    status: 'read',
+    message_id: messageId
+  };
+  return sendWhatsAppMessage(payload, connection);
 }

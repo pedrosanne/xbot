@@ -2,6 +2,157 @@
 
 import { useState, useEffect, useRef } from 'react';
 
+// Custom Audio Player for voice messages
+function CustomAudioPlayer({ src }) {
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
+  };
+
+  const handleAudioEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const handleSeek = (e) => {
+    if (audioRef.current) {
+      const time = parseFloat(e.target.value);
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  const formatDuration = (secs) => {
+    if (isNaN(secs) || !isFinite(secs)) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  return (
+    <div className="custom-audio-player">
+      <audio
+        ref={audioRef}
+        src={src}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleAudioEnded}
+        preload="metadata"
+      />
+      <button type="button" onClick={togglePlay} className="audio-play-btn">
+        {isPlaying ? (
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        )}
+      </button>
+      <div className="audio-progress-container">
+        <input
+          type="range"
+          min="0"
+          max={duration || 100}
+          value={currentTime}
+          onChange={handleSeek}
+          className="audio-slider"
+        />
+        <div className="audio-time-row">
+          <span>{formatDuration(currentTime)}</span>
+          <span>{formatDuration(duration)}</span>
+        </div>
+      </div>
+      <div className="audio-avatar-indicator">
+        🎙️
+      </div>
+    </div>
+  );
+}
+
+// Clean date formatting headers
+const formatDateHeader = (date) => {
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const checkDate = new Date(date);
+
+  if (checkDate.toDateString() === today.toDateString()) {
+    return 'Hoje';
+  }
+  if (checkDate.toDateString() === yesterday.toDateString()) {
+    return 'Ontem';
+  }
+  
+  if (checkDate.getFullYear() === today.getFullYear()) {
+    return checkDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
+  }
+  
+  return checkDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+};
+
+// Render ticks for message delivery confirmation
+const renderTicks = (status) => {
+  if (status === 'read') {
+    return (
+      <svg className="tick-icon blue" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12.78 1.22a.75.75 0 0 1 0 1.06l-7 7a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 1 1 1.06-1.06L5.25 7.69l6.47-6.47a.75.75 0 0 1 1.06 0z"/>
+        <path d="M15.78 1.22a.75.75 0 0 1 0 1.06l-7 7a.75.75 0 0 1-1.06 0l-1.5-1.5a.75.75 0 1 1 1.06-1.06l.97.97 5.97-5.97a.75.75 0 0 1 1.06 0z"/>
+      </svg>
+    );
+  }
+  if (status === 'delivered') {
+    return (
+      <svg className="tick-icon grey" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12.78 1.22a.75.75 0 0 1 0 1.06l-7 7a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 1 1 1.06-1.06L5.25 7.69l6.47-6.47a.75.75 0 0 1 1.06 0z"/>
+        <path d="M15.78 1.22a.75.75 0 0 1 0 1.06l-7 7a.75.75 0 0 1-1.06 0l-1.5-1.5a.75.75 0 1 1 1.06-1.06l.97.97 5.97-5.97a.75.75 0 0 1 1.06 0z"/>
+      </svg>
+    );
+  }
+  if (status === 'sent') {
+    return (
+      <svg className="tick-icon grey" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12.78 1.22a.75.75 0 0 1 0 1.06l-7 7a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 1 1 1.06-1.06L5.25 7.69l6.47-6.47a.75.75 0 0 1 1.06 0z"/>
+      </svg>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <span style={{ color: '#ff5c5c', marginLeft: '4px', fontWeight: 'bold', fontSize: '0.85rem' }} title="Falha ao enviar">⚠️</span>
+    );
+  }
+  return (
+    <svg className="tick-icon grey" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12.78 1.22a.75.75 0 0 1 0 1.06l-7 7a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 1 1 1.06-1.06L5.25 7.69l6.47-6.47a.75.75 0 0 1 1.06 0z"/>
+    </svg>
+  );
+};
+
 export default function ChatPage() {
   const [contacts, setContacts] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
@@ -535,6 +686,31 @@ export default function ChatPage() {
     if (!simPhone.trim()) return;
 
     const messageId = `wamid_simulated_${Date.now()}`;
+    const formattedContactId = simConnectionPhoneId !== 'sim_phone_id' 
+      ? `${simConnectionPhoneId}:${simPhone}` 
+      : simPhone;
+
+    // 1. Simular digitação primeiro (2 segundos)
+    try {
+      await fetch('/api/chat', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: formattedContactId,
+          typingState: simType === 'audio' ? 'RECORDING' : 'TYPING'
+        })
+      });
+      fetchContacts();
+      if (selectedContact && selectedContact.id === formattedContactId) {
+        setSelectedContact(prev => ({ ...prev, typingState: simType === 'audio' ? 'RECORDING' : 'TYPING' }));
+      }
+    } catch (err) {
+      console.error('Error setting simulated typing state:', err);
+    }
+
+    // Atraso artificial de 2 segundos para ver a digitação fluida
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     const payload = {
       object: 'whatsapp_business_account',
       entry: [
@@ -578,18 +754,67 @@ export default function ChatPage() {
       });
 
       if (res.ok) {
+        // Redefinir o status de digitação localmente para IDLE
+        try {
+          await fetch('/api/chat', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contactId: formattedContactId,
+              typingState: 'IDLE'
+            })
+          });
+        } catch (e) {}
+
         alert('Simulação enviada com sucesso ao Webhook! Aguarde a IA responder na fila em 2.5s.');
-        // Select simulated contact automatically
-        const formattedContactId = simConnectionPhoneId !== 'sim_phone_id' 
-          ? `${simConnectionPhoneId}:${simPhone}` 
-          : simPhone;
-        const checkContact = { id: formattedContactId, name: simName, status: 'AUTO' };
+        const checkContact = { id: formattedContactId, name: simName, status: 'AUTO', typingState: 'IDLE' };
         setSelectedContact(checkContact);
         fetchContacts();
       }
     } catch (err) {
       console.error('Error simulating webhook:', err);
       alert('Falha ao simular webhook.');
+    }
+  };
+
+  const handleSimulateTyping = async (state, durationMs) => {
+    if (!simPhone.trim()) return;
+    const formattedContactId = simConnectionPhoneId !== 'sim_phone_id' 
+      ? `${simConnectionPhoneId}:${simPhone}` 
+      : simPhone;
+
+    try {
+      await fetch('/api/chat', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: formattedContactId,
+          typingState: state
+        })
+      });
+      fetchContacts();
+      if (selectedContact && selectedContact.id === formattedContactId) {
+        setSelectedContact(prev => ({ ...prev, typingState: state }));
+      }
+      
+      setTimeout(async () => {
+        try {
+          await fetch('/api/chat', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contactId: formattedContactId,
+              typingState: 'IDLE'
+            })
+          });
+          fetchContacts();
+          if (selectedContact && selectedContact.id === formattedContactId) {
+            setSelectedContact(prev => ({ ...prev, typingState: 'IDLE' }));
+          }
+        } catch (e) {}
+      }, durationMs);
+    } catch (err) {
+      console.error('Error simulating typing state:', err);
     }
   };
 
@@ -721,7 +946,13 @@ export default function ChatPage() {
                     </div>
                     <div className="contact-msg-row">
                       <span className="contact-last-msg">
-                        {contact.lastMessage?.content || '(Sem mensagens)'}
+                        {contact.typingState === 'TYPING' ? (
+                          <span className="status-typing-green">digitando...</span>
+                        ) : contact.typingState === 'RECORDING' ? (
+                          <span className="status-typing-green">🎙️ gravando áudio...</span>
+                        ) : (
+                          contact.lastMessage?.content || '(Sem mensagens)'
+                        )}
                       </span>
                     </div>
                   </div>
@@ -761,7 +992,15 @@ export default function ChatPage() {
                 )}
                 <div className="chat-header-text">
                   <span className="chat-header-title">{selectedContact.name}</span>
-                  <span className="chat-header-sub">WhatsApp: {selectedContact.id}</span>
+                  <span className="chat-header-sub">
+                    {selectedContact.typingState === 'TYPING' ? (
+                      <span className="status-typing-green">digitando...</span>
+                    ) : selectedContact.typingState === 'RECORDING' ? (
+                      <span className="status-typing-green">🎙️ gravando áudio...</span>
+                    ) : (
+                      `online | WhatsApp: ${selectedContact.id}`
+                    )}
+                  </span>
                 </div>
               </div>
               
@@ -852,82 +1091,101 @@ export default function ChatPage() {
 
             {/* Message Area */}
             <div className="messages-container">
-              {messages.map((msg) => {
-                const isClient = msg.direction === 'INCOMING';
-                const isBot = msg.senderType === 'BOT';
-                
-                let wrapperClass = 'message-wrapper';
-                let senderLabel = selectedContact.name;
+              {(() => {
+                let lastDateStr = null;
+                return messages.map((msg, index) => {
+                  const isClient = msg.direction === 'INCOMING';
+                  const isBot = msg.senderType === 'BOT';
+                  
+                  let wrapperClass = 'message-wrapper';
+                  if (isClient) {
+                    wrapperClass += ' incoming';
+                  } else {
+                    wrapperClass += ' outgoing';
+                    wrapperClass += isBot ? ' bot' : ' human';
+                  }
 
-                if (isClient) {
-                  wrapperClass += ' incoming';
-                } else {
-                  wrapperClass += ' outgoing';
-                  wrapperClass += isBot ? ' bot' : ' human';
-                  senderLabel = isBot ? 'IA (Assistente)' : 'Você (Humano)';
-                }
+                  const msgDate = new Date(msg.timestamp);
+                  const dateStr = msgDate.toDateString();
+                  const showDateSeparator = dateStr !== lastDateStr;
+                  lastDateStr = dateStr;
 
-                return (
-                  <div key={msg.id} className={wrapperClass}>
-                    <span className="message-meta">
-                      {senderLabel} • {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    <div className="message-bubble" style={{ position: 'relative' }}>
-                      {/* Media Renderers */}
-                      {msg.type === 'image' && msg.mediaUrl && (
-                        <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden' }}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={msg.mediaUrl} alt="WhatsApp Image" style={{ maxWidth: '100%', maxHeight: '250px', display: 'block' }} />
+                  return (
+                    <div key={msg.id || index} style={{ display: 'contents' }}>
+                      {showDateSeparator && (
+                        <div className="date-separator">
+                          <span className="date-separator-text">{formatDateHeader(msgDate)}</span>
                         </div>
                       )}
+                      
+                      <div className={wrapperClass}>
+                        <div className="message-bubble" style={{ position: 'relative' }}>
+                          {!isClient && (
+                            <div className="message-sender-tag">
+                              {msg.senderType === 'BOT' ? '🤖 Assistente IA' : 'Atendente'}
+                            </div>
+                          )}
 
-                      {msg.type === 'audio' && msg.mediaUrl && (
-                        <div style={{ marginBottom: '8px', minWidth: '220px' }}>
-                          <audio src={msg.mediaUrl} controls style={{ width: '100%', height: '40px' }} />
+                          {/* Media Renderers */}
+                          {msg.type === 'image' && msg.mediaUrl && (
+                            <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden' }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={msg.mediaUrl} alt="WhatsApp Image" style={{ maxWidth: '100%', maxHeight: '250px', display: 'block' }} />
+                            </div>
+                          )}
+
+                          {msg.type === 'audio' && msg.mediaUrl && (
+                            <CustomAudioPlayer src={msg.mediaUrl} />
+                          )}
+
+                          {msg.type === 'video' && msg.mediaUrl && (
+                            <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden', maxWidth: '300px' }}>
+                              <video src={msg.mediaUrl} controls style={{ width: '100%', maxHeight: '200px' }} />
+                            </div>
+                          )}
+
+                          {msg.type === 'document' && msg.mediaUrl && (
+                            <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <svg style={{ width: '24px', height: '24px', color: '#ef4444' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', fontSize: '0.85rem', textDecoration: 'underline' }}>
+                                Ver Documento / Arquivo
+                              </a>
+                            </div>
+                          )}
+
+                          {msg.type !== 'audio' && msg.content}
+
+                          <span className="message-time-check">
+                            {msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            {!isClient && renderTicks(msg.status)}
+                          </span>
                         </div>
-                      )}
 
-                      {msg.type === 'video' && msg.mediaUrl && (
-                        <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden', maxWidth: '300px' }}>
-                          <video src={msg.mediaUrl} controls style={{ width: '100%', maxHeight: '200px' }} />
-                        </div>
-                      )}
-
-                      {msg.type === 'document' && msg.mediaUrl && (
-                        <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <svg style={{ width: '24px', height: '24px', color: '#ef4444' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
-                          <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', fontSize: '0.85rem', textDecoration: 'underline' }}>
-                            Ver Documento / Arquivo
-                          </a>
-                        </div>
-                      )}
-
-                      {msg.content}
-                    </div>
-
-                    {/* Exibe erro de entrega se houver */}
-                    {msg.sendError && (
-                      <div 
-                        style={{ 
-                          display: 'inline-flex', 
-                          alignItems: 'center', 
-                          gap: '4px', 
-                          fontSize: '0.72rem', 
-                          color: '#ff5c5c', 
-                          marginTop: '2px',
-                          alignSelf: isClient ? 'flex-start' : 'flex-end',
-                          cursor: 'help'
-                        }} 
-                        title={`Falha ao enviar via WhatsApp API: ${msg.sendError}`}
-                      >
-                        ⚠️ Não enviado ao lead ({msg.sendError})
+                        {/* Exibe erro de entrega se houver */}
+                        {msg.sendError && (
+                          <div 
+                            style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              fontSize: '0.72rem', 
+                              color: '#ff5c5c', 
+                              marginTop: '2px',
+                              alignSelf: isClient ? 'flex-start' : 'flex-end',
+                              cursor: 'help'
+                            }} 
+                            title={`Falha ao enviar via WhatsApp API: ${msg.sendError}`}
+                          >
+                            ⚠️ Não enviado ao lead ({msg.sendError})
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                });
+              })()}
               <div ref={messagesEndRef} />
             </div>
 
@@ -1348,6 +1606,30 @@ export default function ChatPage() {
                 Simular Mensagem Recebida
               </button>
             </form>
+
+            <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <label className="form-label" style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Simular Status em Tempo Real</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => handleSimulateTyping('TYPING', 3000)}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '8px', fontSize: '0.75rem', justifyContent: 'center', margin: 0 }}
+                  title="Simula cliente digitando por 3 segundos"
+                >
+                  💬 Digitando (3s)
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => handleSimulateTyping('RECORDING', 5000)}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '8px', fontSize: '0.75rem', justifyContent: 'center', margin: 0 }}
+                  title="Simula cliente gravando áudio por 5 segundos"
+                >
+                  🎙️ Gravando (5s)
+                </button>
+              </div>
+            </div>
             
             <div style={{ margin: 'auto 16px 16px', padding: '12px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
               💡 <strong>Dica de Teste:</strong> Clique em "Simular" para receber a mensagem. A IA responderá na fila em 3 segundos.

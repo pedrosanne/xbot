@@ -73,6 +73,7 @@ export async function enqueueMessage(contactId, messageData) {
         type: messageData.type,
         content: messageData.content || '',
         mediaUrl: messageData.mediaUrl || '',
+        status: 'received',
         timestamp: new Date(messageData.timestamp)
       }
     });
@@ -233,6 +234,12 @@ async function processSingleMessage(contact, messageData) {
               if (messageData.id) {
                 await sendTypingIndicator(messageData.id, freshContact.connection);
               }
+              try {
+                await prisma.contact.update({
+                  where: { id: contactId },
+                  data: { typingState: 'TYPING' }
+                });
+              } catch (e) {}
               const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, freshContact.designatedAgentId);
               
               // Envia resposta da IA
@@ -279,6 +286,12 @@ async function processSingleMessage(contact, messageData) {
         if (messageData.id) {
           await sendTypingIndicator(messageData.id, freshContact.connection);
         }
+        try {
+          await prisma.contact.update({
+            where: { id: contactId },
+            data: { typingState: 'TYPING' }
+          });
+        } catch (e) {}
         const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, agent.id);
         await sendBotResponse(contactId, aiTextResponse, messageData.id, freshContact.connection);
         return;
@@ -314,6 +327,12 @@ async function processSingleMessage(contact, messageData) {
       if (messageData.id) {
         await sendTypingIndicator(messageData.id, freshContact.connection);
       }
+      try {
+        await prisma.contact.update({
+          where: { id: contactId },
+          data: { typingState: 'TYPING' }
+        });
+      } catch (e) {}
       const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, activeAgent.id);
       await sendBotResponse(contactId, aiTextResponse, messageData.id, freshContact.connection);
     } else {
@@ -362,6 +381,13 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
   if (step.delaySeconds) {
     try {
       await logToDb('INFO', 'FLOW', `Simulando atraso de digitação de ${step.delaySeconds}s para o contato ${contactId} na etapa '${step.id}'`);
+      const isAudioStep = step.media && step.media.type === 'audio';
+      try {
+        await prisma.contact.update({
+          where: { id: contactId },
+          data: { typingState: isAudioStep ? 'RECORDING' : 'TYPING' }
+        });
+      } catch (e) {}
       await new Promise(resolve => setTimeout(resolve, step.delaySeconds * 1000));
     } catch (err) {
       console.error('Error simulating typing delay:', err);
@@ -456,6 +482,14 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
       await sendStepResponse(contactId, nextStep, steps, incomingMessageId, connection);
     }
   }
+
+  // Reset typing state to IDLE after step response completes
+  try {
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { typingState: 'IDLE' }
+    });
+  } catch (e) {}
 }
 
 async function executeFlowOption(contact, flow, steps, option, groupedText, latestMediaUrl, latestMimeType, incomingMessageId = null) {
@@ -497,6 +531,12 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
       if (incomingMessageId) {
         await sendTypingIndicator(incomingMessageId, contact.connection);
       }
+      try {
+        await prisma.contact.update({
+          where: { id: contact.id },
+          data: { typingState: 'TYPING' }
+        });
+      } catch (e) {}
       const aiTextResponse = await generateAIResponse(contact.id, groupedText, latestMediaUrl, latestMimeType, agent.id);
       await sendBotResponse(contact.id, aiTextResponse, incomingMessageId, contact.connection);
     } else {
@@ -554,6 +594,13 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
   const audioRegex = /\[ENVIAR\s+AUDIO:\s*([^\]]+)\]/i;
   const audioMatch = textToSend.match(audioRegex);
   if (audioMatch) {
+    try {
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: { typingState: 'RECORDING' }
+      });
+    } catch (e) {}
+
     const audioScript = audioMatch[1].trim();
     // Resolve designated agent to use specific TTS credentials
     const contactObj = await prisma.contact.findUnique({ where: { id: contactId } });
@@ -624,6 +671,14 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
       console.error('Failed to send text to WhatsApp:', err);
     }
   }
+
+  // Reset typing state to IDLE after response completes
+  try {
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { typingState: 'IDLE' }
+    });
+  } catch (e) {}
 }
 
 async function saveOutgoingMessage(id, contactId, type, mediaUrl = '', content = '') {
@@ -635,7 +690,8 @@ async function saveOutgoingMessage(id, contactId, type, mediaUrl = '', content =
       senderType: 'BOT',
       type,
       content,
-      mediaUrl
+      mediaUrl,
+      status: 'sent'
     }
   });
 
