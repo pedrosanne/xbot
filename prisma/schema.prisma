@@ -66,6 +66,8 @@ model Contact {
   connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   designatedAgentId String?
   typingState       String              @default("IDLE")
+  assignedUserId    String?
+  assignedUser      User?               @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
 }
 
 model WhatsAppConnection {
@@ -109,6 +111,7 @@ model User {
   password  String   // Hashed password
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  assignedContacts Contact[]
 }
 
 model Flow {

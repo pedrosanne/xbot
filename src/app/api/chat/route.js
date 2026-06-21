@@ -16,7 +16,16 @@ export async function GET(request) {
       // Return profile details first to get the connection details
       const contact = await prisma.contact.findUnique({
         where: { id: contactId },
-        include: { connection: true }
+        include: { 
+          connection: true,
+          assignedUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        }
       });
 
       // Find unread incoming messages and mark them as read
@@ -58,7 +67,7 @@ export async function GET(request) {
       where.connectionId = connectionId;
     }
 
-    // Return list of all contacts with their last message
+    // Return list of all contacts with their last message and assigned user
     const contacts = await prisma.contact.findMany({
       where,
       orderBy: { lastInteraction: 'desc' },
@@ -66,6 +75,13 @@ export async function GET(request) {
         messages: {
           orderBy: { timestamp: 'desc' },
           take: 1
+        },
+        assignedUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
         }
       }
     });
@@ -81,7 +97,9 @@ export async function GET(request) {
       tags: c.tags || '',
       avatarUrl: c.avatarUrl || '',
       lastInteraction: c.lastInteraction,
-      lastMessage: c.messages[0] || null
+      lastMessage: c.messages[0] || null,
+      assignedUserId: c.assignedUserId || null,
+      assignedUser: c.assignedUser || null
     }));
 
     return NextResponse.json(formattedContacts);
@@ -237,7 +255,7 @@ export async function POST(request) {
 // PUT: Update contact details (status, name, email, notes, tags, avatarUrl, typingState)
 export async function PUT(request) {
   try {
-    const { contactId, status, name, email, notes, tags, avatarUrl, typingState } = await request.json();
+    const { contactId, status, name, email, notes, tags, avatarUrl, typingState, assignedUserId } = await request.json();
 
     if (!contactId) {
       return NextResponse.json({ error: 'Missing contactId' }, { status: 400 });
@@ -251,6 +269,7 @@ export async function PUT(request) {
     if (tags !== undefined) dataToUpdate.tags = tags;
     if (avatarUrl !== undefined) dataToUpdate.avatarUrl = avatarUrl;
     if (typingState !== undefined) dataToUpdate.typingState = typingState;
+    if (assignedUserId !== undefined) dataToUpdate.assignedUserId = assignedUserId;
 
     const existing = await prisma.contact.findUnique({
       where: { id: contactId }
@@ -278,7 +297,16 @@ export async function PUT(request) {
 
     const updatedContact = await prisma.contact.update({
       where: { id: contactId },
-      data: dataToUpdate
+      data: dataToUpdate,
+      include: {
+        assignedUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
     });
 
     return NextResponse.json(updatedContact);

@@ -160,6 +160,11 @@ export default function ChatPage() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // Collaborators and logged user states
+  const [collaborators, setCollaborators] = useState([]);
+  const [loggedUser, setLoggedUser] = useState(null);
+  const [assigneeFilter, setAssigneeFilter] = useState('ALL'); // 'ALL', 'ME', 'UNASSIGNED'
+  
   // Call Modal State
   const [showCallModal, setShowCallModal] = useState(false);
   const [callFirstMessage, setCallFirstMessage] = useState('');
@@ -216,6 +221,29 @@ export default function ChatPage() {
   const [connections, setConnections] = useState([]);
   const [selectedConnectionId, setSelectedConnectionId] = useState('all');
 
+  const fetchCollaborators = async () => {
+    try {
+      const res = await fetch('/api/collaborators');
+      if (res.ok) {
+        setCollaborators(await res.json());
+      }
+    } catch (err) {
+      console.error('Error fetching collaborators:', err);
+    }
+  };
+
+  const fetchLoggedUser = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        setLoggedUser(data.user);
+      }
+    } catch (err) {
+      console.error('Error fetching logged user:', err);
+    }
+  };
+
   // Fetch all WhatsApp Connections
   const fetchConnections = async () => {
     try {
@@ -268,6 +296,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     fetchConnections();
+    fetchCollaborators();
+    fetchLoggedUser();
   }, []);
 
   useEffect(() => {
@@ -825,7 +855,15 @@ export default function ChatPage() {
     const matchesFilter = 
       statusFilter === 'ALL' || 
       contact.status === statusFilter;
-    return matchesSearch && matchesFilter;
+
+    let matchesAssignee = true;
+    if (assigneeFilter === 'ME') {
+      matchesAssignee = contact.assignedUserId === loggedUser?.id;
+    } else if (assigneeFilter === 'UNASSIGNED') {
+      matchesAssignee = !contact.assignedUserId;
+    }
+
+    return matchesSearch && matchesFilter && matchesAssignee;
   });
 
   const getInitials = (name) => {
@@ -910,6 +948,32 @@ export default function ChatPage() {
           </button>
         </div>
 
+        {/* Assignee Filter Tabs */}
+        <div className="contacts-filters" style={{ marginTop: '8px', borderTop: '1px solid var(--border-glass)', paddingTop: '8px' }}>
+          <button 
+            className={`filter-tab ${assigneeFilter === 'ALL' ? 'active' : ''}`}
+            onClick={() => setAssigneeFilter('ALL')}
+            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+          >
+            Fila Geral
+          </button>
+          <button 
+            className={`filter-tab ${assigneeFilter === 'ME' ? 'active' : ''}`}
+            onClick={() => setAssigneeFilter('ME')}
+            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+            disabled={!loggedUser}
+          >
+            Meus Leads
+          </button>
+          <button 
+            className={`filter-tab ${assigneeFilter === 'UNASSIGNED' ? 'active' : ''}`}
+            onClick={() => setAssigneeFilter('UNASSIGNED')}
+            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+          >
+            Sem Atendente
+          </button>
+        </div>
+
         {/* Contact list body */}
         <div className="contacts-list">
           {filteredContacts.length === 0 ? (
@@ -944,6 +1008,11 @@ export default function ChatPage() {
                       <span className="contact-name">{contact.name || 'Sem Nome'}</span>
                       <span className={`status-indicator ${isManual ? 'manual' : 'auto'}`} />
                     </div>
+                    {contact.assignedUser && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--color-primary-hover)', display: 'flex', alignItems: 'center', gap: '3px', margin: '2px 0' }}>
+                        <span>👤 {contact.assignedUser.name}</span>
+                      </div>
+                    )}
                     <div className="contact-msg-row">
                       <span className="contact-last-msg">
                         {contact.typingState === 'TYPING' ? (
@@ -1385,6 +1454,54 @@ export default function ChatPage() {
                     <span style={{ fontSize: '0.9rem', color: selectedContact.email ? 'white' : 'var(--text-muted)', fontWeight: 500 }}>
                       {selectedContact.email || 'Não informado'}
                     </span>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Colaborador Responsável</label>
+                    <select
+                      value={selectedContact.assignedUserId || ''}
+                      onChange={async (e) => {
+                        const newAssigneeId = e.target.value || null;
+                        try {
+                          const res = await fetch('/api/chat', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              contactId: selectedContact.id,
+                              assignedUserId: newAssigneeId
+                            })
+                          });
+                          if (res.ok) {
+                            const updated = await res.json();
+                            setSelectedContact(prev => ({ 
+                              ...prev, 
+                              assignedUserId: newAssigneeId, 
+                              assignedUser: updated.assignedUser 
+                            }));
+                            fetchContacts();
+                          }
+                        } catch (err) {
+                          console.error('Error assigning contact:', err);
+                        }
+                      }}
+                      className="form-select"
+                      style={{ 
+                        width: '100%', 
+                        padding: '8px 12px', 
+                        fontSize: '0.85rem', 
+                        background: 'rgba(255,255,255,0.03)', 
+                        border: '1px solid var(--border-glass)',
+                        color: 'white',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      <option value="" style={{ background: '#1c1c24', color: 'white' }}>👤 Sem Responsável (Fila Geral)</option>
+                      {collaborators.map((user) => (
+                        <option key={user.id} value={user.id} style={{ background: '#1c1c24', color: 'white' }}>
+                          👤 {user.name} ({user.email})
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>

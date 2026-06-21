@@ -306,38 +306,31 @@ async function processSingleMessage(contact, messageData) {
       return;
     }
 
-    // 7. Último Fallback: roteia para o Agente de IA (específico ou global)
-    let activeAgent = await prisma.agent.findFirst({
-      where: { isActive: true, connectionId: freshContact.connectionId || null }
-    });
-    if (!activeAgent) {
-      activeAgent = await prisma.agent.findFirst({
-        where: { isActive: true, connectionId: null }
-      });
-    }
-    if (activeAgent) {
-      await logToDb('INFO', 'AI', `Sem fluxo ativo. Definindo contato ${contactId} para modo IA com agente '${activeAgent.name}' e chamando Gemini.`);
-      await prisma.contact.update({
-        where: { id: contactId },
-        data: { 
-          botMode: 'IA',
-          designatedAgentId: activeAgent.id
-        }
-      });
-      if (messageData.id) {
-        await sendTypingIndicator(messageData.id, freshContact.connection);
+    // 7. Último Fallback: roteia o contato diretamente para o atendimento MANUAL (transbordo humano)
+    // ao invés de usar IA ou retornar erros, conforme solicitado pelo usuário.
+    await logToDb('INFO', 'SYSTEM', `Nenhuma palavra-chave ou fluxo ativo para o contato ${contactId}. Realizando transbordo automático para MANUAL.`);
+    
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        status: 'MANUAL',
+        botMode: 'FLOW',
+        currentStepId: '',
+        activeFlowId: ''
       }
-      try {
-        await prisma.contact.update({
-          where: { id: contactId },
-          data: { typingState: 'TYPING' }
-        });
-      } catch (e) {}
-      const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, activeAgent.id);
-      await sendBotResponse(contactId, aiTextResponse, messageData.id, freshContact.connection);
-    } else {
-      await logToDb('WARN', 'SYSTEM', 'Nenhuma persona de IA ativa ou fluxo de chatbot encontrado para responder à mensagem.');
-    }
+    });
+
+    // Dispara a notificação push para a equipe de atendimento
+    const contactName = freshContact.name || freshContact.profileName || contactId;
+    const messageSnippet = text 
+      ? (text.length > 60 ? text.substring(0, 60) + '...' : text) 
+      : 'Mídia recebida';
+
+    await sendPushNotification(
+      `Novo Atendimento: ${contactName} 👤`,
+      messageSnippet,
+      `/chat?contactId=${contactId}`
+    );
 
   } catch (error) {
     await logToDb('ERROR', 'SYSTEM', `Erro crítico ao processar mensagem do contato ${contactId}: ${error.message}`, {
