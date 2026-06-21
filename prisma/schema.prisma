@@ -57,6 +57,7 @@ model Contact {
   lastInteraction DateTime  @default(now())
   messages        Message[]
   calls           Call[]
+  payments        Payment[]
   createdAt       DateTime  @default(now())
   
   // Scoping fields for multi-number support
@@ -177,5 +178,33 @@ model Upload {
   mimeType  String
   data      Bytes
   createdAt DateTime @default(now())
+}
+
+model PaymentGateway {
+  id            String    @id @default(uuid())
+  name          String    // Ex: "Mercado Pago", "Stripe", "Asaas"
+  type          String    // "stripe", "mercadopago", "asaas", "custom"
+  isActive      Boolean   @default(true)
+  apiKey        String    @default("") // Chave secreta / API Token
+  publicKey     String    @default("") // Public Key / Client ID (opcional)
+  webhookSecret String    @default("") // Webhook signing secret (opcional)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  payments      Payment[]
+}
+
+model Payment {
+  id            String         @id @default(uuid())
+  gatewayId     String
+  gateway       PaymentGateway @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+  contactId     String?
+  contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  externalId    String         @default("") // ID do pagamento no gateway externo
+  amount        Float
+  status        String         @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
+  paymentMethod String         @default("pix") // pix, credit_card, boleto, etc.
+  description   String         @default("")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
