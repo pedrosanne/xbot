@@ -209,3 +209,66 @@ model Payment {
   updatedAt     DateTime       @updatedAt
 }
 
+model Product {
+  id          String      @id @default(uuid())
+  name        String
+  description String      @default("")
+  type        String      @default("DIGITAL") // "DIGITAL" ou "PHYSICAL"
+  price       Float       @default(0.0)
+  imageUrl    String      @default("")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  offers      Offer[]
+  pixels      Pixel[]
+  orderBumps  OrderBump[] @relation("BumpMainProduct")
+  bumpedIn    OrderBump[] @relation("BumpTargetProduct")
+  upsells     Upsell[]    @relation("UpsellMainProduct")
+  upselledIn  Upsell[]    @relation("UpsellTargetProduct")
+}
+
+model Offer {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String
+  price       Float
+  description String   @default("")
+  code        String   @default("") // Slug / URL da oferta
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OrderBump {
+  id              String   @id @default(uuid())
+  productId       String
+  product         Product  @relation("BumpMainProduct", fields: [productId], references: [id], onDelete: Cascade)
+  targetProductId String
+  targetProduct   Product  @relation("BumpTargetProduct", fields: [targetProductId], references: [id], onDelete: Cascade)
+  title           String
+  description     String   @default("")
+  price           Float
+  createdAt       DateTime @default(now())
+}
+
+model Upsell {
+  id              String   @id @default(uuid())
+  productId       String
+  product         Product  @relation("UpsellMainProduct", fields: [productId], references: [id], onDelete: Cascade)
+  targetProductId String
+  targetProduct   Product  @relation("UpsellTargetProduct", fields: [targetProductId], references: [id], onDelete: Cascade)
+  title           String
+  description     String   @default("")
+  price           Float
+  createdAt       DateTime @default(now())
+}
+
+model Pixel {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  platform  String   // "facebook", "google", "tiktok"
+  pixelId   String
+  token     String   @default("") // Token de Conversão da API (opcional)
+  createdAt DateTime @default(now())
+}
+
