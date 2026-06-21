@@ -456,6 +456,8 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
     }
   }
 
+  let quoteMessageId = incomingMessageId;
+
   // Send media first if present
   if (media && media.type && media.url) {
     try {
@@ -464,17 +466,17 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
       const caption = media.caption || '';
 
       if (media.type === 'image') {
-        await sendImage(contactId, absoluteMediaUrl, caption, incomingMessageId, connection);
+        await sendImage(contactId, absoluteMediaUrl, caption, quoteMessageId, connection);
         await saveOutgoingMessage(`bot_${Date.now()}_media_img`, contactId, 'image', media.url, caption);
       } else if (media.type === 'video') {
-        await sendVideo(contactId, absoluteMediaUrl, caption, incomingMessageId, connection);
+        await sendVideo(contactId, absoluteMediaUrl, caption, quoteMessageId, connection);
         await saveOutgoingMessage(`bot_${Date.now()}_media_vid`, contactId, 'video', media.url, caption);
       } else if (media.type === 'audio') {
-        await sendAudio(contactId, absoluteMediaUrl, incomingMessageId, connection);
+        await sendAudio(contactId, absoluteMediaUrl, quoteMessageId, connection);
         await saveOutgoingMessage(`bot_${Date.now()}_media_aud`, contactId, 'audio', media.url, 'Áudio do fluxo');
       } else if (media.type === 'document') {
         const originalFilename = getFilenameFromUrl(media.url, 'documento');
-        await sendDocument(contactId, absoluteMediaUrl, originalFilename, caption, incomingMessageId, connection);
+        await sendDocument(contactId, absoluteMediaUrl, originalFilename, caption, quoteMessageId, connection);
         await saveOutgoingMessage(`bot_${Date.now()}_media_doc`, contactId, 'document', media.url, caption);
       } else if (media.type === 'link') {
         // For links, prepend to the text message
@@ -483,6 +485,7 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
         // Will be sent below with buttons or as plain text
         // Skip sending separately, instead modify text below
       }
+      quoteMessageId = null;
     } catch (err) {
       await logToDb('WARN', 'API', `Falha ao enviar mídia na etapa '${step.id}': ${err.message}`);
     }
@@ -499,13 +502,15 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
   if (urlButton) {
     try {
       await logToDb('INFO', 'API', `Enviando botão de link para ${contactId} na etapa '${step.id}'`);
-      await sendCTAUrlButton(contactId, finalText, urlButton.title, urlButton.url || '', incomingMessageId, connection);
+      await sendCTAUrlButton(contactId, finalText, urlButton.title, urlButton.url || '', quoteMessageId, connection);
       await saveOutgoingMessage(`bot_${Date.now()}_cta`, contactId, 'text', '', `${finalText} [Link: ${urlButton.title} - ${urlButton.url}]`);
+      quoteMessageId = null;
     } catch (err) {
       console.error('Failed to send WhatsApp buttons, falling back to text options', err);
       const fallbackText = `${finalText}\n\n🔗 *${urlButton.title}*: ${urlButton.url}`;
-      await sendText(contactId, fallbackText, incomingMessageId, connection);
+      await sendText(contactId, fallbackText, quoteMessageId, connection);
       await saveOutgoingMessage(`bot_${Date.now()}_text_fallback`, contactId, 'text', '', fallbackText);
+      quoteMessageId = null;
     }
   } else if (options.length > 0) {
     const formattedButtons = options.slice(0, 3).map(opt => ({
@@ -515,21 +520,24 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
 
     try {
       await logToDb('INFO', 'API', `Enviando botões interativos para ${contactId} na etapa '${step.id}'`);
-      await sendButtons(contactId, finalText, formattedButtons, incomingMessageId, connection);
+      await sendButtons(contactId, finalText, formattedButtons, quoteMessageId, connection);
       await saveOutgoingMessage(`bot_${Date.now()}_buttons`, contactId, 'text', '', `${finalText} [Botões: ${formattedButtons.map(b => b.title).join(', ')}]`);
+      quoteMessageId = null;
     } catch (err) {
       console.error('Failed to send WhatsApp buttons, falling back to text options', err);
       let fallbackText = finalText + '\n\n';
       formattedButtons.forEach((btn, idx) => {
         fallbackText += `*${idx + 1}*. ${btn.title}\n`;
       });
-      await sendText(contactId, fallbackText, incomingMessageId, connection);
+      await sendText(contactId, fallbackText, quoteMessageId, connection);
       await saveOutgoingMessage(`bot_${Date.now()}_text_fallback`, contactId, 'text', '', fallbackText);
+      quoteMessageId = null;
     }
   } else if (finalText) {
     await logToDb('INFO', 'API', `Enviando texto simples para ${contactId} na etapa '${step.id}'`);
-    await sendText(contactId, finalText, incomingMessageId, connection);
+    await sendText(contactId, finalText, quoteMessageId, connection);
     await saveOutgoingMessage(`bot_${Date.now()}_text`, contactId, 'text', '', finalText);
+    quoteMessageId = null;
   }
 
   // Auto-advance if this step has no buttons and has nextStepId (direct transition sequence)
@@ -541,7 +549,7 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
         where: { id: contactId },
         data: { currentStepId: nextStep.id }
       });
-      await sendStepResponse(contactId, nextStep, steps, incomingMessageId, connection);
+      await sendStepResponse(contactId, nextStep, steps, quoteMessageId, connection);
     }
   }
 
@@ -653,6 +661,7 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
   let audioUrlToSend = null;
   let imageUrlToSend = null;
   let docUrlToSend = null;
+  let quoteMessageId = incomingMessageId;
 
   const audioRegex = /\[ENVIAR\s+AUDIO:\s*([^\]]+)\]/i;
   const audioMatch = textToSend.match(audioRegex);
@@ -704,8 +713,9 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
   if (audioUrlToSend) {
     const absoluteAudioUrl = await getAbsoluteUrl(audioUrlToSend);
     try {
-      await sendAudio(contactId, absoluteAudioUrl, incomingMessageId, connection);
+      await sendAudio(contactId, absoluteAudioUrl, quoteMessageId, connection);
       await saveOutgoingMessage(botMessageId, contactId, 'audio', audioUrlToSend, 'Mensagem de voz');
+      quoteMessageId = null;
     } catch (err) {
       console.error('Failed to send audio to WhatsApp:', err);
       textToSend = textToSend || 'Mensagem de voz';
@@ -715,9 +725,10 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
   if (imageUrlToSend) {
     try {
       const absoluteImgUrl = await getAbsoluteUrl(imageUrlToSend);
-      await sendImage(contactId, absoluteImgUrl, textToSend, incomingMessageId, connection);
+      await sendImage(contactId, absoluteImgUrl, textToSend, quoteMessageId, connection);
       await saveOutgoingMessage(botMessageId + '_img', contactId, 'image', imageUrlToSend, textToSend);
       textToSend = '';
+      quoteMessageId = null;
     } catch (err) {
       console.error('Failed to send image to WhatsApp:', err);
     }
@@ -727,9 +738,10 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
     try {
       const absoluteDocUrl = await getAbsoluteUrl(docUrlToSend);
       const originalFilename = getFilenameFromUrl(docUrlToSend, 'documento');
-      await sendDocument(contactId, absoluteDocUrl, originalFilename, textToSend, incomingMessageId, connection);
+      await sendDocument(contactId, absoluteDocUrl, originalFilename, textToSend, quoteMessageId, connection);
       await saveOutgoingMessage(botMessageId + '_doc', contactId, 'document', docUrlToSend, textToSend);
       textToSend = '';
+      quoteMessageId = null;
     } catch (err) {
       console.error('Failed to send document to WhatsApp:', err);
     }
@@ -737,8 +749,9 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
 
   if (textToSend) {
     try {
-      await sendText(contactId, textToSend, incomingMessageId, connection);
+      await sendText(contactId, textToSend, quoteMessageId, connection);
       await saveOutgoingMessage(botMessageId, contactId, 'text', '', textToSend);
+      quoteMessageId = null;
     } catch (err) {
       console.error('Failed to send text to WhatsApp:', err);
     }
