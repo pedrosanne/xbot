@@ -87,20 +87,66 @@ export async function enqueueMessage(contactId, messageData) {
 
     // 3. Verifica se o contato está em modo MANUAL (atendimento humano)
     if (contact.status === 'MANUAL') {
-      await logToDb('INFO', 'SYSTEM', `Contato ${contactId} está em modo MANUAL. Resposta automática pausada.`);
-      
-      // Envia notificação push para os administradores/operadores
-      const contactName = contact.name || contact.profileName || contactId;
-      const messageSnippet = messageData.content 
-        ? (messageData.content.length > 60 ? messageData.content.substring(0, 60) + '...' : messageData.content) 
-        : 'Mídia recebida';
+      // Check if message is a flow keyword trigger to release from MANUAL
+      const activeFlows = await prisma.flow.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { connectionId: null },
+            { connectionId: contact.connectionId || null }
+          ]
+        }
+      });
+      const normalizedInput = (messageData.content || '').trim().toLowerCase();
+      let triggeredFlow = null;
+      if (messageData.type === 'text' && normalizedInput) {
+        triggeredFlow = activeFlows.find(f => {
+          if (f.trigger !== 'keyword') return false;
+          if (f.keywords.trim().toLowerCase() === normalizedInput) return true;
+          const keywordsArray = f.keywords.split(',').map(k => k.trim().toLowerCase());
+          return keywordsArray.includes(normalizedInput);
+        });
+      }
 
-      await sendPushNotification(
-        `Atendimento Manual: ${contactName} 💬`,
-        messageSnippet,
-        `/chat?contactId=${contactId}`
-      );
-      return;
+      if (triggeredFlow) {
+        await logToDb('INFO', 'FLOW', `Contato ${contactId} estava em MANUAL mas enviou a palavra-chave do fluxo '${triggeredFlow.name}'. Retornando para AUTO.`);
+        contact = await prisma.contact.update({
+          where: { id: contactId },
+          data: { status: 'AUTO' },
+          include: { connection: true }
+        });
+      } else {
+        await logToDb('INFO', 'SYSTEM', `Contato ${contactId} está em modo MANUAL. Resposta automática pausada.`);
+        
+        // Busca os colaboradores vinculados a esta conexão de WhatsApp para segmentar
+        let targetUserIds = null;
+        if (contact.connectionId) {
+          try {
+            const connWithUsers = await prisma.whatsAppConnection.findUnique({
+              where: { id: contact.connectionId },
+              include: { users: { select: { id: true } } }
+            });
+            if (connWithUsers && connWithUsers.users.length > 0) {
+              targetUserIds = connWithUsers.users.map(u => u.id);
+            }
+          } catch (err) {
+            console.error('Error fetching connection users for manual override push:', err);
+          }
+        }
+
+        const contactName = contact.name || contact.profileName || contactId;
+        const messageSnippet = messageData.content 
+          ? (messageData.content.length > 60 ? messageData.content.substring(0, 60) + '...' : messageData.content) 
+          : 'Mídia recebida';
+
+        await sendPushNotification(
+          `Atendimento Manual: ${contactName} 💬`,
+          messageSnippet,
+          `/chat?contactId=${contactId}`,
+          targetUserIds
+        );
+        return;
+      }
     }
 
     // 4. Processa a mensagem de forma síncrona e imediata
@@ -175,6 +221,7 @@ async function processSingleMessage(contact, messageData) {
     if (!clickedButtonId && normalizedInput) {
       triggeredFlow = activeFlows.find(f => {
         if (f.trigger !== 'keyword') return false;
+        if (f.keywords.trim().toLowerCase() === normalizedInput) return true;
         const keywordsArray = f.keywords.split(',').map(k => k.trim().toLowerCase());
         return keywordsArray.includes(normalizedInput);
       });
