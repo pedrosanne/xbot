@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { sendText, sendAudio, sendImage, sendDocument, sendVideo, markWhatsAppMessageAsRead } from '@/lib/whatsapp';
 import { getSystemSettings } from '@/lib/settings';
 import { logToDb } from '@/lib/log';
 import { voiceChanger } from '@/lib/tts';
+import { verifyToken } from '@/lib/auth';
 
 // GET: Retrieve contacts list OR message history for a contact
 export async function GET(request) {
@@ -12,6 +14,29 @@ export async function GET(request) {
   const connectionId = searchParams.get('connectionId');
 
   try {
+    // Authenticate the requesting user to resolve scoped connections
+    let loggedUserId = null;
+    try {
+      const cookieStore = await cookies();
+      const cookie = cookieStore.get('session');
+      const token = cookie ? cookie.value : null;
+      if (token) {
+        const payload = await verifyToken(token);
+        if (payload) {
+          loggedUserId = payload.userId;
+        }
+      }
+    } catch (e) {}
+
+    let userConnections = [];
+    if (loggedUserId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: loggedUserId },
+        include: { connections: { select: { id: true } } }
+      });
+      userConnections = dbUser?.connections?.map(c => c.id) || [];
+    }
+
     if (contactId) {
       // Return profile details first to get the connection details
       const contact = await prisma.contact.findUnique({
@@ -27,6 +52,15 @@ export async function GET(request) {
           }
         }
       });
+
+      if (!contact) {
+        return NextResponse.json({ error: 'Contato não encontrado.' }, { status: 404 });
+      }
+
+      // Check if collaborator is assigned to this contact's connection
+      if (userConnections.length > 0 && contact.connectionId && !userConnections.includes(contact.connectionId)) {
+        return NextResponse.json({ error: 'Acesso negado para este lead.' }, { status: 403 });
+      }
 
       // Find unread incoming messages and mark them as read
       const unreadIncoming = await prisma.message.findMany({
@@ -63,8 +97,20 @@ export async function GET(request) {
 
     // Filter by connectionId if provided
     const where = {};
-    if (connectionId && connectionId !== 'all') {
-      where.connectionId = connectionId;
+    if (userConnections.length > 0) {
+      if (connectionId && connectionId !== 'all') {
+        if (userConnections.includes(connectionId)) {
+          where.connectionId = connectionId;
+        } else {
+          where.connectionId = 'unauthorized_connection_id';
+        }
+      } else {
+        where.connectionId = { in: userConnections };
+      }
+    } else {
+      if (connectionId && connectionId !== 'all') {
+        where.connectionId = connectionId;
+      }
     }
 
     // Return list of all contacts with their last message and assigned user

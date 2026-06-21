@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { logToDb } from '@/lib/log';
+import { verifyToken } from '@/lib/auth';
 
 // POST: Subscribe a device to push notifications
 export async function POST(request) {
@@ -15,17 +17,35 @@ export async function POST(request) {
     const auth = keys?.auth || '';
     const p256dh = keys?.p256dh || '';
 
-    // Save or update subscription in DB
+    // Find authenticated user if exists in cookies session
+    let userId = null;
+    try {
+      const cookieStore = await cookies();
+      const cookie = cookieStore.get('session');
+      const token = cookie ? cookie.value : null;
+      if (token) {
+        const payload = await verifyToken(token);
+        if (payload) {
+          userId = payload.userId;
+        }
+      }
+    } catch (sessionErr) {
+      console.error('Error extracting user session in push subscribe:', sessionErr);
+    }
+
+    // Save or update subscription in DB (including optional userId link)
     const savedSub = await prisma.pushSubscription.upsert({
       where: { endpoint },
       update: {
         keysAuth: auth,
-        keysP256dh: p256dh
+        keysP256dh: p256dh,
+        userId
       },
       create: {
         endpoint,
         keysAuth: auth,
-        keysP256dh: p256dh
+        keysP256dh: p256dh,
+        userId
       }
     });
 

@@ -17,7 +17,7 @@ async function getAuthenticatedUser() {
   }
 }
 
-// GET: List all collaborators (users)
+// GET: List all collaborators (users) with their designated connections
 export async function GET() {
   const userPayload = await getAuthenticatedUser();
   if (!userPayload) {
@@ -30,7 +30,15 @@ export async function GET() {
         id: true,
         name: true,
         email: true,
-        createdAt: true
+        createdAt: true,
+        connections: {
+          select: {
+            id: true,
+            name: true,
+            whatsappPhoneId: true,
+            phoneNumber: true
+          }
+        }
       },
       orderBy: { name: 'asc' }
     });
@@ -42,7 +50,7 @@ export async function GET() {
   }
 }
 
-// POST: Create a new collaborator
+// POST: Create a new collaborator with optional designated connections
 export async function POST(req) {
   const userPayload = await getAuthenticatedUser();
   if (!userPayload) {
@@ -50,7 +58,7 @@ export async function POST(req) {
   }
 
   try {
-    const { name, email, password } = await req.json();
+    const { name, email, password, connectionIds } = await req.json();
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -81,18 +89,29 @@ export async function POST(req) {
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create the user
+    // Create the user and connect connections
     const newUser = await prisma.user.create({
       data: {
         name,
         email: email.toLowerCase(),
-        password: hashedPassword
+        password: hashedPassword,
+        connections: connectionIds && Array.isArray(connectionIds) ? {
+          connect: connectionIds.map(id => ({ id }))
+        } : undefined
       },
       select: {
         id: true,
         name: true,
         email: true,
-        createdAt: true
+        createdAt: true,
+        connections: {
+          select: {
+            id: true,
+            name: true,
+            whatsappPhoneId: true,
+            phoneNumber: true
+          }
+        }
       }
     });
 
@@ -104,6 +123,65 @@ export async function POST(req) {
       { error: 'Erro interno ao criar colaborador.' },
       { status: 500 }
     );
+  }
+}
+
+// PUT: Update collaborator details and assigned connections
+export async function PUT(req) {
+  const userPayload = await getAuthenticatedUser();
+  if (!userPayload) {
+    return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+  }
+
+  try {
+    const { id, name, email, connectionIds } = await req.json();
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID do colaborador é obrigatório.' }, { status: 400 });
+    }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
+    }
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email.toLowerCase();
+    
+    if (connectionIds && Array.isArray(connectionIds)) {
+      updateData.connections = {
+        set: connectionIds.map(connId => ({ id: connId }))
+      };
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        connections: {
+          select: {
+            id: true,
+            name: true,
+            whatsappPhoneId: true,
+            phoneNumber: true
+          }
+        }
+      }
+    });
+
+    return NextResponse.json(updatedUser);
+  } catch (error) {
+    console.error('Error updating collaborator:', error);
+    return NextResponse.json({ error: 'Erro interno ao atualizar colaborador.' }, { status: 500 });
   }
 }
 

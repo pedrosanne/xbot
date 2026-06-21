@@ -320,7 +320,19 @@ async function processSingleMessage(contact, messageData) {
       }
     });
 
-    // Dispara a notificação push para a equipe de atendimento
+    // Busca os colaboradores vinculados a esta conexão de WhatsApp
+    let targetUserIds = null;
+    if (freshContact.connectionId) {
+      const connWithUsers = await prisma.whatsAppConnection.findUnique({
+        where: { id: freshContact.connectionId },
+        include: { users: { select: { id: true } } }
+      });
+      if (connWithUsers && connWithUsers.users.length > 0) {
+        targetUserIds = connWithUsers.users.map(u => u.id);
+      }
+    }
+
+    // Dispara a notificação push para a equipe de atendimento (segmentada por quem gerencia o número)
     const contactName = freshContact.name || freshContact.profileName || contactId;
     const messageSnippet = text 
       ? (text.length > 60 ? text.substring(0, 60) + '...' : text) 
@@ -329,7 +341,8 @@ async function processSingleMessage(contact, messageData) {
     await sendPushNotification(
       `Novo Atendimento: ${contactName} 👤`,
       messageSnippet,
-      `/chat?contactId=${contactId}`
+      `/chat?contactId=${contactId}`,
+      targetUserIds
     );
 
   } catch (error) {

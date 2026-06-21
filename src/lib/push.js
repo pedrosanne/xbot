@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 import { getSystemSettings } from './settings';
 import { logToDb } from './log';
 
-export async function sendPushNotification(title, body, url = '/chat') {
+export async function sendPushNotification(title, body, url = '/chat', targetUserIds = null) {
   try {
     const settings = await getSystemSettings();
     
@@ -19,7 +19,14 @@ export async function sendPushNotification(title, body, url = '/chat') {
       settings.vapidPrivateKey
     );
 
-    const subscriptions = await prisma.pushSubscription.findMany();
+    const whereClause = {};
+    if (targetUserIds && Array.isArray(targetUserIds)) {
+      whereClause.userId = { in: targetUserIds };
+    }
+
+    const subscriptions = await prisma.pushSubscription.findMany({
+      where: whereClause
+    });
     if (subscriptions.length === 0) {
       return { success: true, sent: 0 };
     }
