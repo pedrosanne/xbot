@@ -28,10 +28,20 @@ export async function GET(request, { params }) {
       else if (ext === '.pdf') contentType = 'application/pdf';
     }
 
+    // Retrieve original filename if it has separator
+    let originalFilename = filename;
+    if (filename.includes('___')) {
+      const parts = filename.split('___');
+      const originalPart = parts[0];
+      const ext = path.extname(filename);
+      originalFilename = originalPart.endsWith(ext) ? originalPart : `${originalPart}${ext}`;
+    }
+
     return new Response(upload.data, {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Disposition': `inline; filename="${encodeURIComponent(originalFilename)}"`
       },
     });
   } catch (error) {

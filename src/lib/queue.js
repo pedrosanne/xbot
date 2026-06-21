@@ -11,6 +11,18 @@ function getFilenameFromUrl(urlPath, defaultName = 'documento') {
     const cleanUrl = urlPath.split('?')[0];
     const decodedUrl = decodeURIComponent(cleanUrl);
     const base = decodedUrl.substring(decodedUrl.lastIndexOf('/') + 1);
+    
+    // Check if the filename contains our unique separator ___
+    if (base.includes('___')) {
+      const parts = base.split('___');
+      const originalPart = parts[0];
+      const ext = base.substring(base.lastIndexOf('.'));
+      if (originalPart.endsWith(ext)) {
+        return originalPart;
+      }
+      return `${originalPart}${ext}`;
+    }
+    
     return base || defaultName;
   } catch (err) {
     return defaultName;

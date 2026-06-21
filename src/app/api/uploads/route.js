@@ -14,9 +14,16 @@ export async function POST(request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Create unique filename
-    const extension = path.extname(file.name) || '.ogg';
-    const filename = `manual_upload_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${extension}`;
+    // Create unique filename preserving original name
+    const extension = path.extname(file.name) || '';
+    const baseName = path.basename(file.name, extension);
+    const sanitizedBase = baseName
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9 ._-]/g, '')
+      .trim() || 'manual_upload';
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const filename = `${sanitizedBase}___${uniqueId}${extension}`;
 
     // Save to database
     await prisma.upload.create({
