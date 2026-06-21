@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { generateAIResponse } from './gemini';
-import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton, sendTypingIndicator } from './whatsapp';
+import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton, sendTypingIndicator, markWhatsAppMessageAsRead } from './whatsapp';
 import { textToSpeech } from './tts';
 import { logToDb } from './log';
 import { sendPushNotification } from './push';
@@ -279,8 +279,9 @@ async function processSingleMessage(contact, messageData) {
             if (freshContact.designatedAgentId) {
               await logToDb('INFO', 'AI', `Entrada de texto livre no fluxo. Acionando fallback híbrido com Gemini AI usando agente designado.`);
               if (messageData.id) {
-                await sendTypingIndicator(messageData.id, freshContact.connection);
+                await markWhatsAppMessageAsRead(messageData.id, freshContact.connection);
               }
+              await sendTypingIndicator(contactId, freshContact.connection);
               try {
                 await prisma.contact.update({
                   where: { id: contactId },
@@ -331,8 +332,9 @@ async function processSingleMessage(contact, messageData) {
       if (agent) {
         await logToDb('INFO', 'AI', `Contato está em modo IA puro com o agente '${agent.name}'. Chamando Gemini...`);
         if (messageData.id) {
-          await sendTypingIndicator(messageData.id, freshContact.connection);
+          await markWhatsAppMessageAsRead(messageData.id, freshContact.connection);
         }
+        await sendTypingIndicator(contactId, freshContact.connection);
         try {
           await prisma.contact.update({
             where: { id: contactId },
@@ -425,23 +427,30 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
   const options = step.buttons || [];
   const media = step.media || null;
 
-  // Start typing indicator immediately if incomingMessageId is provided
+  // Mark message as read and start typing indicator
   if (incomingMessageId) {
-    await sendTypingIndicator(incomingMessageId, connection);
+    await markWhatsAppMessageAsRead(incomingMessageId, connection);
   }
+  await sendTypingIndicator(contactId, connection);
 
   // Typing delay simulation
-  if (step.delaySeconds) {
+  const isAudioStep = media && media.type === 'audio';
+  let delay = step.delaySeconds || 0;
+  if (isAudioStep && delay === 0) {
+    // If it's an audio step and no delay is set, use a natural default delay of 4 seconds to simulate recording
+    delay = 4;
+  }
+
+  if (delay > 0) {
     try {
-      await logToDb('INFO', 'FLOW', `Simulando atraso de digitação de ${step.delaySeconds}s para o contato ${contactId} na etapa '${step.id}'`);
-      const isAudioStep = step.media && step.media.type === 'audio';
+      await logToDb('INFO', 'FLOW', `Simulando atraso de digitação/gravação de ${delay}s para o contato ${contactId} na etapa '${step.id}'`);
       try {
         await prisma.contact.update({
           where: { id: contactId },
           data: { typingState: isAudioStep ? 'RECORDING' : 'TYPING' }
         });
       } catch (e) {}
-      await new Promise(resolve => setTimeout(resolve, step.delaySeconds * 1000));
+      await new Promise(resolve => setTimeout(resolve, delay * 1000));
     } catch (err) {
       console.error('Error simulating typing delay:', err);
     }
@@ -582,8 +591,9 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
 
     if (agent) {
       if (incomingMessageId) {
-        await sendTypingIndicator(incomingMessageId, contact.connection);
+        await markWhatsAppMessageAsRead(incomingMessageId, contact.connection);
       }
+      await sendTypingIndicator(contact.id, contact.connection);
       try {
         await prisma.contact.update({
           where: { id: contact.id },
@@ -654,6 +664,9 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
       });
     } catch (e) {}
 
+    // Send typing indicator to the WhatsApp contact
+    await sendTypingIndicator(contactId, connection);
+
     const audioScript = audioMatch[1].trim();
     // Resolve designated agent to use specific TTS credentials
     const contactObj = await prisma.contact.findUnique({ where: { id: contactId } });
@@ -663,6 +676,12 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
     if (!audioUrlToSend) {
       textToSend = (textToSend ? textToSend + '\n\n' : '') + audioScript;
     }
+
+    // Simulate natural recording delay based on script length
+    const charCount = audioScript.length;
+    const recordingDelay = Math.min(Math.max(Math.round(charCount / 15), 3), 8);
+    await logToDb('INFO', 'AI', `Simulando atraso de gravação de áudio de ${recordingDelay}s para o contato ${contactId}`);
+    await new Promise(resolve => setTimeout(resolve, recordingDelay * 1000));
   }
 
   const imageRegex = /\[ENVIAR\s+IMAGEM:\s*([^\]]+)\]/i;

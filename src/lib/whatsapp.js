@@ -200,12 +200,13 @@ export async function sendCTAUrlButton(to, bodyText, buttonTitle, url, contextMe
   return sendWhatsAppMessage(payload, connection);
 }
 
-export async function sendTypingIndicator(incomingMessageId, connection = null) {
-  if (!incomingMessageId) return null;
+export async function sendTypingIndicator(to, connection = null) {
+  if (!to) return null;
   const payload = {
     messaging_product: 'whatsapp',
-    status: 'read',
-    message_id: incomingMessageId,
+    recipient_type: 'individual',
+    to,
+    type: 'typing_indicator',
     typing_indicator: {
       type: 'text'
     }
