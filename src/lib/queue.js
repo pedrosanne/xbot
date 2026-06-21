@@ -450,7 +450,7 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
   // Send media first if present
   if (media && media.type && media.url) {
     try {
-      const absoluteMediaUrl = getAbsoluteUrl(media.url);
+      const absoluteMediaUrl = await getAbsoluteUrl(media.url);
       await logToDb('INFO', 'API', `Enviando mídia do tipo '${media.type}' para ${contactId} na etapa '${step.id}': ${absoluteMediaUrl}`);
       const caption = media.caption || '';
 
@@ -683,7 +683,7 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
   const botMessageId = `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   if (audioUrlToSend) {
-    const absoluteAudioUrl = getAbsoluteUrl(audioUrlToSend);
+    const absoluteAudioUrl = await getAbsoluteUrl(audioUrlToSend);
     try {
       await sendAudio(contactId, absoluteAudioUrl, incomingMessageId, connection);
       await saveOutgoingMessage(botMessageId, contactId, 'audio', audioUrlToSend, 'Mensagem de voz');
@@ -695,7 +695,7 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
 
   if (imageUrlToSend) {
     try {
-      const absoluteImgUrl = getAbsoluteUrl(imageUrlToSend);
+      const absoluteImgUrl = await getAbsoluteUrl(imageUrlToSend);
       await sendImage(contactId, absoluteImgUrl, textToSend, incomingMessageId, connection);
       await saveOutgoingMessage(botMessageId + '_img', contactId, 'image', imageUrlToSend, textToSend);
       textToSend = '';
@@ -706,7 +706,7 @@ async function sendBotResponse(contactId, aiTextResponse, incomingMessageId = nu
 
   if (docUrlToSend) {
     try {
-      const absoluteDocUrl = getAbsoluteUrl(docUrlToSend);
+      const absoluteDocUrl = await getAbsoluteUrl(docUrlToSend);
       const originalFilename = getFilenameFromUrl(docUrlToSend, 'documento');
       await sendDocument(contactId, absoluteDocUrl, originalFilename, textToSend, incomingMessageId, connection);
       await saveOutgoingMessage(botMessageId + '_doc', contactId, 'document', docUrlToSend, textToSend);
@@ -754,13 +754,27 @@ async function saveOutgoingMessage(id, contactId, type, mediaUrl = '', content =
   });
 }
 
-function getAbsoluteUrl(urlPath) {
+async function getAbsoluteUrl(urlPath) {
   if (!urlPath) return '';
   if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
     return urlPath;
   }
-  // Try NEXT_PUBLIC_BASE_URL first, then Vercel deployment URL, then fallback to domain.com
+  
+  // Try fetching publicBaseUrl from database Settings first
+  try {
+    const settings = await prisma.setting.findUnique({
+      where: { id: 'system' }
+    });
+    if (settings && settings.publicBaseUrl) {
+      return `${settings.publicBaseUrl}${urlPath}`;
+    }
+  } catch (err) {
+    console.error('Error fetching publicBaseUrl from Settings:', err);
+  }
+
+  // Try NEXT_PUBLIC_BASE_URL first, then Vercel project production URL, then Vercel deployment URL, then fallback to domain.com
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL 
+    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
     || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
     || 'https://domain.com';
   return `${baseUrl}${urlPath}`;

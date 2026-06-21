@@ -15,7 +15,8 @@ export async function getSystemSettings() {
           whatsappVerifyToken: 'antigravity_token_123',
           geminiApiKey: '',
           elevenLabsApiKey: '',
-          elevenLabsVoiceId: '21m00Tcm4TlvDq8ikWAM' // Rachel
+          elevenLabsVoiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel
+          publicBaseUrl: ''
         }
       });
     } catch (err) {

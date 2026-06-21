@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const [whatsappToken, setWhatsappToken] = useState('');
   const [whatsappPhoneId, setWhatsappPhoneId] = useState('');
   const [whatsappVerifyToken, setWhatsappVerifyToken] = useState('');
+  const [publicBaseUrl, setPublicBaseUrl] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
   const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState('21m00Tcm4TlvDq8ikWAM');
@@ -71,6 +72,7 @@ export default function SettingsPage() {
         setWhatsappToken(data.whatsappToken || '');
         setWhatsappPhoneId(data.whatsappPhoneId || '');
         setWhatsappVerifyToken(data.whatsappVerifyToken || 'antigravity_token_123');
+        setPublicBaseUrl(data.publicBaseUrl || '');
         setGeminiApiKey(data.geminiApiKey || '');
         setElevenLabsApiKey(data.elevenLabsApiKey || '');
         setElevenLabsVoiceId(data.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM');
@@ -114,6 +116,7 @@ export default function SettingsPage() {
           whatsappToken,
           whatsappPhoneId,
           whatsappVerifyToken,
+          publicBaseUrl,
           geminiApiKey,
           elevenLabsApiKey,
           elevenLabsVoiceId,
@@ -362,6 +365,20 @@ export default function SettingsPage() {
                   onChange={(e) => setWhatsappVerifyToken(e.target.value)}
                   className="form-input"
                 />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">URL Pública da Aplicação (Produção)</label>
+                <input
+                  type="text"
+                  value={publicBaseUrl}
+                  onChange={(e) => setPublicBaseUrl(e.target.value)}
+                  placeholder="Ex: https://meu-chatbot.vercel.app ou https://xbot.meudominio.com"
+                  className="form-input"
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
+                  Necessário para que a API do WhatsApp consiga baixar mídias, áudios, imagens e PDFs do seu servidor.
+                </span>
               </div>
             </div>
 

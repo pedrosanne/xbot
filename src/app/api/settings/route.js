@@ -31,7 +31,8 @@ export async function POST(request) {
         vapidPrivateKey: data.vapidPrivateKey !== undefined ? data.vapidPrivateKey : undefined,
         vapiApiKey: data.vapiApiKey !== undefined ? data.vapiApiKey : undefined,
         vapiPhoneNumberId: data.vapiPhoneNumberId !== undefined ? data.vapiPhoneNumberId : undefined,
-        vapiAssistantId: data.vapiAssistantId !== undefined ? data.vapiAssistantId : undefined
+        vapiAssistantId: data.vapiAssistantId !== undefined ? data.vapiAssistantId : undefined,
+        publicBaseUrl: data.publicBaseUrl !== undefined ? data.publicBaseUrl : undefined
       }
     });
 

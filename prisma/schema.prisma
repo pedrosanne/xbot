@@ -21,6 +21,7 @@ model Setting {
   vapiApiKey          String   @default("")
   vapiPhoneNumberId   String   @default("")
   vapiAssistantId     String   @default("")
+  publicBaseUrl       String   @default("")
   updatedAt           DateTime @updatedAt
 }
 
