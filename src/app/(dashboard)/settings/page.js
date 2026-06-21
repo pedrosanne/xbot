@@ -31,6 +31,14 @@ export default function SettingsPage() {
   // VAPID keys
   const [vapidPublicKey, setVapidPublicKey] = useState('');
   const [vapidPrivateKey, setVapidPrivateKey] = useState('');
+  
+  // Visibility and Copy states for API Keys
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [copiedPrivate, setCopiedPrivate] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [copiedGemini, setCopiedGemini] = useState(false);
+  const [showElevenKey, setShowElevenKey] = useState(false);
+  const [copiedEleven, setCopiedEleven] = useState(false);
 
   // Status/Loading States
   const [loading, setLoading] = useState(false);
@@ -312,13 +320,39 @@ export default function SettingsPage() {
 
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Gemini API Key</label>
-              <input
-                type="password"
-                value={geminiApiKey}
-                onChange={(e) => setGeminiApiKey(e.target.value)}
-                placeholder="AIzaSy..."
-                className="form-input"
-              />
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type={showGeminiKey ? 'text' : 'password'}
+                  value={geminiApiKey}
+                  onChange={(e) => setGeminiApiKey(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="form-input"
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGeminiKey(!showGeminiKey)}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                >
+                  {showGeminiKey ? 'Ocultar' : 'Mostrar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (geminiApiKey) {
+                      navigator.clipboard.writeText(geminiApiKey);
+                      setCopiedGemini(true);
+                      setTimeout(() => setCopiedGemini(false), 2000);
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                  disabled={!geminiApiKey}
+                >
+                  {copiedGemini ? 'Copiado!' : 'Copiar'}
+                </button>
+              </div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
                 Obtenha uma chave gratuita no Google AI Studio (https://aistudio.google.com).
               </span>
@@ -334,13 +368,39 @@ export default function SettingsPage() {
 
             <div className="form-group">
               <label className="form-label">ElevenLabs API Key (Opcional)</label>
-              <input
-                type="password"
-                value={elevenLabsApiKey}
-                onChange={(e) => setElevenLabsApiKey(e.target.value)}
-                placeholder="Insira sua chave para habilitar respostas de voz"
-                className="form-input"
-              />
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type={showElevenKey ? 'text' : 'password'}
+                  value={elevenLabsApiKey}
+                  onChange={(e) => setElevenLabsApiKey(e.target.value)}
+                  placeholder="Insira sua chave para habilitar respostas de voz"
+                  className="form-input"
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowElevenKey(!showElevenKey)}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                >
+                  {showElevenKey ? 'Ocultar' : 'Mostrar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (elevenLabsApiKey) {
+                      navigator.clipboard.writeText(elevenLabsApiKey);
+                      setCopiedEleven(true);
+                      setTimeout(() => setCopiedEleven(false), 2000);
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                  disabled={!elevenLabsApiKey}
+                >
+                  {copiedEleven ? 'Copiado!' : 'Copiar'}
+                </button>
+              </div>
             </div>
 
             <div className="form-group" style={{ margin: 0 }}>
@@ -449,14 +509,39 @@ export default function SettingsPage() {
 
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Chave Privada VAPID (VAPID Private Key)</label>
-                <input
-                  type="password"
-                  value={vapidPrivateKey}
-                  onChange={(e) => setVapidPrivateKey(e.target.value)}
-                  placeholder="Gere ou insira a chave privada..."
-                  className="form-input"
-                  style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
-                />
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type={showPrivateKey ? 'text' : 'password'}
+                    value={vapidPrivateKey}
+                    onChange={(e) => setVapidPrivateKey(e.target.value)}
+                    placeholder="Gere ou insira a chave privada..."
+                    className="form-input"
+                    style={{ fontFamily: 'monospace', fontSize: '0.8rem', flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPrivateKey(!showPrivateKey)}
+                    className="btn btn-secondary"
+                    style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                  >
+                    {showPrivateKey ? 'Ocultar' : 'Mostrar'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (vapidPrivateKey) {
+                        navigator.clipboard.writeText(vapidPrivateKey);
+                        setCopiedPrivate(true);
+                        setTimeout(() => setCopiedPrivate(false), 2000);
+                      }
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                    disabled={!vapidPrivateKey}
+                  >
+                    {copiedPrivate ? 'Copiado!' : 'Copiar'}
+                  </button>
+                </div>
               </div>
             </div>
 
