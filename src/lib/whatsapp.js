@@ -92,6 +92,8 @@ export async function sendText(to, text, contextMessageId = null, connection = n
 }
 
 export async function sendAudio(to, audioUrl, contextMessageId = null, connection = null) {
+  const isOgg = typeof audioUrl === 'string' && audioUrl.toLowerCase().split('?')[0].endsWith('.ogg');
+
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
@@ -99,7 +101,8 @@ export async function sendAudio(to, audioUrl, contextMessageId = null, connectio
     ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'audio',
     audio: { 
-      link: audioUrl
+      link: audioUrl,
+      ...(isOgg && { voice: true })
     },
   };
   return sendWhatsAppMessage(payload, connection);
