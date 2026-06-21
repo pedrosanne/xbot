@@ -99,8 +99,7 @@ export async function sendAudio(to, audioUrl, contextMessageId = null, connectio
     ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'audio',
     audio: { 
-      link: audioUrl,
-      voice: true
+      link: audioUrl
     },
   };
   return sendWhatsAppMessage(payload, connection);
