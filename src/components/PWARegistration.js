@@ -4,9 +4,8 @@ import { useEffect } from 'react';
 
 export default function PWARegistration() {
   useEffect(() => {
-    // Only register service worker in browser environments and when not already registered
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+      const registerSW = () => {
         navigator.serviceWorker.register('/sw.js')
           .then((registration) => {
             console.log('PWA: Service Worker registrado com escopo:', registration.scope);
@@ -14,7 +13,14 @@ export default function PWARegistration() {
           .catch((error) => {
             console.error('PWA: Falha ao registrar Service Worker:', error);
           });
-      });
+      };
+
+      if (document.readyState === 'complete') {
+        registerSW();
+      } else {
+        window.addEventListener('load', registerSW);
+        return () => window.removeEventListener('load', registerSW);
+      }
     }
   }, []);
 
