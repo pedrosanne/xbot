@@ -105,6 +105,9 @@ export default function AgentsPage() {
   const [connectionVerifyToken, setConnectionVerifyToken] = useState('antigravity_token_123');
   const [connectionIsActive, setConnectionIsActive] = useState(true);
   const [editingConnectionId, setEditingConnectionId] = useState(null);
+  const [editingSystemDefault, setEditingSystemDefault] = useState(false);
+  const [showConnectionToken, setShowConnectionToken] = useState(false);
+  const [copiedConnectionToken, setCopiedConnectionToken] = useState(false);
   const [showConnectionForm, setShowConnectionForm] = useState(false);
   const [connectionLoading, setConnectionLoading] = useState(false);
   const [testingConnectionId, setTestingConnectionId] = useState(null);
@@ -156,6 +159,9 @@ export default function AgentsPage() {
 
   const resetConnectionForm = () => {
     setEditingConnectionId(null);
+    setEditingSystemDefault(false);
+    setShowConnectionToken(false);
+    setCopiedConnectionToken(false);
     setConnectionName('');
     setConnectionPhoneNumber('');
     setConnectionToken('');
@@ -165,8 +171,48 @@ export default function AgentsPage() {
     setShowConnectionForm(false);
   };
 
+  const handleEditSystemDefault = () => {
+    setEditingSystemDefault(true);
+    setEditingConnectionId(null);
+    setConnectionName('Padrão do Sistema');
+    setConnectionPhoneNumber('');
+    setConnectionToken(whatsappToken);
+    setConnectionPhoneId(whatsappPhoneId);
+    setConnectionVerifyToken(whatsappVerifyToken);
+    setConnectionIsActive(true);
+    setShowConnectionForm(true);
+  };
+
   const handleConnectionSubmit = async (e) => {
     e.preventDefault();
+    if (editingSystemDefault) {
+      if (!connectionPhoneId.trim()) return;
+      setConnectionLoading(true);
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            whatsappToken: connectionToken,
+            whatsappPhoneId: connectionPhoneId,
+            whatsappVerifyToken: connectionVerifyToken
+          })
+        });
+        if (res.ok) {
+          setWhatsappToken(connectionToken);
+          setWhatsappPhoneId(connectionPhoneId);
+          setWhatsappVerifyToken(connectionVerifyToken);
+          resetConnectionForm();
+          fetchSettings();
+        }
+      } catch (err) {
+        console.error('Error saving default settings:', err);
+      } finally {
+        setConnectionLoading(false);
+      }
+      return;
+    }
+
     if (!connectionName.trim() || !connectionPhoneId.trim()) return;
     setConnectionLoading(true);
     const payload = {
@@ -1570,133 +1616,171 @@ export default function AgentsPage() {
                   <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-glass)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                       <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>
-                        {editingConnectionId ? '✏️ Editar Conexão' : '📞 Nova Conexão WhatsApp'}
+                        {editingSystemDefault ? '✏️ Editar Conexão Padrão do Sistema' : editingConnectionId ? '✏️ Editar Conexão' : '📞 Nova Conexão WhatsApp'}
                       </h3>
                       <button onClick={resetConnectionForm} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>Fechar</button>
                     </div>
 
                     <form onSubmit={handleConnectionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <div className="form-group" style={{ margin: 0 }}>
-                        <label className="form-label">Nome da Conexão</label>
-                        <input type="text" className="form-input" placeholder="Ex: Comercial, Suporte, Filial SP" value={connectionName} onChange={(e) => setConnectionName(e.target.value)} required />
-                      </div>
-                      <div className="form-group" style={{ margin: 0 }}>
-                        <label className="form-label">Número de Telefone</label>
-                        <input type="text" className="form-input" placeholder="Ex: +5511999999999" value={connectionPhoneNumber} onChange={(e) => setConnectionPhoneNumber(e.target.value)} />
-                      </div>
+                      {!editingSystemDefault && (
+                        <>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Nome da Conexão</label>
+                            <input type="text" className="form-input" placeholder="Ex: Comercial, Suporte, Filial SP" value={connectionName} onChange={(e) => setConnectionName(e.target.value)} required={!editingSystemDefault} />
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Número de Telefone</label>
+                            <input type="text" className="form-input" placeholder="Ex: +5511999999999" value={connectionPhoneNumber} onChange={(e) => setConnectionPhoneNumber(e.target.value)} />
+                          </div>
+                        </>
+                      )}
                       <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label">Phone Number ID (Meta)</label>
                         <input type="text" className="form-input" placeholder="Ex: 34892401824901" value={connectionPhoneId} onChange={(e) => setConnectionPhoneId(e.target.value)} required />
                       </div>
+                      
                       <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label">Access Token (Meta)</label>
-                        <input type="password" className="form-input" placeholder="EAAGz..." value={connectionToken} onChange={(e) => setConnectionToken(e.target.value)} />
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type={showConnectionToken ? 'text' : 'password'}
+                            value={connectionToken}
+                            onChange={(e) => setConnectionToken(e.target.value)}
+                            placeholder="EAAGz..."
+                            className="form-input"
+                            style={{ flex: 1 }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConnectionToken(!showConnectionToken)}
+                            className="btn btn-secondary"
+                            style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                          >
+                            {showConnectionToken ? 'Ocultar' : 'Mostrar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (connectionToken) {
+                                navigator.clipboard.writeText(connectionToken);
+                                setCopiedConnectionToken(true);
+                                setTimeout(() => setCopiedConnectionToken(false), 2000);
+                              }
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                            disabled={!connectionToken}
+                          >
+                            {copiedConnectionToken ? 'Copiado!' : 'Copiar'}
+                          </button>
+                        </div>
                       </div>
+
                       <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label">Webhook Verify Token</label>
                         <input type="text" className="form-input" value={connectionVerifyToken} onChange={(e) => setConnectionVerifyToken(e.target.value)} />
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <label className="switch">
-                          <input type="checkbox" checked={connectionIsActive} onChange={(e) => setConnectionIsActive(e.target.checked)} />
-                          <span className="slider"></span>
-                        </label>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Ativar esta conexão</span>
-                      </div>
+
+                      {!editingSystemDefault && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <label className="switch">
+                            <input type="checkbox" checked={connectionIsActive} onChange={(e) => setConnectionIsActive(e.target.checked)} />
+                            <span className="slider"></span>
+                          </label>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Ativar esta conexão</span>
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                         <button type="button" onClick={resetConnectionForm} className="btn btn-secondary" style={{ flex: 1, padding: '10px' }}>
                           Cancelar
                         </button>
                         <button type="submit" className="btn btn-primary" style={{ flex: 1, padding: '10px', justifyContent: 'center' }} disabled={connectionLoading}>
-                          {connectionLoading ? 'Salvando...' : editingConnectionId ? 'Salvar Alterações' : 'Adicionar'}
+                          {connectionLoading ? 'Salvando...' : editingConnectionId || editingSystemDefault ? 'Salvar Alterações' : 'Adicionar'}
                         </button>
                       </div>
                     </form>
                   </div>
                 )}
 
-                 {/* Connections List */}
-                {connections.length === 0 && !whatsappPhoneId ? (
-                  <div style={{ padding: '32px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-glass)', borderRadius: '12px' }}>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '12px' }}>Nenhuma conexão WhatsApp configurada.</p>
-                    <button onClick={() => { resetConnectionForm(); setShowConnectionForm(true); }} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
-                      Configurar Primeira Conexão
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {/* Render Fallback System Connection if configured */}
-                    {whatsappPhoneId && (
-                      <div className="glass-panel" style={{ padding: '16px', border: '1px solid var(--border-glass)', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <h4 style={{ fontWeight: 600, fontSize: '0.95rem', margin: 0 }}>Padrão do Sistema (Configurações Gerais)</h4>
-                            <span className="badge badge-success" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
-                              Ativo
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            <span>ID: {whatsappPhoneId}</span>
-                          </div>
-                          {testResults['system'] && (
-                            <div style={{ fontSize: '0.78rem', marginTop: '6px', fontWeight: 500, color: testResults['system'].success ? '#4ade80' : 'var(--color-error)' }}>
-                              {testResults['system'].loading ? '⌛ Testando...' : `${testResults['system'].success ? '✓' : '✗'} ${testResults['system'].message}`}
-                            </div>
-                          )}
+                {/* Connections List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Render Fallback System Connection */}
+                  <div className="glass-panel" style={{ padding: '16px', border: '1px solid var(--border-glass)', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <h4 style={{ fontWeight: 600, fontSize: '0.95rem', margin: 0 }}>Padrão do Sistema (Configurações Gerais)</h4>
+                        <span className={`badge ${whatsappPhoneId ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.65rem', padding: '2px 6px', ...(whatsappPhoneId ? {} : { background: 'rgba(239, 68, 68, 0.1)', color: '#f87171' }) }}>
+                          {whatsappPhoneId ? 'Ativo' : 'Não Configurado'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {whatsappPhoneId ? <span>ID: {whatsappPhoneId}</span> : <span>Número padrão usado para fallbacks e notificações</span>}
+                      </div>
+                      {testResults['system'] && (
+                        <div style={{ fontSize: '0.78rem', marginTop: '6px', fontWeight: 500, color: testResults['system'].success ? '#4ade80' : 'var(--color-error)' }}>
+                          {testResults['system'].loading ? '⌛ Testando...' : `${testResults['system'].success ? '✓' : '✗'} ${testResults['system'].message}`}
                         </div>
+                      )}
+                    </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <button onClick={() => handleTestConnection({ id: 'system', whatsappPhoneId, whatsappToken })} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} disabled={testingConnectionId === 'system'}>
-                            Testar
-                          </button>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '12px' }}>
-                            ℹ️ Editar nas Configurações Gerais
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {whatsappPhoneId && (
+                        <button onClick={() => handleTestConnection({ id: 'system', whatsappPhoneId, whatsappToken })} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} disabled={testingConnectionId === 'system'}>
+                          Testar
+                        </button>
+                      )}
+                      <button onClick={handleEditSystemDefault} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }} title="Editar Número Padrão">
+                        ✏️
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Render Custom Connections */}
+                  {connections.map((conn) => (
+                    <div key={conn.id} className="glass-panel" style={{ padding: '16px', border: '1px solid var(--border-glass)', background: 'rgba(255, 255, 255, 0.01)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <h4 style={{ fontWeight: 600, fontSize: '0.95rem', margin: 0 }}>{conn.name}</h4>
+                          <span className={`badge ${conn.isActive ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                            {conn.isActive ? 'Ativo' : 'Inativo'}
                           </span>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Render Custom Connections */}
-                    {connections.map((conn) => (
-                      <div key={conn.id} className="glass-panel" style={{ padding: '16px', border: '1px solid var(--border-glass)', background: 'rgba(255, 255, 255, 0.01)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <h4 style={{ fontWeight: 600, fontSize: '0.95rem', margin: 0 }}>{conn.name}</h4>
-                            <span className={`badge ${conn.isActive ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
-                              {conn.isActive ? 'Ativo' : 'Inativo'}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            {conn.phoneNumber && <span style={{ marginRight: '12px' }}>📞 {conn.phoneNumber}</span>}
-                            <span>ID: {conn.whatsappPhoneId}</span>
-                          </div>
-                          {testResults[conn.id] && (
-                            <div style={{ fontSize: '0.78rem', marginTop: '6px', fontWeight: 500, color: testResults[conn.id].success ? '#4ade80' : 'var(--color-error)' }}>
-                              {testResults[conn.id].loading ? '⌛ Testando...' : `${testResults[conn.id].success ? '✓' : '✗'} ${testResults[conn.id].message}`}
-                            </div>
-                          )}
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                          {conn.phoneNumber && <span style={{ marginRight: '12px' }}>📞 {conn.phoneNumber}</span>}
+                          <span>ID: {conn.whatsappPhoneId}</span>
                         </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <button onClick={() => handleTestConnection(conn)} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} disabled={testingConnectionId === conn.id}>
-                            Testar
-                          </button>
-                          <button onClick={() => handleEditConnection(conn)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-                            ✏️
-                          </button>
-                          <button onClick={() => handleDeleteConnection(conn.id)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', color: 'var(--color-error)' }}>
-                            🗑️
-                          </button>
-                          <label className="switch" style={{ marginLeft: '4px' }}>
-                            <input type="checkbox" checked={conn.isActive} onChange={() => handleToggleConnectionActive(conn)} />
-                            <span className="slider"></span>
-                          </label>
-                        </div>
+                        {testResults[conn.id] && (
+                          <div style={{ fontSize: '0.78rem', marginTop: '6px', fontWeight: 500, color: testResults[conn.id].success ? '#4ade80' : 'var(--color-error)' }}>
+                            {testResults[conn.id].loading ? '⌛ Testando...' : `${testResults[conn.id].success ? '✓' : '✗'} ${testResults[conn.id].message}`}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button onClick={() => handleTestConnection(conn)} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} disabled={testingConnectionId === conn.id}>
+                          Testar
+                        </button>
+                        <button onClick={() => handleEditConnection(conn)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDeleteConnection(conn.id)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', color: 'var(--color-error)' }}>
+                          🗑️
+                        </button>
+                        <label className="switch" style={{ marginLeft: '4px' }}>
+                          <input type="checkbox" checked={conn.isActive} onChange={() => handleToggleConnectionActive(conn)} />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+
+                  {connections.length === 0 && (
+                    <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-glass)', borderRadius: '12px', marginTop: '4px' }}>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>Nenhuma conexão WhatsApp adicional configurada.</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Global AI & Speech Settings */}

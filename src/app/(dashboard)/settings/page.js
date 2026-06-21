@@ -39,6 +39,8 @@ export default function SettingsPage() {
   const [copiedGemini, setCopiedGemini] = useState(false);
   const [showElevenKey, setShowElevenKey] = useState(false);
   const [copiedEleven, setCopiedEleven] = useState(false);
+  const [showWhatsappToken, setShowWhatsappToken] = useState(false);
+  const [copiedWhatsappToken, setCopiedWhatsappToken] = useState(false);
 
   // Status/Loading States
   const [loading, setLoading] = useState(false);
@@ -293,21 +295,82 @@ export default function SettingsPage() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* 1. Meta / WhatsApp Credentials Redirect */}
+          {/* 1. Meta / WhatsApp Credentials */}
           <div className="glass-panel" style={{ padding: '24px' }}>
             <h3 style={{ marginBottom: '12px', fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ background: '#25d366', color: 'white', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>W</span>
-              WhatsApp Cloud API
+              WhatsApp Cloud API (Padrão do Sistema)
             </h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: '1.6', margin: '0 0 16px 0' }}>
-              As configurações de WhatsApp agora foram centralizadas. Você pode gerenciar múltiplos números, testar o status de integração e ativar/desativar conexões em tempo real.
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 16px 0' }}>
+              Configure o número padrão do sistema. Para cadastrar múltiplos números adicionais, utilize o gerenciador de conexões.
             </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Phone Number ID</label>
+                <input
+                  type="text"
+                  value={whatsappPhoneId}
+                  onChange={(e) => setWhatsappPhoneId(e.target.value)}
+                  placeholder="Ex: 1200987366423001"
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Access Token</label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type={showWhatsappToken ? 'text' : 'password'}
+                    value={whatsappToken}
+                    onChange={(e) => setWhatsappToken(e.target.value)}
+                    placeholder="EAAGz..."
+                    className="form-input"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowWhatsappToken(!showWhatsappToken)}
+                    className="btn btn-secondary"
+                    style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                  >
+                    {showWhatsappToken ? 'Ocultar' : 'Mostrar'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (whatsappToken) {
+                        navigator.clipboard.writeText(whatsappToken);
+                        setCopiedWhatsappToken(true);
+                        setTimeout(() => setCopiedWhatsappToken(false), 2000);
+                      }
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: '8px 12px', fontSize: '0.8rem', height: '100%', whiteSpace: 'nowrap' }}
+                    disabled={!whatsappToken}
+                  >
+                    {copiedWhatsappToken ? 'Copiado!' : 'Copiar'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Webhook Verify Token</label>
+                <input
+                  type="text"
+                  value={whatsappVerifyToken}
+                  onChange={(e) => setWhatsappVerifyToken(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+            </div>
+
             <Link 
               href="/agents" 
-              className="btn btn-primary" 
-              style={{ display: 'inline-flex', alignSelf: 'flex-start', padding: '8px 16px', fontSize: '0.85rem', textDecoration: 'none' }}
+              className="btn btn-secondary" 
+              style={{ display: 'inline-flex', alignSelf: 'flex-start', padding: '8px 16px', fontSize: '0.85rem', textDecoration: 'none', borderColor: 'var(--color-primary)', color: 'var(--color-primary-hover)' }}
             >
-              Gerenciar Conexões WhatsApp →
+              Gerenciar Múltiplas Conexões WhatsApp →
             </Link>
           </div>
 

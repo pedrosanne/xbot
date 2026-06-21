@@ -21,17 +21,17 @@ export async function POST(request) {
     const updatedSettings = await prisma.setting.update({
       where: { id: 'system' },
       data: {
-        whatsappToken: data.whatsappToken ?? '',
-        whatsappPhoneId: data.whatsappPhoneId ?? '',
-        whatsappVerifyToken: data.whatsappVerifyToken ?? 'antigravity_token_123',
-        geminiApiKey: data.geminiApiKey ?? '',
-        elevenLabsApiKey: data.elevenLabsApiKey ?? '',
-        elevenLabsVoiceId: data.elevenLabsVoiceId ?? '21m00Tcm4TlvDq8ikWAM',
-        vapidPublicKey: data.vapidPublicKey ?? '',
-        vapidPrivateKey: data.vapidPrivateKey ?? '',
-        vapiApiKey: data.vapiApiKey ?? '',
-        vapiPhoneNumberId: data.vapiPhoneNumberId ?? '',
-        vapiAssistantId: data.vapiAssistantId ?? ''
+        whatsappToken: data.whatsappToken !== undefined ? data.whatsappToken : undefined,
+        whatsappPhoneId: data.whatsappPhoneId !== undefined ? data.whatsappPhoneId : undefined,
+        whatsappVerifyToken: data.whatsappVerifyToken !== undefined ? data.whatsappVerifyToken : undefined,
+        geminiApiKey: data.geminiApiKey !== undefined ? data.geminiApiKey : undefined,
+        elevenLabsApiKey: data.elevenLabsApiKey !== undefined ? data.elevenLabsApiKey : undefined,
+        elevenLabsVoiceId: data.elevenLabsVoiceId !== undefined ? data.elevenLabsVoiceId : undefined,
+        vapidPublicKey: data.vapidPublicKey !== undefined ? data.vapidPublicKey : undefined,
+        vapidPrivateKey: data.vapidPrivateKey !== undefined ? data.vapidPrivateKey : undefined,
+        vapiApiKey: data.vapiApiKey !== undefined ? data.vapiApiKey : undefined,
+        vapiPhoneNumberId: data.vapiPhoneNumberId !== undefined ? data.vapiPhoneNumberId : undefined,
+        vapiAssistantId: data.vapiAssistantId !== undefined ? data.vapiAssistantId : undefined
       }
     });
 
