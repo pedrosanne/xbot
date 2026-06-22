@@ -2243,4 +2243,51 @@ input:checked + .slider:before {
   color: rgba(0, 0, 0, 0.5) !important;
 }
 
+/* Light Theme Flow Builder Right Sidebar & Minimap Overrides */
+[data-theme='light'] .flow-sidebar {
+  background: rgba(255, 255, 255, 0.98);
+  border-left-color: var(--border-glass);
+  color: var(--text-primary);
+}
+
+[data-theme='light'] .flow-sidebar-header {
+  border-bottom-color: var(--border-glass);
+}
+
+[data-theme='light'] .flow-sidebar-section h4 {
+  color: var(--text-muted);
+}
+
+[data-theme='light'] .flow-minimap {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: var(--border-glass);
+}
+
+[data-theme='light'] .flow-minimap-viewport {
+  border-color: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='light'] .flow-minimap-node {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme='light'] .flow-node-btn {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .flow-node-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .flow-node-media {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='light'] .flow-toolbar .tb-sep {
+  background: rgba(0, 0, 0, 0.08);
+}
+
 

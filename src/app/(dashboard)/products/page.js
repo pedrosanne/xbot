@@ -613,7 +613,7 @@ export default function ProductsPage() {
                               <span style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                                 {p.description || 'Sem descrição.'}
                               </span>
-                              <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'white', marginTop: '4px' }}>
+                              <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px' }}>
                                 R$ {p.price.toFixed(2).replace('.', ',')}
                               </span>
                             </div>
@@ -810,7 +810,7 @@ export default function ProductsPage() {
                               <span style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                                 {o.description || 'Sem descrição.'}
                               </span>
-                              <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, color: 'white', marginTop: '6px' }}>
+                              <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '6px' }}>
                                 R$ {o.price.toFixed(2).replace('.', ',')}
                               </span>
                             </div>
@@ -927,7 +927,7 @@ export default function ProductsPage() {
                           <div>
                             <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{b.title}</span>
                             <div style={{ display: 'flex', gap: '6px', margin: '4px 0', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.68rem', padding: '2px 5px', background: 'rgba(255,255,255,0.04)', color: '#aaa', borderRadius: '4px' }}>
+                              <span style={{ fontSize: '0.68rem', padding: '2px 5px', background: 'var(--color-success-bg)', color: 'var(--text-secondary)', borderRadius: '4px' }}>
                                 Principal: {b.product?.name}
                               </span>
                               <span style={{ fontSize: '0.68rem', padding: '2px 5px', background: 'rgba(255, 165, 0, 0.08)', color: '#ffa500', borderRadius: '4px' }}>
@@ -937,7 +937,7 @@ export default function ProductsPage() {
                             <span style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                               {b.description || 'Sem descrição.'}
                             </span>
-                            <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, color: 'white', marginTop: '6px' }}>
+                            <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '6px' }}>
                               Preço Bump: R$ {b.price.toFixed(2).replace('.', ',')}
                             </span>
                           </div>
@@ -1053,7 +1053,7 @@ export default function ProductsPage() {
                           <div>
                             <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{u.title}</span>
                             <div style={{ display: 'flex', gap: '6px', margin: '4px 0', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.68rem', padding: '2px 5px', background: 'rgba(255,255,255,0.04)', color: '#aaa', borderRadius: '4px' }}>
+                              <span style={{ fontSize: '0.68rem', padding: '2px 5px', background: 'var(--color-success-bg)', color: 'var(--text-secondary)', borderRadius: '4px' }}>
                                 Pág. Agradecimento de: {u.product?.name}
                               </span>
                               <span style={{ fontSize: '0.68rem', padding: '2px 5px', background: 'rgba(52, 152, 219, 0.08)', color: '#3498db', borderRadius: '4px' }}>
@@ -1063,7 +1063,7 @@ export default function ProductsPage() {
                             <span style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                               {u.description || 'Sem descrição.'}
                             </span>
-                            <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, color: 'white', marginTop: '6px' }}>
+                            <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '6px' }}>
                               Preço Upsell: R$ {u.price.toFixed(2).replace('.', ',')}
                             </span>
                           </div>

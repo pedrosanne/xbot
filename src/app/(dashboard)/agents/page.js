@@ -1374,7 +1374,7 @@ export default function AgentsPage() {
             <div className="flow-sidebar-header">
               <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Propriedades do Nó</h3>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={() => duplicateNode(selectedNodeId)} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>Duplicar</button>
+                <button onClick={() => duplicateNode(selectedNodeId)} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Duplicar</button>
                 <button onClick={() => deleteNode(selectedNodeId)} className="btn btn-danger" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Excluir</button>
                 <button onClick={() => setSelectedNodeId(null)} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>✕</button>
               </div>
@@ -1468,8 +1468,8 @@ export default function AgentsPage() {
                           cursor: 'pointer',
                           padding: '8px 12px',
                           fontSize: '0.82rem',
-                          background: 'rgba(255, 255, 255, 0.08)',
-                          border: '1px dashed rgba(255, 255, 255, 0.2)',
+                          background: 'var(--color-success-bg)',
+                          border: '1px dashed var(--border-glass)',
                           borderRadius: '6px',
                           textAlign: 'center'
                         }}>

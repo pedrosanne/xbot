@@ -552,7 +552,7 @@ export default function GatewaysPage() {
                         <td style={{ padding: '14px 8px' }}>
                           {p.contact ? (
                             <div>
-                              <span style={{ display: 'block', fontWeight: 600, color: 'white' }}>
+                              <span style={{ display: 'block', fontWeight: 600, color: 'var(--text-primary)' }}>
                                 {p.contact.name || p.contact.profileName || 'Cliente'}
                               </span>
                               <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
@@ -575,7 +575,7 @@ export default function GatewaysPage() {
                         <td style={{ padding: '14px 8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 500 }}>
                           {p.paymentMethod}
                         </td>
-                        <td style={{ padding: '14px 8px', fontWeight: 600, color: 'white' }}>
+                        <td style={{ padding: '14px 8px', fontWeight: 600, color: 'var(--text-primary)' }}>
                           R$ {p.amount.toFixed(2).replace('.', ',')}
                         </td>
                         <td style={{ padding: '14px 8px' }}>

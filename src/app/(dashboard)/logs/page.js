@@ -181,7 +181,7 @@ export default function LogsPage() {
                         {log.category}
                       </span>
 
-                      <span style={{ fontSize: '0.9rem', fontWeight: 600, flexGrow: 1, color: log.level === 'ERROR' ? '#fca5a5' : 'var(--text-primary)' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 600, flexGrow: 1, color: log.level === 'ERROR' ? 'var(--color-error)' : 'var(--text-primary)' }}>
                         {log.message}
                       </span>
 
@@ -203,13 +203,13 @@ export default function LogsPage() {
                     {/* Expanded JSON Details */}
                     {isExpanded && hasDetails && (
                       <div className="animate-fade-in" style={{
-                        background: 'rgba(0,0,0,0.4)',
+                        background: 'var(--bg-primary)',
                         border: '1px solid var(--border-glass)',
                         borderRadius: '8px',
                         padding: '14px',
                         fontSize: '0.8rem',
                         fontFamily: 'monospace',
-                        color: '#a7f3d0', // mint green text
+                        color: 'var(--text-primary)',
                         overflowX: 'auto',
                         whiteSpace: 'pre-wrap',
                         maxHeight: '400px'
