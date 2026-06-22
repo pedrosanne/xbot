@@ -69,7 +69,7 @@ export default function LoginPage() {
         }}>
           X
         </div>
-        <h2 style={{ fontSize: '1.75rem', fontWeight: 700, background: 'linear-gradient(135deg, #fff, var(--text-secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+        <h2 style={{ fontSize: '1.75rem', fontWeight: 700, background: 'linear-gradient(135deg, var(--text-primary), var(--text-secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
           Xbot
         </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>

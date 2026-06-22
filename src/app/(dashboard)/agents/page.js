@@ -1065,7 +1065,7 @@ export default function AgentsPage() {
         width: '100vw',
         height: '100vh',
         zIndex: 99999,
-        background: '#0b0f19',
+        background: 'var(--bg-primary)',
         padding: '24px',
         display: 'flex',
         flexDirection: 'column',

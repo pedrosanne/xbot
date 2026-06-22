@@ -82,7 +82,7 @@ export default function RegisterPage() {
         }}>
           W
         </div>
-        <h2 style={{ fontSize: '1.75rem', fontWeight: 700, background: 'linear-gradient(135deg, #fff, var(--text-secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+        <h2 style={{ fontSize: '1.75rem', fontWeight: 700, background: 'linear-gradient(135deg, var(--text-primary), var(--text-secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
           Criar Conta
         </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>

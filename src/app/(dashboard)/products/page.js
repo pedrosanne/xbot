@@ -536,7 +536,7 @@ export default function ProductsPage() {
                           value={editingProduct.type}
                           onChange={(e) => setEditingProduct({ ...editingProduct, type: e.target.value })}
                           className="form-input"
-                          style={{ background: '#0a0a0a', color: 'white' }}
+                         
                         >
                           <option value="DIGITAL">Digital (Infoproduto)</option>
                           <option value="PHYSICAL">Físico</option>
@@ -662,7 +662,7 @@ export default function ProductsPage() {
                           value={prodType}
                           onChange={(e) => setProdType(e.target.value)}
                           className="form-input"
-                          style={{ background: '#0a0a0a', color: 'white' }}
+                         
                         >
                           <option value="DIGITAL">Digital (Infoproduto)</option>
                           <option value="PHYSICAL">Físico</option>
@@ -715,7 +715,7 @@ export default function ProductsPage() {
                           value={editingOffer.productId}
                           onChange={(e) => setEditingOffer({ ...editingOffer, productId: e.target.value })}
                           className="form-input"
-                          style={{ background: '#0a0a0a', color: 'white' }}
+                         
                         >
                           {products.map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
@@ -837,7 +837,7 @@ export default function ProductsPage() {
                           value={offProductId}
                           onChange={(e) => setOffProductId(e.target.value)}
                           className="form-input"
-                          style={{ background: '#0a0a0a', color: 'white' }}
+                         
                           required
                         >
                           <option value="">Selecione o produto...</option>
@@ -959,7 +959,7 @@ export default function ProductsPage() {
                         value={bumpProductId}
                         onChange={(e) => setBumpProductId(e.target.value)}
                         className="form-input"
-                        style={{ background: '#0a0a0a', color: 'white' }}
+                       
                         required
                       >
                         <option value="">Selecione o produto principal...</option>
@@ -974,7 +974,7 @@ export default function ProductsPage() {
                         value={bumpTargetProductId}
                         onChange={(e) => setBumpTargetProductId(e.target.value)}
                         className="form-input"
-                        style={{ background: '#0a0a0a', color: 'white' }}
+                       
                         required
                       >
                         <option value="">Selecione o bump...</option>
@@ -1085,7 +1085,7 @@ export default function ProductsPage() {
                         value={upProductId}
                         onChange={(e) => setUpProductId(e.target.value)}
                         className="form-input"
-                        style={{ background: '#0a0a0a', color: 'white' }}
+                       
                         required
                       >
                         <option value="">Selecione o produto principal...</option>
@@ -1100,7 +1100,7 @@ export default function ProductsPage() {
                         value={upTargetProductId}
                         onChange={(e) => setUpTargetProductId(e.target.value)}
                         className="form-input"
-                        style={{ background: '#0a0a0a', color: 'white' }}
+                       
                         required
                       >
                         <option value="">Selecione o produto do upsell...</option>
@@ -1218,7 +1218,7 @@ export default function ProductsPage() {
                         value={pixProductId}
                         onChange={(e) => setPixProductId(e.target.value)}
                         className="form-input"
-                        style={{ background: '#0a0a0a', color: 'white' }}
+                       
                         required
                       >
                         <option value="">Selecione o produto...</option>
@@ -1233,7 +1233,7 @@ export default function ProductsPage() {
                         value={pixPlatform}
                         onChange={(e) => setPixPlatform(e.target.value)}
                         className="form-input"
-                        style={{ background: '#0a0a0a', color: 'white' }}
+                       
                         required
                       >
                         <option value="facebook">Meta / Facebook Pixel</option>

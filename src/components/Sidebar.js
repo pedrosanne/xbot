@@ -9,13 +9,24 @@ export default function Sidebar() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [theme, setTheme] = useState('dark');
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebar-collapsed');
     if (saved === 'true') {
       setIsCollapsed(true);
     }
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+    document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    localStorage.setItem('theme', nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
+  };
 
   const toggleCollapse = () => {
     const nextState = !isCollapsed;
@@ -167,6 +178,40 @@ export default function Sidebar() {
           })}
         </ul>
       </nav>
+
+      {/* Theme Switcher Toggle */}
+      <div style={{ padding: '0 8px', marginBottom: '8px' }}>
+        <button 
+          onClick={toggleTheme} 
+          className="btn btn-secondary" 
+          style={{ 
+            width: '100%', 
+            justifyContent: isCollapsed && !isMobile ? 'center' : 'flex-start',
+            padding: '10px 14px', 
+            fontSize: '0.82rem',
+            border: '1px solid var(--border-glass)',
+            background: 'rgba(255, 255, 255, 0.02)',
+            height: '40px',
+            margin: 0
+          }}
+          title={isCollapsed && !isMobile ? (theme === 'light' ? 'Mudar para Tema Escuro' : 'Mudar para Tema Claro') : undefined}
+        >
+          {theme === 'light' ? (
+            <svg style={{ width: '16px', height: '16px', color: '#eab308' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707m12.728 12.728A9 9 0 115.636 5.636m12.728 12.728A9 9 0 015.636 5.636" />
+            </svg>
+          ) : (
+            <svg style={{ width: '16px', height: '16px', color: '#a5b4fc' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+          {(!isCollapsed || isMobile) && (
+            <span style={{ fontWeight: 500 }}>
+              {theme === 'light' ? 'Modo Claro' : 'Modo Escuro'}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* User profile & Logout */}
       {user && (

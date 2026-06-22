@@ -243,7 +243,7 @@ export default function GatewaysPage() {
                       value={editingGateway.type}
                       onChange={(e) => setEditingGateway({ ...editingGateway, type: e.target.value })}
                       className="form-input"
-                      style={{ background: '#0a0a0a', color: 'white' }}
+                     
                     >
                       <option value="mercadopago">Mercado Pago</option>
                       <option value="stripe">Stripe</option>
@@ -378,7 +378,7 @@ export default function GatewaysPage() {
                         </div>
 
                         {/* Webhook Endpoint section */}
-                        <div style={{ padding: '12px', background: '#050505', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '6px' }}>
+                        <div style={{ padding: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-glass)', borderRadius: '6px' }}>
                           <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 500 }}>
                             URL de Webhook (Configure no portal do provedor):
                           </span>
@@ -391,7 +391,7 @@ export default function GatewaysPage() {
                                 flex: 1, 
                                 background: 'transparent', 
                                 border: 'none', 
-                                color: '#eee', 
+                                color: 'var(--text-primary)', 
                                 fontSize: '0.75rem', 
                                 fontFamily: 'monospace', 
                                 outline: 'none' 
@@ -438,7 +438,7 @@ export default function GatewaysPage() {
                       value={type}
                       onChange={(e) => setType(e.target.value)}
                       className="form-input"
-                      style={{ background: '#0a0a0a', color: 'white' }}
+                     
                     >
                       <option value="mercadopago">Mercado Pago</option>
                       <option value="stripe">Stripe</option>
