@@ -783,8 +783,17 @@ export default function AgentsPage() {
         body: formData,
       });
 
+      let errorMsg = 'Ocorreu um erro ao enviar o arquivo.';
       if (!res.ok) {
-        throw new Error('Falha no upload');
+        if (res.status === 413) {
+          errorMsg = 'Arquivo muito grande! O limite de tamanho permitido é de 4.5 MB.';
+        } else {
+          try {
+            const errorData = await res.json();
+            if (errorData?.error) errorMsg = errorData.error;
+          } catch (e) {}
+        }
+        throw new Error(errorMsg);
       }
 
       const data = await res.json();
@@ -798,11 +807,11 @@ export default function AgentsPage() {
           }
         });
       } else {
-        alert('Erro ao realizar upload do arquivo.');
+        alert(data.error || 'Erro ao realizar upload do arquivo.');
       }
     } catch (err) {
       console.error('Error uploading file:', err);
-      alert('Ocorreu um erro ao enviar o arquivo.');
+      alert(err.message || 'Ocorreu um erro ao enviar o arquivo.');
     } finally {
       setUploadingMedia(false);
     }

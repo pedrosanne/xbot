@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import path from 'path';
+import { logToDb } from '@/lib/log';
 
 export async function POST(request) {
   try {
@@ -39,6 +40,14 @@ export async function POST(request) {
     return NextResponse.json({ success: true, url: fileUrl, filename: file.name });
   } catch (error) {
     console.error('Error handling upload:', error);
+    try {
+      await logToDb('ERROR', 'API', `Erro no upload manual do arquivo: ${error.message}`, {
+        error: error.message,
+        stack: error.stack
+      });
+    } catch (logErr) {
+      console.error('Failed to write upload error to DB logs:', logErr);
+    }
     return NextResponse.json({ error: 'Falha ao processar upload.' }, { status: 500 });
   }
 }
