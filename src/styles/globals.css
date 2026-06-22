@@ -2193,4 +2193,54 @@ input:checked + .slider:before {
   border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
+/* Light Theme Chat Bubbles & Meta Overrides */
+[data-theme='light'] .message-wrapper.incoming .message-bubble {
+  background: #ffffff !important;
+  color: #111b21 !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme='light'] .message-wrapper.outgoing.human .message-bubble {
+  background: #d9fdd3 !important; /* WhatsApp Green */
+  color: #111b21 !important;
+  border-color: rgba(0, 168, 132, 0.15) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme='light'] .message-wrapper.outgoing.bot .message-bubble {
+  background: #eef2ff !important; /* Violet/Indigo Light */
+  color: #312e81 !important; /* Indigo Dark */
+  border-color: rgba(139, 92, 246, 0.2) !important;
+  box-shadow: 0 1px 2px rgba(139, 92, 246, 0.05) !important;
+}
+
+[data-theme='light'] .message-time-check {
+  color: rgba(0, 0, 0, 0.45) !important;
+}
+
+[data-theme='light'] .message-sender-tag {
+  color: rgba(49, 46, 129, 0.6) !important;
+}
+
+[data-theme='light'] .date-separator-text {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  color: #6e6e73 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme='light'] .custom-audio-player {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme='light'] .audio-slider {
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme='light'] .audio-time-row {
+  color: rgba(0, 0, 0, 0.5) !important;
+}
+
 
