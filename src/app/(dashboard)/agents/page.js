@@ -1516,28 +1516,39 @@ export default function AgentsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
                     {['image', 'video', 'audio', 'document'].includes(selectedNode.media.type) && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label className="btn btn-secondary" style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          gap: '8px', 
-                          cursor: 'pointer',
-                          padding: '8px 12px',
-                          fontSize: '0.82rem',
-                          background: 'var(--color-success-bg)',
-                          border: '1px dashed var(--border-glass)',
-                          borderRadius: '6px',
-                          textAlign: 'center'
-                        }}>
+                        <label 
+                          htmlFor="node-file-upload"
+                          className="btn btn-secondary" 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            gap: '8px', 
+                            cursor: 'pointer',
+                            padding: '8px 12px',
+                            fontSize: '0.82rem',
+                            background: 'var(--color-success-bg)',
+                            border: '1px dashed var(--border-glass)',
+                            borderRadius: '6px',
+                            textAlign: 'center'
+                          }}
+                        >
                           {uploadingMedia ? '📤 Enviando...' : `📁 Escolher ${selectedNode.media.type === 'image' ? 'Imagem' : selectedNode.media.type === 'video' ? 'Vídeo' : selectedNode.media.type === 'audio' ? 'Áudio' : 'Documento'} do Dispositivo`}
-                          <input
-                            type="file"
-                            accept={selectedNode.media.type === 'image' ? 'image/*' : selectedNode.media.type === 'video' ? 'video/*' : selectedNode.media.type === 'audio' ? 'audio/*' : undefined}
-                            style={{ display: 'none' }}
-                            disabled={uploadingMedia}
-                            onChange={(e) => handleMediaUpload(e, selectedNodeId, selectedNode.media.type)}
-                          />
                         </label>
+                        <input
+                          id="node-file-upload"
+                          type="file"
+                          accept={
+                            selectedNode.media.type === 'image' ? 'image/*' : 
+                            selectedNode.media.type === 'video' ? 'video/*' : 
+                            selectedNode.media.type === 'audio' ? 'audio/*' : 
+                            selectedNode.media.type === 'document' ? '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv' : 
+                            undefined
+                          }
+                          style={{ position: 'absolute', width: '1px', height: '1px', padding: '0', margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: '0', opacity: 0 }}
+                          disabled={uploadingMedia}
+                          onChange={(e) => handleMediaUpload(e, selectedNodeId, selectedNode.media.type)}
+                        />
                         {selectedNode.media.type === 'audio' && (
                           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '2px 0 4px 0', lineHeight: '1.3' }}>
                             ⚠️ <strong>Dica Xbot:</strong> Para o áudio chegar como gravação nativa (humana), use arquivos no formato <strong>.ogg (codec Opus)</strong>.
