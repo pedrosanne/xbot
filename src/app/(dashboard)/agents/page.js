@@ -1395,14 +1395,70 @@ export default function AgentsPage() {
 
               {/* Message Text */}
               <div className="flow-sidebar-section">
-                <h4>Mensagem de Texto</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4>Mensagem de Texto</h4>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const textarea = document.getElementById('node-text-editor');
+                        const text = selectedNode.text || '';
+                        if (textarea) {
+                          const start = textarea.selectionStart;
+                          const end = textarea.selectionEnd;
+                          const newText = text.substring(0, start) + '{nome}' + text.substring(end);
+                          updateNode(selectedNodeId, { text: newText });
+                          setTimeout(() => {
+                            textarea.focus();
+                            textarea.setSelectionRange(start + 6, start + 6);
+                          }, 50);
+                        } else {
+                          updateNode(selectedNodeId, { text: text + '{nome}' });
+                        }
+                      }}
+                      className="btn btn-secondary"
+                      style={{ padding: '2px 6px', fontSize: '0.7rem', display: 'flex', gap: '3px', alignItems: 'center', height: 'auto', border: '1px solid var(--border-glass)' }}
+                      title="Inserir primeiro nome do cliente"
+                    >
+                      👤 {'{nome}'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const textarea = document.getElementById('node-text-editor');
+                        const text = selectedNode.text || '';
+                        if (textarea) {
+                          const start = textarea.selectionStart;
+                          const end = textarea.selectionEnd;
+                          const newText = text.substring(0, start) + '{nome_real}' + text.substring(end);
+                          updateNode(selectedNodeId, { text: newText });
+                          setTimeout(() => {
+                            textarea.focus();
+                            textarea.setSelectionRange(start + 11, start + 11);
+                          }, 50);
+                        } else {
+                          updateNode(selectedNodeId, { text: text + '{nome_real}' });
+                        }
+                      }}
+                      className="btn btn-secondary"
+                      style={{ padding: '2px 6px', fontSize: '0.7rem', display: 'flex', gap: '3px', alignItems: 'center', height: 'auto', border: '1px solid var(--border-glass)' }}
+                      title="Inserir nome apenas se for um nome real (evita emojis/símbolos)"
+                    >
+                      ✨ {'{nome_real}'}
+                    </button>
+                  </div>
+                </div>
                 <textarea
+                  id="node-text-editor"
                   className="form-textarea"
                   style={{ minHeight: '100px', fontSize: '0.85rem', padding: '10px' }}
                   value={selectedNode.text}
                   onChange={(e) => updateNode(selectedNodeId, { text: e.target.value })}
                   placeholder="Mensagem que o bot enviará..."
                 />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3' }}>
+                  Use <strong>{'{nome}'}</strong> para o primeiro nome e <strong>{'{nome_real}'}</strong> para validar nomes reais sem emojis.
+                </span>
               </div>
 
               {/* Delay & Fallback Step */}

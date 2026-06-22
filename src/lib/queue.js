@@ -435,9 +435,67 @@ async function startFlowForContact(contact, flow, incomingMessageId = null) {
 }
 
 async function sendStepResponse(contactId, step, steps, incomingMessageId = null, connection = null) {
-  const text = step.text || '';
-  const options = step.buttons || [];
-  const media = step.media || null;
+  let contact = null;
+  try {
+    contact = await prisma.contact.findUnique({
+      where: { id: contactId }
+    });
+  } catch (err) {
+    console.error('Error fetching contact in sendStepResponse:', err);
+  }
+
+  const extractRealName = (name) => {
+    if (!name) return null;
+    const normalized = name.trim();
+    if (normalized.toLowerCase() === 'cliente whatsapp' || normalized.toLowerCase() === 'cliente' || normalized.toLowerCase() === 'lead') {
+      return null;
+    }
+    // Keeps only alphanumeric characters / standard name letters
+    const onlyLetters = normalized.replace(/[^a-zA-ZáàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]/g, '').trim();
+    const words = onlyLetters.split(/\s+/).filter(w => w.length >= 2);
+    if (words.length === 0) return null;
+    const firstName = words[0];
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+  };
+
+  const replacePlaceholders = (val) => {
+    if (!val || !contact) return val || '';
+    let rawName = contact.name || contact.profileName || '';
+    if (rawName.toLowerCase() === 'cliente whatsapp' && contact.profileName) {
+      rawName = contact.profileName;
+    }
+    let firstName = rawName.trim().split(/\s+/)[0] || '';
+    if (firstName.toLowerCase() === 'cliente' || firstName.toLowerCase() === 'lead') {
+      firstName = '';
+    }
+    const nomeReplacement = firstName || 'cliente';
+    const realName = extractRealName(rawName);
+
+    let result = val.replace(/\{nome\}/g, nomeReplacement);
+    if (realName) {
+      result = result.replace(/\{nome_real\}/g, realName);
+    } else {
+      // Clean up dynamic commas and spaces if name is rejected
+      result = result.replace(/,\s*\{nome_real\}/gi, '');
+      result = result.replace(/\{nome_real\}\s*,/g, '');
+      result = result.replace(/\{nome_real\}/g, '');
+      result = result.replace(/\s+/g, ' ');
+      result = result.replace(/\s+([.,!?])/g, '$1');
+    }
+    return result.trim();
+  };
+
+  const text = replacePlaceholders(step.text || '');
+  const options = (step.buttons || []).map(opt => ({
+    ...opt,
+    title: opt.title ? replacePlaceholders(opt.title) : '',
+    url: opt.url ? replacePlaceholders(opt.url) : ''
+  }));
+  const media = step.media ? {
+    ...step.media,
+    caption: replacePlaceholders(step.media.caption || ''),
+    url: step.media.type === 'link' ? replacePlaceholders(step.media.url || '') : step.media.url
+  } : null;
 
   // Mark message as read and start typing indicator
   if (incomingMessageId) {
