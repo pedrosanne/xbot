@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { generateAIResponse } from './gemini';
-import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton, sendTypingIndicator, markWhatsAppMessageAsRead } from './whatsapp';
+import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton, sendTypingIndicator, markWhatsAppMessageAsRead, sendPixPaymentRequest } from './whatsapp';
 import { textToSpeech } from './tts';
 import { logToDb } from './log';
 import { sendPushNotification } from './push';
@@ -434,6 +434,67 @@ async function startFlowForContact(contact, flow, incomingMessageId = null) {
   await sendStepResponse(contact.id, startStep, steps, incomingMessageId, contact.connection);
 }
 
+function getCRC16(data) {
+  let crc = 0xFFFF;
+  const polynomial = 0x1021;
+  for (let i = 0; i < data.length; i++) {
+    let b = data.charCodeAt(i);
+    for (let j = 0; j < 8; j++) {
+      let bit = ((b >> (7 - j) & 1) === 1);
+      let c15 = ((crc >> 15 & 1) === 1);
+      crc <<= 1;
+      if (c15 ^ bit) {
+        crc ^= polynomial;
+      }
+    }
+  }
+  crc &= 0xFFFF;
+  let hex = crc.toString(16).toUpperCase();
+  return hex.padStart(4, '0');
+}
+
+function generateStaticPixCode({ key, amount, merchantName, merchantCity, description, txId = '***' }) {
+  function formatEMV(id, value) {
+    const len = value.length.toString().padStart(2, '0');
+    return `${id}${len}${value}`;
+  }
+
+  let parts = formatEMV('00', '01');
+
+  let merchantInfo = formatEMV('00', 'br.gov.bcb.pix');
+  merchantInfo += formatEMV('01', key.trim());
+  if (description) {
+    const cleanDesc = description.normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 25);
+    merchantInfo += formatEMV('02', cleanDesc);
+  }
+  parts += formatEMV('26', merchantInfo);
+
+  parts += formatEMV('52', '0000');
+  parts += formatEMV('53', '986');
+
+  if (amount) {
+    const amountStr = Number(amount).toFixed(2);
+    parts += formatEMV('54', amountStr);
+  }
+
+  parts += formatEMV('58', 'BR');
+
+  const cleanName = merchantName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').slice(0, 25).trim();
+  parts += formatEMV('59', cleanName || 'Beneficiario');
+
+  const cleanCity = merchantCity.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').slice(0, 15).trim();
+  parts += formatEMV('60', cleanCity || 'SAO PAULO');
+
+  const cleanTxId = txId.replace(/\s+/g, '').slice(0, 25) || '***';
+  const additionalData = formatEMV('05', cleanTxId);
+  parts += formatEMV('62', additionalData);
+
+  const baseString = parts + '6304';
+  const crc = getCRC16(baseString);
+  
+  return baseString + crc;
+}
+
 async function sendStepResponse(contactId, step, steps, incomingMessageId = null, connection = null) {
   let contact = null;
   try {
@@ -608,6 +669,60 @@ async function sendStepResponse(contactId, step, steps, incomingMessageId = null
     await sendText(contactId, finalText, quoteMessageId, connection);
     await saveOutgoingMessage(`bot_${Date.now()}_text`, contactId, 'text', '', finalText);
     quoteMessageId = null;
+  }
+
+  // Send Pix billing request if enabled
+  if (step.pixEnabled && step.pixKey && step.pixAmount > 0) {
+    try {
+      const pixMerchantName = step.pixMerchantName || 'Beneficiario';
+      const pixMerchantCity = step.pixMerchantCity || 'SAO PAULO';
+      const pixDescription = step.pixDescription || 'Pagamento';
+      const pixKeyType = step.pixKeyType || 'EVP';
+      const amount = parseFloat(step.pixAmount);
+      
+      await logToDb('INFO', 'FLOW', `Gerando cobrança Pix de R$ ${amount.toFixed(2)} para ${contactId}`);
+      
+      const pixCode = generateStaticPixCode({
+        key: step.pixKey,
+        amount: amount,
+        merchantName: pixMerchantName,
+        merchantCity: pixMerchantCity,
+        description: pixDescription
+      });
+
+      const amountInCents = Math.round(amount * 100);
+      const referenceId = `pix_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      const bodyText = pixDescription ? `Pagamento de R$ ${amount.toFixed(2)}: ${pixDescription}` : `Solicitação de Pagamento Pix (R$ ${amount.toFixed(2)})`;
+
+      try {
+        await logToDb('INFO', 'API', `Enviando solicitação interativa de Pix para ${contactId}`);
+        await sendPixPaymentRequest(
+          contactId,
+          amountInCents,
+          pixCode,
+          pixMerchantName,
+          step.pixKey,
+          pixKeyType,
+          referenceId,
+          bodyText,
+          connection
+        );
+        await saveOutgoingMessage(`bot_${Date.now()}_pix_req`, contactId, 'interactive', '', `Cobrança Pix R$ ${amount.toFixed(2)} [Código Pix Copia e Cola gerado]`);
+      } catch (err) {
+        await logToDb('WARN', 'API', `Falha ao enviar a solicitação interativa de pagamento Pix do WhatsApp: ${err.message}. Enviando apenas texto de fallback.`);
+      }
+
+      const pixMsgText = `*Código Pix Copia e Cola* (Toque para copiar):\n\n\`\`\`${pixCode}\`\`\``;
+      await sendText(contactId, pixMsgText, quoteMessageId, connection);
+      await saveOutgoingMessage(`bot_${Date.now()}_pix_code`, contactId, 'text', '', `Copia e Cola: ${pixCode}`);
+      quoteMessageId = null;
+
+    } catch (pixErr) {
+      await logToDb('ERROR', 'FLOW', `Erro ao gerar/enviar cobrança Pix na etapa '${step.id}': ${pixErr.message}`, {
+        error: pixErr.message,
+        stack: pixErr.stack
+      });
+    }
   }
 
   // Auto-advance if this step has no buttons and has nextStepId (direct transition sequence)
