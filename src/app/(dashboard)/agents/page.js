@@ -10,6 +10,7 @@ const uid = () => Math.random().toString(36).substr(2, 8);
 
 export default function AgentsPage() {
   const [activeTab, setActiveTab] = useState('whatsapp');
+  const [productsList, setProductsList] = useState([]);
 
   // ==========================================
   // STATE: WhatsApp & API Settings
@@ -39,6 +40,7 @@ export default function AgentsPage() {
   const [agentElevenLabsApiKey, setAgentElevenLabsApiKey] = useState('');
   const [agentElevenLabsVoiceId, setAgentElevenLabsVoiceId] = useState('');
   const [agentConnectionId, setAgentConnectionId] = useState('');
+  const [agentProductId, setAgentProductId] = useState('');
   const [editingAgentId, setEditingAgentId] = useState(null);
   const [agentLoading, setAgentLoading] = useState(false);
   const [showAgentForm, setShowAgentForm] = useState(false);
@@ -60,6 +62,7 @@ export default function AgentsPage() {
   const [flowKeywords, setFlowKeywords] = useState('');
   const [flowAgentId, setFlowAgentId] = useState(null);
   const [flowConnectionId, setFlowConnectionId] = useState('');
+  const [flowProductId, setFlowProductId] = useState('');
   const [nodes, setNodes] = useState([]); // { id, x, y, text, media:{type,url,caption}, buttons:[] }
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -126,6 +129,7 @@ export default function AgentsPage() {
     fetchAgents();
     fetchFlows();
     fetchCalls();
+    fetchProducts();
   }, []);
 
   const fetchSettings = async () => {
@@ -352,6 +356,15 @@ export default function AgentsPage() {
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch('/api/products');
+      if (res.ok) setProductsList(await res.json());
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    }
+  };
+
   // ==========================================
   // METHODS: AI AGENTS
   // ==========================================
@@ -376,7 +389,8 @@ export default function AgentsPage() {
       geminiApiKey: agentGeminiApiKey,
       elevenLabsApiKey: agentElevenLabsApiKey,
       elevenLabsVoiceId: agentElevenLabsVoiceId,
-      connectionId: agentConnectionId || null
+      connectionId: agentConnectionId || null,
+      productId: agentProductId || null
     };
     try {
       let res;
@@ -409,6 +423,7 @@ export default function AgentsPage() {
     setAgentElevenLabsApiKey(agent.elevenLabsApiKey || '');
     setAgentElevenLabsVoiceId(agent.elevenLabsVoiceId || '');
     setAgentConnectionId(agent.connectionId || '');
+    setAgentProductId(agent.productId || '');
     setShowAgentForm(true);
   };
 
@@ -432,6 +447,7 @@ export default function AgentsPage() {
     setAgentElevenLabsApiKey('');
     setAgentElevenLabsVoiceId('');
     setAgentConnectionId('');
+    setAgentProductId('');
     setShowAgentForm(false);
   };
 
@@ -530,6 +546,7 @@ export default function AgentsPage() {
     setFlowKeywords('');
     setFlowAgentId(null);
     setFlowConnectionId('');
+    setFlowProductId('');
     const startNode = {
       id: 'boas_vindas',
       x: 300,
@@ -555,6 +572,7 @@ export default function AgentsPage() {
     setFlowKeywords(flow.keywords);
     setFlowAgentId(flow.agentId || null);
     setFlowConnectionId(flow.connectionId || '');
+    setFlowProductId(flow.productId || '');
     let parsed = [];
     try { parsed = JSON.parse(flow.steps || '[]'); } catch { parsed = []; }
     // Add default x/y if missing
@@ -607,6 +625,7 @@ export default function AgentsPage() {
     setNodes([]);
     setSelectedNodeId(null);
     setIsFullScreen(false);
+    setFlowProductId('');
   };
 
   const handleSaveFlow = async () => {
@@ -621,7 +640,8 @@ export default function AgentsPage() {
       steps: nodes,
       isActive: true,
       agentId: flowAgentId,
-      connectionId: flowConnectionId || null
+      connectionId: flowConnectionId || null,
+      productId: flowProductId || null
     };
 
     try {
@@ -1147,6 +1167,24 @@ export default function AgentsPage() {
               {connections.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Linked Product Selection */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '0 1 220px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Produto Relacionado:</span>
+            <select 
+              className="form-select" 
+              style={{ padding: '6px 10px', fontSize: '0.82rem', height: '32px', margin: 0 }} 
+              value={flowProductId} 
+              onChange={(e) => setFlowProductId(e.target.value)}
+            >
+              <option value="">Nenhum Produto</option>
+              {productsList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -1927,6 +1965,15 @@ export default function AgentsPage() {
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Produto Relacionado</label>
+                    <select value={agentProductId} onChange={(e) => setAgentProductId(e.target.value)} className="form-select">
+                      <option value="">Nenhum Produto</option>
+                      {productsList.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <label className="form-label" style={{ margin: 0 }}>Temperatura</label>
                       <span style={{ fontSize: '0.85rem', color: '#4ade80' }}>{agentTemperature}</span>
@@ -2050,6 +2097,11 @@ export default function AgentsPage() {
                             🌐 Global
                           </span>
                         )}
+                        {productsList.find(p => p.id === agent.productId) && (
+                          <span style={{ padding: '3px 8px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', borderRadius: '6px', border: '1px solid rgba(168, 85, 247, 0.3)' }} title={`Produto: ${productsList.find(p => p.id === agent.productId).name}`}>
+                            📦 {productsList.find(p => p.id === agent.productId).name}
+                          </span>
+                        )}
                         {agent.geminiApiKey && (
                           <span style={{ padding: '3px 8px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', borderRadius: '6px', border: '1px solid rgba(52, 211, 153, 0.3)' }} title="Gemini customizado">
                             🔑 Gemini
@@ -2130,6 +2182,11 @@ export default function AgentsPage() {
                               ) : (
                                 <span className="badge" style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--text-muted)' }}>
                                   🌐 Global
+                                </span>
+                              )}
+                              {productsList.find(p => p.id === flow.productId) && (
+                                <span className="badge" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' }} title={`Produto: ${productsList.find(p => p.id === flow.productId).name}`}>
+                                  📦 {productsList.find(p => p.id === flow.productId).name}
                                 </span>
                               )}
                               {agents.find(a => a.id === flow.agentId) ? (

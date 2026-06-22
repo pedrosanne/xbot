@@ -18,7 +18,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const data = await request.json();
-    const { name, trigger, keywords, steps, isActive, agentId, connectionId } = data;
+    const { name, trigger, keywords, steps, isActive, agentId, connectionId, productId } = data;
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -32,7 +32,8 @@ export async function POST(request) {
         steps: steps ? JSON.stringify(steps) : '[]',
         isActive: isActive !== undefined ? isActive : true,
         agentId: agentId || null,
-        connectionId: connectionId || null
+        connectionId: connectionId || null,
+        productId: productId || null
       }
     });
 
@@ -47,7 +48,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const data = await request.json();
-    const { id, name, trigger, keywords, steps, isActive, agentId, connectionId } = data;
+    const { id, name, trigger, keywords, steps, isActive, agentId, connectionId, productId } = data;
 
     if (!id) {
       return NextResponse.json({ error: 'Flow ID is required' }, { status: 400 });
@@ -62,7 +63,8 @@ export async function PUT(request) {
         ...(steps !== undefined && { steps: JSON.stringify(steps) }),
         ...(isActive !== undefined && { isActive }),
         ...(agentId !== undefined && { agentId: agentId || null }),
-        ...(connectionId !== undefined && { connectionId: connectionId || null })
+        ...(connectionId !== undefined && { connectionId: connectionId || null }),
+        ...(productId !== undefined && { productId: productId || null })
       }
     });
 

@@ -200,6 +200,47 @@ export async function sendCTAUrlButton(to, bodyText, buttonTitle, url, contextMe
   return sendWhatsAppMessage(payload, connection);
 }
 
+export async function sendPixPaymentRequest(to, amountInCents, pixCode, merchantName, pixKey, keyType, referenceId = null, bodyText = "Solicitação de Pagamento Pix", connection = null) {
+  const refId = referenceId || `pay_${Date.now()}`;
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'order_details',
+      body: {
+        text: bodyText
+      },
+      action: {
+        name: 'review_and_pay',
+        parameters: {
+          reference_id: refId,
+          type: 'digital-goods',
+          payment_type: 'br',
+          currency: 'BRL',
+          total_amount: {
+            value: amountInCents,
+            offset: 100
+          },
+          payment_settings: [
+            {
+              type: 'pix_dynamic_code',
+              pix_dynamic_code: {
+                code: pixCode,
+                merchant_name: merchantName,
+                key: pixKey,
+                key_type: keyType
+              }
+            }
+          ]
+        }
+      }
+    }
+  };
+  return sendWhatsAppMessage(payload, connection);
+}
+
 export async function sendTypingIndicator(to, connection = null) {
   if (!to) return null;
   const payload = {
@@ -211,7 +252,13 @@ export async function sendTypingIndicator(to, connection = null) {
       type: 'text'
     }
   };
-  return sendWhatsAppMessage(payload, connection);
+  try {
+    return await sendWhatsAppMessage(payload, connection);
+  } catch (err) {
+    console.warn('Failed to send typing indicator (ignoring to prevent crash):', err.message);
+    await logToDb('WARN', 'API', `Erro ignorado ao enviar indicador de digitação (para evitar travamento do fluxo): ${err.message}`);
+    return null;
+  }
 }
 
 

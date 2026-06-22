@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import crypto from 'crypto';
 import { logToDb } from '@/lib/log';
 import { sendText } from '@/lib/whatsapp';
 import { sendPushNotification } from '@/lib/push';
@@ -49,6 +50,8 @@ export async function POST(request, { params }) {
     let email = '';
     let phone = '';
     let contactId = '';
+    let productId = null;
+    let sellerId = null;
 
     // 1. Parse fields based on provider type
     if (gateway.type === 'stripe') {
@@ -71,6 +74,8 @@ export async function POST(request, { params }) {
         if (stripeObj.metadata?.phone) {
           phone = stripeObj.metadata.phone;
         }
+        productId = stripeObj.metadata?.productId || stripeObj.metadata?.product_id || null;
+        sellerId = stripeObj.metadata?.sellerId || stripeObj.metadata?.seller_id || stripeObj.metadata?.assignedUserId || null;
       } else {
         return NextResponse.json({ success: true, message: `Evento Stripe ignorado: ${stripeEvent}` });
       }
@@ -114,6 +119,8 @@ export async function POST(request, { params }) {
           email = mpPayment.payer?.email || '';
           phone = mpPayment.payer?.phone?.number || '';
           contactId = mpPayment.metadata?.contact_id || mpPayment.metadata?.contactId || mpPayment.external_reference || '';
+          productId = mpPayment.metadata?.productId || mpPayment.metadata?.product_id || null;
+          sellerId = mpPayment.metadata?.sellerId || mpPayment.metadata?.seller_id || null;
 
           if (mpPayment.payer?.phone?.area_code && mpPayment.payer?.phone?.number) {
             phone = `${mpPayment.payer.phone.area_code}${mpPayment.payer.phone.number}`;
@@ -148,7 +155,71 @@ export async function POST(request, { params }) {
       // Asaas sometimes returns customer details or metadata
       email = paymentObj.email || '';
       phone = paymentObj.phone || '';
+      productId = body.productId || body.product_id || null;
+      sellerId = body.sellerId || body.seller_id || null;
     } 
+    else if (gateway.type === 'naut') {
+      // Signature verification
+      const signature = request.headers.get('x-webhook-signature');
+      if (gateway.webhookSecret && signature) {
+        const expected = crypto.createHmac('sha256', gateway.webhookSecret).update(rawBody).digest('hex');
+        let isValid = false;
+        try {
+          isValid = crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
+        } catch (e) {
+          isValid = false;
+        }
+        if (!isValid) {
+          await logToDb('WARN', 'WEBHOOK', `Assinatura de webhook inválida para gateway Naut: ${gateway.name}`);
+          return NextResponse.json({ error: 'Assinatura inválida.' }, { status: 401 });
+        }
+      }
+
+      const event = body.event;
+      const eventData = body.data || {};
+      let metadata = eventData.metadata || {};
+      if (typeof metadata === 'string') {
+        try {
+          metadata = JSON.parse(metadata);
+        } catch (e) {}
+      }
+
+      const isPaid = ['transaction.paid', 'transaction.completed', 'subscription.renewed'].includes(event) ||
+                     (event === 'purchase' && ['completed', 'approved', 'paid'].includes(String(eventData.transactionStatus || eventData.status).toLowerCase()));
+
+      if (isPaid) {
+        status = 'PAID';
+        externalId = eventData.transactionId || eventData.paymentId || eventData.id || `naut_${Date.now()}`;
+        amount = Number(eventData.grossAmount || eventData.amount || 0) / 100;
+        paymentMethod = eventData.paymentMethod || 'pix';
+        description = eventData.description || `Naut Payment ${externalId}`;
+        productId = eventData.productId || metadata.productId || metadata.product_id || null;
+        sellerId = metadata.sellerId || metadata.seller_id || null;
+        contactId = metadata.contactId || metadata.contact_id || '';
+        email = metadata.email || '';
+        phone = metadata.phone || '';
+      } else if (event === 'transaction.failed') {
+        status = 'FAILED';
+        externalId = eventData.transactionId || eventData.paymentId || eventData.id || `naut_${Date.now()}`;
+        amount = Number(eventData.grossAmount || eventData.amount || 0) / 100;
+        paymentMethod = eventData.paymentMethod || 'pix';
+        description = `Naut Payment Failed`;
+        productId = eventData.productId || metadata.productId || metadata.product_id || null;
+        sellerId = metadata.sellerId || metadata.seller_id || null;
+        contactId = metadata.contactId || metadata.contact_id || '';
+      } else if (event === 'transaction.refunded' || event === 'transaction.partially_refunded') {
+        status = 'REFUNDED';
+        externalId = eventData.transactionId || eventData.paymentId || eventData.id || `naut_${Date.now()}`;
+        amount = Number(eventData.grossAmount || eventData.amount || 0) / 100;
+        paymentMethod = eventData.paymentMethod || 'pix';
+        description = `Naut Payment Refunded`;
+        productId = eventData.productId || metadata.productId || metadata.product_id || null;
+        sellerId = metadata.sellerId || metadata.seller_id || null;
+        contactId = metadata.contactId || metadata.contact_id || '';
+      } else {
+        return NextResponse.json({ success: true, message: `Evento Naut ignorado: ${event}` });
+      }
+    }
     else if (gateway.type === 'custom') {
       externalId = body.externalId || body.id || `custom_${Date.now()}`;
       amount = Number(body.amount || body.value || 0);
@@ -163,6 +234,8 @@ export async function POST(request, { params }) {
       contactId = body.contactId || '';
       phone = body.phone || body.phoneNumber || '';
       email = body.email || '';
+      productId = body.productId || body.product_id || null;
+      sellerId = body.sellerId || body.seller_id || null;
     }
 
     if (!externalId) {
@@ -202,6 +275,27 @@ export async function POST(request, { params }) {
       });
     }
 
+    // Deduce product and seller from contact if not supplied in metadata
+    if (contact) {
+      if (!productId) {
+        if (contact.activeFlowId) {
+          const flow = await prisma.flow.findUnique({ where: { id: contact.activeFlowId } });
+          if (flow && flow.productId) {
+            productId = flow.productId;
+          }
+        }
+        if (!productId && contact.designatedAgentId) {
+          const agent = await prisma.agent.findUnique({ where: { id: contact.designatedAgentId } });
+          if (agent && agent.productId) {
+            productId = agent.productId;
+          }
+        }
+      }
+      if (!sellerId && contact.assignedUserId) {
+        sellerId = contact.assignedUserId;
+      }
+    }
+
     // 3. Upsert Payment Record
     let existingPayment = await prisma.payment.findFirst({
       where: {
@@ -224,7 +318,9 @@ export async function POST(request, { params }) {
           contactId: contact ? contact.id : undefined,
           amount: amount || existingPayment.amount,
           paymentMethod: paymentMethod || existingPayment.paymentMethod,
-          description: description || existingPayment.description
+          description: description || existingPayment.description,
+          productId: productId || undefined,
+          sellerId: sellerId || undefined
         }
       });
     } else {
@@ -239,7 +335,9 @@ export async function POST(request, { params }) {
           amount,
           status,
           paymentMethod,
-          description
+          description,
+          productId: productId || null,
+          sellerId: sellerId || null
         }
       });
     }

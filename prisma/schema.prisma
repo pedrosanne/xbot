@@ -41,6 +41,8 @@ model Agent {
 
   connectionId      String?
   connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  productId         String?
+  product           Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
 
 model Contact {
@@ -117,6 +119,7 @@ model User {
   assignedContacts Contact[]
   connections WhatsAppConnection[]
   pushSubscriptions PushSubscription[]
+  sales             Payment[]            @relation("PaymentSeller")
 }
 
 model Flow {
@@ -135,6 +138,8 @@ model Flow {
 
   connectionId      String?
   connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  productId         String?
+  product           Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
 
 model Log {
@@ -205,6 +210,10 @@ model Payment {
   status        String         @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
   paymentMethod String         @default("pix") // pix, credit_card, boleto, etc.
   description   String         @default("")
+  productId     String?
+  product       Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sellerId      String?
+  seller        User?          @relation("PaymentSeller", fields: [sellerId], references: [id], onDelete: SetNull)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -224,6 +233,9 @@ model Product {
   bumpedIn    OrderBump[] @relation("BumpTargetProduct")
   upsells     Upsell[]    @relation("UpsellMainProduct")
   upselledIn  Upsell[]    @relation("UpsellTargetProduct")
+  agents      Agent[]
+  flows       Flow[]
+  payments    Payment[]
 }
 
 model Offer {

@@ -17,7 +17,7 @@ export async function GET() {
 // POST: Create a new agent
 export async function POST(request) {
   try {
-    const { name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId, connectionId } = await request.json();
+    const { name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId, connectionId, productId } = await request.json();
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -42,7 +42,8 @@ export async function POST(request) {
         geminiApiKey: geminiApiKey || '',
         elevenLabsApiKey: elevenLabsApiKey || '',
         elevenLabsVoiceId: elevenLabsVoiceId || '',
-        connectionId: connectionId || null
+        connectionId: connectionId || null,
+        productId: productId || null
       }
     });
 
@@ -56,7 +57,7 @@ export async function POST(request) {
 // PUT: Update an existing agent
 export async function PUT(request) {
   try {
-    const { id, name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId, connectionId } = await request.json();
+    const { id, name, description, systemPrompt, model, temperature, isActive, geminiApiKey, elevenLabsApiKey, elevenLabsVoiceId, connectionId, productId } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 });
@@ -85,7 +86,8 @@ export async function PUT(request) {
         geminiApiKey: geminiApiKey !== undefined ? geminiApiKey : undefined,
         elevenLabsApiKey: elevenLabsApiKey !== undefined ? elevenLabsApiKey : undefined,
         elevenLabsVoiceId: elevenLabsVoiceId !== undefined ? elevenLabsVoiceId : undefined,
-        connectionId: connectionId !== undefined ? (connectionId || null) : undefined
+        connectionId: connectionId !== undefined ? (connectionId || null) : undefined,
+        productId: productId !== undefined ? (productId || null) : undefined
       }
     });
 

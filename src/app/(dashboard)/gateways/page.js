@@ -164,6 +164,7 @@ export default function GatewaysPage() {
       mercadopago: 'Mercado Pago',
       stripe: 'Stripe',
       asaas: 'Asaas',
+      naut: 'Naut',
       custom: 'Custom / API'
     };
     return map[pType] || pType;
@@ -247,6 +248,7 @@ export default function GatewaysPage() {
                       <option value="mercadopago">Mercado Pago</option>
                       <option value="stripe">Stripe</option>
                       <option value="asaas">Asaas</option>
+                      <option value="naut">Naut</option>
                       <option value="custom">Custom (Geral)</option>
                     </select>
                   </div>
@@ -441,6 +443,7 @@ export default function GatewaysPage() {
                       <option value="mercadopago">Mercado Pago</option>
                       <option value="stripe">Stripe</option>
                       <option value="asaas">Asaas</option>
+                      <option value="naut">Naut</option>
                       <option value="custom">Custom (Geral)</option>
                     </select>
                   </div>
