@@ -3,6 +3,7 @@ import path from 'path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from './prisma';
 import { getSystemSettings } from './settings';
+import { logToDb } from './log';
 
 export async function generateAIResponse(contactId, incomingText = '', mediaUrl = '', mimeType = '', customAgentId = null) {
   // 1. Fetch designated agent or globally active agent
@@ -30,7 +31,10 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
   }
 
   const settings = await getSystemSettings();
-  const apiKeyToUse = agent?.geminiApiKey || settings.geminiApiKey;
+  let apiKeyToUse = agent?.geminiApiKey;
+  if (!apiKeyToUse || apiKeyToUse.trim().length < 20) {
+    apiKeyToUse = settings.geminiApiKey;
+  }
 
   if (!apiKeyToUse) {
     console.error('Gemini API key is not configured.');
@@ -185,6 +189,12 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
     return textResponse;
   } catch (error) {
     console.error('Error generating AI response:', error);
+    await logToDb('ERROR', 'AI', `Erro ao gerar resposta do Gemini para o agente ${agent.name}: ${error.message}`, {
+      error: error.message,
+      stack: error.stack,
+      model: modelName,
+      apiKeyUsed: apiKeyToUse ? (apiKeyToUse.substring(0, 8) + '...') : 'none'
+    });
     return 'Desculpe, tive um problema ao processar sua resposta. Por favor, tente novamente.';
   }
 }

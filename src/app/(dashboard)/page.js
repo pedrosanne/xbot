@@ -35,7 +35,7 @@ export default async function DashboardPage() {
   });
 
   return (
-    <div className="main-content">
+    <div className="page-container">
       <header className="page-header">
         <h1 className="page-title">Dashboard</h1>
         <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>

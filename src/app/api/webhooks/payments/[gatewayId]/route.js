@@ -400,6 +400,35 @@ export async function POST(request, { params }) {
 
       // e. Log event
       await logToDb('INFO', 'WEBHOOK', `Pagamento de R$ ${amount} confirmado no gateway ${gateway.name} para o contato ${contact.id}.`);
+
+      // f. Continue Chatbot Flow if waiting on a Pix node
+      if (contact.activeFlowId && contact.currentStepId) {
+        try {
+          const flow = await prisma.flow.findUnique({ where: { id: contact.activeFlowId } });
+          if (flow) {
+            const steps = JSON.parse(flow.steps || '[]');
+            const currentStep = steps.find(s => s.id === contact.currentStepId);
+            if (currentStep && currentStep.pixEnabled && currentStep.nextStepId) {
+              const nextStep = steps.find(s => s.id === currentStep.nextStepId);
+              if (nextStep) {
+                await logToDb('INFO', 'FLOW', `Pagamento recebido. Avançando contato ${contact.id} para a próxima etapa do fluxo: '${nextStep.id}'`);
+                
+                await prisma.contact.update({
+                  where: { id: contact.id },
+                  data: { currentStepId: nextStep.id }
+                });
+                
+                // Import dynamic execution from queue.js
+                const { sendStepResponse } = await import('@/lib/queue');
+                await sendStepResponse(contact.id, nextStep, steps, null, contact.connection);
+              }
+            }
+          }
+        } catch (flowError) {
+          console.error('Error auto-advancing flow on payment confirmation:', flowError);
+          await logToDb('ERROR', 'FLOW', `Erro ao auto-avançar fluxo do contato ${contact.id} após pagamento: ${flowError.message}`);
+        }
+      }
     }
 
     return NextResponse.json({ success: true, paymentId: paymentRecord.id });

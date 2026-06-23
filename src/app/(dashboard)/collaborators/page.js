@@ -180,7 +180,7 @@ export default function CollaboratorsPage() {
   };
 
   return (
-    <div className="main-content">
+    <div className="page-container">
       <header className="page-header">
         <h1 className="page-title">Gestão de Colaboradores</h1>
       </header>
@@ -273,7 +273,7 @@ export default function CollaboratorsPage() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '24px', alignItems: 'start' }}>
+        <div className="dashboard-split-layout">
           
           {/* List panel */}
           <div className="glass-panel" style={{ padding: '24px' }}>

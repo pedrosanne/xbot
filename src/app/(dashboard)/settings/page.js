@@ -272,7 +272,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="main-content">
+    <div className="page-container">
       <header className="page-header">
         <h1 className="page-title">Configurações do Sistema</h1>
       </header>

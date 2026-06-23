@@ -443,7 +443,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="main-content">
+    <div className="page-container">
       <header className="page-header">
         <h1 className="page-title">📦 Gestão de Produtos & Ofertas</h1>
       </header>
@@ -574,7 +574,7 @@ export default function ProductsPage() {
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
+                <div className="dashboard-split-layout">
                   <div className="glass-panel" style={{ padding: '24px' }}>
                     <h3 style={{ marginBottom: '16px', fontSize: '1.05rem', fontWeight: 600 }}>Produtos</h3>
                     {products.length === 0 ? (
@@ -775,7 +775,7 @@ export default function ProductsPage() {
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
+                <div className="dashboard-split-layout">
                   <div className="glass-panel" style={{ padding: '24px' }}>
                     <h3 style={{ marginBottom: '16px', fontSize: '1.05rem', fontWeight: 600 }}>Ofertas Configuradas</h3>
                     {offers.length === 0 ? (
@@ -902,7 +902,7 @@ export default function ProductsPage() {
                 TAB 3: ORDER BUMPS
                ======================================================== */}
             {activeTab === 'bumps' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
+              <div className="dashboard-split-layout">
                 <div className="glass-panel" style={{ padding: '24px' }}>
                   <h3 style={{ marginBottom: '16px', fontSize: '1.05rem', fontWeight: 600 }}>Bumps Ativos</h3>
                   {bumps.length === 0 ? (
@@ -1028,7 +1028,7 @@ export default function ProductsPage() {
                 TAB 4: UPSELLS
                ======================================================== */}
             {activeTab === 'upsells' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
+              <div className="dashboard-split-layout">
                 <div className="glass-panel" style={{ padding: '24px' }}>
                   <h3 style={{ marginBottom: '16px', fontSize: '1.05rem', fontWeight: 600 }}>Upsells Ativos</h3>
                   {upsells.length === 0 ? (
@@ -1154,7 +1154,7 @@ export default function ProductsPage() {
                 TAB 5: PIXELS
                ======================================================== */}
             {activeTab === 'pixels' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
+              <div className="dashboard-split-layout">
                 <div className="glass-panel" style={{ padding: '24px' }}>
                   <h3 style={{ marginBottom: '16px', fontSize: '1.05rem', fontWeight: 600 }}>Pixels de Rastreamento</h3>
                   {pixels.length === 0 ? (

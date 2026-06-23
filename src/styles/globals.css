@@ -375,6 +375,30 @@ body {
   overflow: hidden;
 }
 
+.page-container {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+.dashboard-split-layout {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-split-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+}
+
 .page-header {
   padding: 20px 24px;
   border-bottom: 1px solid var(--border-glass);
@@ -1021,7 +1045,7 @@ input:checked + .slider:before {
   width: 100%;
   overflow: hidden;
   position: relative;
-  background: radial-gradient(circle at top right, rgba(139, 92, 246, 0.03), transparent 60%), #040508;
+  background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.015), transparent 60%), #040508;
 }
 
 /* Contacts Sidebar Panel */
@@ -1306,9 +1330,9 @@ input:checked + .slider:before {
 
 .message-wrapper.outgoing.bot .message-bubble {
   border-radius: 16px 4px 16px 16px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.04));
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.05);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
 .message-wrapper.outgoing.human .message-bubble {
@@ -1783,8 +1807,8 @@ input:checked + .slider:before {
 }
 
 .message-wrapper.outgoing.bot .message-bubble {
-  background: rgba(139, 92, 246, 0.15) !important; /* Sleek violet for Bot */
-  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  background: rgba(255, 255, 255, 0.08) !important; /* Elegant dark grey/white */
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
   color: #e9edef !important;
   border-radius: 8px 0px 8px 8px !important;
 }
@@ -2069,7 +2093,7 @@ input:checked + .slider:before {
 }
 
 [data-theme='light'] .chat-page-container {
-  background: radial-gradient(circle at top right, rgba(139, 92, 246, 0.03), transparent 60%), #f5f5f7;
+  background: radial-gradient(circle at top right, rgba(0, 0, 0, 0.01), transparent 60%), #f5f5f7;
 }
 
 [data-theme='light'] .contacts-panel {
@@ -2136,11 +2160,11 @@ input:checked + .slider:before {
   min-height: 100vh;
   width: 100vw;
   padding: 20px;
-  background: radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%), var(--bg-primary);
+  background: radial-gradient(at 0% 0%, rgba(255, 255, 255, 0.06) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(255, 255, 255, 0.02) 0px, transparent 50%), var(--bg-primary);
 }
 
 [data-theme='light'] .auth-layout-container {
-  background: radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.06) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.03) 0px, transparent 50%), var(--bg-primary);
+  background: radial-gradient(at 0% 0%, rgba(0, 0, 0, 0.03) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(0, 0, 0, 0.01) 0px, transparent 50%), var(--bg-primary);
 }
 
 /* Light Theme Flow Builder Container Override */
@@ -2209,10 +2233,10 @@ input:checked + .slider:before {
 }
 
 [data-theme='light'] .message-wrapper.outgoing.bot .message-bubble {
-  background: #eef2ff !important; /* Violet/Indigo Light */
-  color: #312e81 !important; /* Indigo Dark */
-  border-color: rgba(139, 92, 246, 0.2) !important;
-  box-shadow: 0 1px 2px rgba(139, 92, 246, 0.05) !important;
+  background: #e4e4e7 !important; /* Zinc-200 */
+  color: #18181b !important; /* Zinc-900 */
+  border-color: #d4d4d8 !important; /* Zinc-300 */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
 }
 
 [data-theme='light'] .message-time-check {
@@ -2220,7 +2244,7 @@ input:checked + .slider:before {
 }
 
 [data-theme='light'] .message-sender-tag {
-  color: rgba(49, 46, 129, 0.6) !important;
+  color: rgba(0, 0, 0, 0.5) !important;
 }
 
 [data-theme='light'] .date-separator-text {

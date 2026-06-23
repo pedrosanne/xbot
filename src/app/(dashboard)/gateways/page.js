@@ -171,7 +171,7 @@ export default function GatewaysPage() {
   };
 
   return (
-    <div className="main-content">
+    <div className="page-container">
       <header className="page-header">
         <h1 className="page-title">Gestão de Gateways & Pagamentos</h1>
       </header>
@@ -308,7 +308,7 @@ export default function GatewaysPage() {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '24px', alignItems: 'start' }}>
+            <div className="dashboard-split-layout">
               
               {/* Gateways List */}
               <div className="glass-panel" style={{ padding: '24px' }}>

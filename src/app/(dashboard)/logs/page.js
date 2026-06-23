@@ -66,7 +66,7 @@ export default function LogsPage() {
   };
 
   return (
-    <div className="main-content">
+    <div className="page-container">
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Logs do Sistema</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
