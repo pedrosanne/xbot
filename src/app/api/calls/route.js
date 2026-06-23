@@ -80,7 +80,8 @@ export async function POST(request) {
           },
           voice: {
             provider: 'eleven-labs',
-            voiceId: settings.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM',
+            voiceId: activeAgent?.elevenLabsVoiceId || settings.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM',
+            modelId: 'eleven_multilingual_v2',
           },
           firstMessage: firstMessage || `Olá ${contact.name || 'cliente'}! Aqui é a ${activeAgent?.name || 'assistente virtual'}. Tudo bem com você?`,
           transcriber: {
