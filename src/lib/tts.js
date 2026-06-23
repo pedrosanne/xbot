@@ -3,6 +3,9 @@ import path from 'path';
 import { getSystemSettings } from './settings';
 import { prisma } from './prisma';
 import { logToDb } from './log';
+import { execFile } from 'child_process';
+import ffmpegPath from 'ffmpeg-static';
+import os from 'os';
 
 export async function textToSpeech(text, customAgentId = null) {
   const settings = await getSystemSettings();
@@ -135,4 +138,37 @@ export async function voiceChanger(audioBuffer, mimeType = 'audio/mpeg', customA
     console.error('Error in voiceChanger:', error);
     return null;
   }
+}
+
+export async function convertToOggOpus(inputBuffer) {
+  return new Promise((resolve, reject) => {
+    const tempDir = os.tmpdir();
+    const inputPath = path.join(tempDir, `input_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`);
+    const outputPath = `${inputPath}.ogg`;
+
+    // Write input buffer to temp file
+    fs.writeFileSync(inputPath, inputBuffer);
+
+    // Run ffmpeg
+    const args = ['-y', '-i', inputPath, '-c:a', 'libopus', '-b:a', '32k', '-ar', '48000', outputPath];
+
+    execFile(ffmpegPath, args, (error, stdout, stderr) => {
+      // Clean up input file
+      try { fs.unlinkSync(inputPath); } catch (e) {}
+
+      if (error) {
+        try { fs.unlinkSync(outputPath); } catch (e) {}
+        console.error('ffmpeg conversion error:', stderr);
+        return reject(error);
+      }
+
+      try {
+        const outputBuffer = fs.readFileSync(outputPath);
+        try { fs.unlinkSync(outputPath); } catch (e) {}
+        resolve(outputBuffer);
+      } catch (readErr) {
+        reject(readErr);
+      }
+    });
+  });
 }

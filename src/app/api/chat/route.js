@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { sendText, sendAudio, sendImage, sendDocument, sendVideo, markWhatsAppMessageAsRead } from '@/lib/whatsapp';
 import { getSystemSettings } from '@/lib/settings';
 import { logToDb } from '@/lib/log';
-import { voiceChanger } from '@/lib/tts';
+import { voiceChanger, convertToOggOpus } from '@/lib/tts';
 import { verifyToken } from '@/lib/auth';
 
 // GET: Retrieve contacts list OR message history for a contact
@@ -229,6 +229,39 @@ export async function POST(request) {
       } catch (err) {
         console.error('Error in Voice Changer route hook:', err);
         await logToDb('ERROR', 'API', `Erro no Voice Changer: ${err.message}`);
+      }
+    }
+
+    // Ensure all audio files sent to the client are OGG Opus formatted for native voice note playback
+    if (type === 'audio' && mediaUrl && !mediaUrl.toLowerCase().split('?')[0].endsWith('.ogg')) {
+      try {
+        const filename = mediaUrl.split('/').pop();
+        const uploadRecord = await prisma.upload.findUnique({
+          where: { filename }
+        });
+
+        if (uploadRecord) {
+          await logToDb('INFO', 'API', `Convertendo áudio original para OGG Opus para envio nativo: ${filename}`);
+          const oggBuffer = await convertToOggOpus(uploadRecord.data);
+          
+          if (oggBuffer) {
+            const newFilename = `converted_voice_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.ogg`;
+            await prisma.upload.create({
+              data: {
+                filename: newFilename,
+                mimeType: 'audio/ogg',
+                data: oggBuffer
+              }
+            });
+            
+            mediaUrl = `/api/uploads/${newFilename}`;
+            absoluteMediaUrl = `${baseUrl}${mediaUrl}`;
+            await logToDb('INFO', 'API', `Áudio convertido com sucesso para OGG Opus para envio nativo: ${newFilename}`);
+          }
+        }
+      } catch (err) {
+        console.error('Error converting audio to OGG Opus:', err);
+        await logToDb('WARN', 'API', `Falha ao converter áudio para OGG Opus: ${err.message}. Enviando original.`);
       }
     }
 
