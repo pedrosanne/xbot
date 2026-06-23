@@ -349,5 +349,37 @@ export async function markWhatsAppMessageAsRead(messageId, connection = null) {
     status: 'read',
     message_id: messageId
   };
-  return sendWhatsAppMessage(payload, connection);
+  const result = await sendWhatsAppMessage(payload, connection);
+
+  try {
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      select: { type: true }
+    });
+
+    if (message) {
+      if (message.type === 'audio') {
+        const payloadPlayed = {
+          messaging_product: 'whatsapp',
+          status: 'played',
+          message_id: messageId
+        };
+        await sendWhatsAppMessage(payloadPlayed, connection);
+        
+        await prisma.message.update({
+          where: { id: messageId },
+          data: { status: 'played' }
+        });
+      } else {
+        await prisma.message.update({
+          where: { id: messageId },
+          data: { status: 'read' }
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error handling played/read status update:', error);
+  }
+
+  return result;
 }

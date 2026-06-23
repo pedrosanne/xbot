@@ -67,17 +67,28 @@ export async function GET(request) {
         where: {
           contactId,
           direction: 'INCOMING',
-          status: { not: 'read' }
+          status: { notIn: ['read', 'played'] }
         }
       });
 
       if (unreadIncoming.length > 0) {
-        await prisma.message.updateMany({
-          where: {
-            id: { in: unreadIncoming.map(m => m.id) }
-          },
-          data: { status: 'read' }
-        });
+        // Update non-audio messages to 'read'
+        const nonAudioIds = unreadIncoming.filter(m => m.type !== 'audio').map(m => m.id);
+        if (nonAudioIds.length > 0) {
+          await prisma.message.updateMany({
+            where: { id: { in: nonAudioIds } },
+            data: { status: 'read' }
+          });
+        }
+
+        // Update audio messages to 'played'
+        const audioIds = unreadIncoming.filter(m => m.type === 'audio').map(m => m.id);
+        if (audioIds.length > 0) {
+          await prisma.message.updateMany({
+            where: { id: { in: audioIds } },
+            data: { status: 'played' }
+          });
+        }
 
         // Trigger read receipts asynchronously to avoid blocking the client request
         for (const msg of unreadIncoming) {
