@@ -147,7 +147,7 @@ export async function enqueueMessage(contactId, messageData) {
           });
         }
 
-        if (triggeredFlow) {
+        if (triggeredFlow && !contact.passedFlows) {
           await logToDb('INFO', 'FLOW', `Contato ${contactId} estava em MANUAL mas enviou a palavra-chave do fluxo '${triggeredFlow.name}'. Retornando para AUTO.`);
           contact = await prisma.contact.update({
             where: { id: contactId },
@@ -244,6 +244,97 @@ async function processSingleMessage(contact, messageData) {
     await logToDb('INFO', 'FLOW', `Entrada consolidada - Texto: "${text}", Botão ID: "${clickedButtonId}"`);
 
     const normalizedInput = text.trim().toLowerCase();
+
+    // INTERCEPT RECURRING CLIENT WHO ALREADY COMPLETED A FLOW
+    if (freshContact.passedFlows && !freshContact.activeFlowId) {
+      await logToDb('INFO', 'AI', `Contato recorrente detectado. Fluxos anteriores: ${freshContact.passedFlows}. Encaminhando para humano.`);
+
+      if (messageData.id) {
+        await markWhatsAppMessageAsRead(messageData.id, freshContact.connection);
+      }
+
+      await sendTypingIndicator(contactId, freshContact.connection);
+      try {
+        await prisma.contact.update({
+          where: { id: contactId },
+          data: { typingState: 'TYPING' }
+        });
+      } catch (e) {}
+
+      // Get agent to use
+      const agentIdToUse = freshContact.designatedAgentId;
+      let agent = null;
+      if (agentIdToUse) {
+        agent = await prisma.agent.findUnique({ where: { id: agentIdToUse } });
+      }
+      if (!agent) {
+        agent = await prisma.agent.findFirst({
+          where: { isActive: true, connectionId: freshContact.connectionId || null }
+        });
+        if (!agent) {
+          agent = await prisma.agent.findFirst({
+            where: { isActive: true, connectionId: null }
+          });
+        }
+      }
+
+      const aiTextResponse = await generateAIResponse(
+        contactId,
+        text,
+        mediaUrl,
+        mimeType,
+        agent?.id || null,
+        freshContact.passedFlows
+      );
+
+      // Clean the response just in case to remove any flow triggers
+      const flowTriggerRegex = /\[DISPARAR_FLUXO:\s*([^\]]+)\]/i;
+      const cleanedResponse = aiTextResponse.replace(flowTriggerRegex, '').trim();
+
+      await sendBotResponse(contactId, cleanedResponse, messageData.id, freshContact.connection);
+
+      // Auto-switch contact status to MANUAL
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: {
+          status: 'MANUAL',
+          botMode: 'FLOW',
+          currentStepId: '',
+          activeFlowId: ''
+        }
+      });
+
+      // Send push notification to users
+      let targetUserIds = null;
+      if (freshContact.connectionId) {
+        try {
+          const connWithUsers = await prisma.whatsAppConnection.findUnique({
+            where: { id: freshContact.connectionId },
+            include: { users: { select: { id: true } } }
+          });
+          if (connWithUsers && connWithUsers.users.length > 0) {
+            targetUserIds = connWithUsers.users.map(u => u.id);
+          }
+        } catch (err) {
+          console.error('Error fetching connection users for recurrent customer push:', err);
+        }
+      }
+
+      const contactName = freshContact.name || freshContact.profileName || contactId;
+      const flowNames = freshContact.passedFlows.split(',').map(f => {
+        const parts = f.split(':');
+        return parts.length > 1 ? parts[1] : parts[0];
+      }).join(', ');
+
+      await sendPushNotification(
+        `Cliente Recorrente: ${contactName} 👤`,
+        `Já passou por: ${flowNames} e retornou contato.`,
+        `/chat?contactId=${contactId}`,
+        targetUserIds
+      );
+
+      return;
+    }
 
     // 2. Carrega os fluxos ativos (escopados por conexão do WhatsApp ou globais)
     const activeFlows = await prisma.flow.findMany({
@@ -552,13 +643,20 @@ async function startFlowForContact(contact, flow, incomingMessageId = null) {
   const startStep = steps[0];
   await logToDb('INFO', 'FLOW', `Iniciando fluxo '${flow.name}' para o contato ${contact.id}. Etapa inicial: '${startStep.id}'`);
 
+  let updatedPassedFlows = contact.passedFlows || '';
+  const flowIdentifier = `${flow.id}:${flow.name}`;
+  if (!updatedPassedFlows.includes(flow.id)) {
+    updatedPassedFlows = updatedPassedFlows ? `${updatedPassedFlows},${flowIdentifier}` : flowIdentifier;
+  }
+
   await prisma.contact.update({
     where: { id: contact.id },
     data: {
       botMode: 'FLOW',
       activeFlowId: flow.id,
       currentStepId: startStep.id,
-      designatedAgentId: flow.agentId || null
+      designatedAgentId: flow.agentId || null,
+      passedFlows: updatedPassedFlows
     }
   });
 

@@ -62,6 +62,7 @@ model Contact {
   calls           Call[]
   payments        Payment[]
   createdAt       DateTime  @default(now())
+  passedFlows     String    @default("")
   
   // Scoping fields for multi-number support
   phoneNumberId   String    @default("")

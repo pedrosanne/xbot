@@ -5,7 +5,7 @@ import { prisma } from './prisma';
 import { getSystemSettings } from './settings';
 import { logToDb } from './log';
 
-export async function generateAIResponse(contactId, incomingText = '', mediaUrl = '', mimeType = '', customAgentId = null) {
+export async function generateAIResponse(contactId, incomingText = '', mediaUrl = '', mimeType = '', customAgentId = null, returningCustomerFlows = null) {
   // 1. Fetch designated agent or globally active agent
   let agent = null;
   if (customAgentId) {
@@ -111,6 +111,19 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
   systemPrompt += `- Se quiser enviar uma mensagem de VOZ (áudio), comece sua resposta exatamente com o marcador [ENVIAR AUDIO: texto do áudio]. O sistema converterá seu texto em voz e enviará ao cliente.\n`;
   systemPrompt += `- Se quiser enviar uma imagem junto, insira no final da resposta: [ENVIAR IMAGEM: url_da_imagem]\n`;
   systemPrompt += `- Se quiser enviar um link de documento, use: [ENVIAR DOCUMENTO: url_do_documento]\n\n`;
+
+  if (returningCustomerFlows) {
+    const flowNames = returningCustomerFlows.split(',').map(f => {
+      const parts = f.split(':');
+      return parts.length > 1 ? parts[1] : parts[0];
+    }).join(', ');
+
+    systemPrompt += `INSTRUÇÕES ESPECIAIS - CLIENTE RECORRENTE:\n`;
+    systemPrompt += `- Este cliente já foi atendido anteriormente e já passou pelos seguintes fluxos: "${flowNames}".\n`;
+    systemPrompt += `- Diga ao cliente, de forma muito breve (máximo de 2 frases), que identificou os atendimentos anteriores dele nesses fluxos, e que você o está transferindo imediatamente para um de nossos atendentes humanos para dar continuidade.\n`;
+    systemPrompt += `- NÃO tente disparar nenhum novo fluxo de chatbot. NUNCA adicione marcadores do tipo [DISPARAR_FLUXO: ...].\n`;
+    systemPrompt += `- Responda de forma curta e direta, prestando atenção no que o cliente enviou agora e fazendo a ponte para o atendimento humano.\n\n`;
+  }
 
   systemPrompt += `HISTÓRICO DA CONVERSA:\n`;
   
