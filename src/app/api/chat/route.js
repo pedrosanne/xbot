@@ -176,6 +176,8 @@ export async function POST(request) {
     content = body.content;
     mediaUrl = body.mediaUrl;
     const useVoiceChanger = body.useVoiceChanger;
+    const replyToId = body.replyToId;
+    const replyToContent = body.replyToContent;
 
     if (!contactId || !type) {
       return NextResponse.json({ error: 'Missing contactId or type' }, { status: 400 });
@@ -287,15 +289,15 @@ export async function POST(request) {
     } else {
       try {
         if (type === 'text') {
-          result = await sendText(contactId, content, null, connectionToUse);
+          result = await sendText(contactId, content, replyToId || null, connectionToUse);
         } else if (type === 'audio') {
-          result = await sendAudio(contactId, absoluteMediaUrl, null, connectionToUse);
+          result = await sendAudio(contactId, absoluteMediaUrl, replyToId || null, connectionToUse);
         } else if (type === 'image') {
-          result = await sendImage(contactId, absoluteMediaUrl, content, null, connectionToUse);
+          result = await sendImage(contactId, absoluteMediaUrl, content, replyToId || null, connectionToUse);
         } else if (type === 'document') {
-          result = await sendDocument(contactId, absoluteMediaUrl, 'documento', content, null, connectionToUse);
+          result = await sendDocument(contactId, absoluteMediaUrl, 'documento', content, replyToId || null, connectionToUse);
         } else if (type === 'video') {
-          result = await sendVideo(contactId, absoluteMediaUrl, content, null, connectionToUse);
+          result = await sendVideo(contactId, absoluteMediaUrl, content, replyToId || null, connectionToUse);
         }
       } catch (apiError) {
         sendError = apiError.message || 'Meta WhatsApp API Error';
@@ -317,7 +319,9 @@ export async function POST(request) {
         content: content || '',
         mediaUrl: mediaUrl || '',
         sendError: sendError || '',
-        status: sendError ? 'failed' : 'sent'
+        status: sendError ? 'failed' : 'sent',
+        replyToId: replyToId || '',
+        replyToContent: replyToContent || ''
       }
     });
 

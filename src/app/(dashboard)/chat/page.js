@@ -118,7 +118,7 @@ const formatDateHeader = (date) => {
 
 // Render ticks for message delivery confirmation
 const renderTicks = (status) => {
-  if (status === 'read') {
+  if (status === 'read' || status === 'played') {
     return (
       <svg className="tick-icon blue" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M12.78 1.22a.75.75 0 0 1 0 1.06l-7 7a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 1 1 1.06-1.06L5.25 7.69l6.47-6.47a.75.75 0 0 1 1.06 0z"/>
@@ -195,6 +195,25 @@ export default function ChatPage() {
   const [mediaStream, setMediaStream] = useState(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+
+  // Advanced Message Actions States
+  const [selectedMessageIds, setSelectedMessageIds] = useState([]);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [editInputText, setEditInputText] = useState('');
+  
+  // Forward Modal State
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [messageToForward, setMessageToForward] = useState(null);
+  const [forwardSearchQuery, setForwardSearchQuery] = useState('');
+
+  // Floating Context Menu for long-press / click on mobile
+  const [activeMenuMessage, setActiveMenuMessage] = useState(null);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+
+  // iOS Attachment menu sheet state
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
 
   useEffect(() => {
     // Only load mic-recorder-to-mp3 on the client side
@@ -281,7 +300,6 @@ export default function ChatPage() {
           if (data.contact) {
             setSelectedContact(prev => {
               if (!prev) return data.contact;
-              // Preserve call and modal toggle states but update dynamic db fields
               return { ...prev, ...data.contact };
             });
           }
@@ -339,10 +357,23 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActiveMenuMessage(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
+
   // Handle Contact Select
   const handleSelectContact = (contact) => {
     setSelectedContact(contact);
     fetchMessages(contact.id);
+    setSelectedMessageIds([]);
+    setIsSelectMode(false);
+    setReplyingTo(null);
+    setEditingMessage(null);
   };
 
   // Toggle Bot Status (AUTO / MANUAL)
@@ -424,7 +455,6 @@ export default function ChatPage() {
       setNativeRecorder(null);
       
       rec.onstop = async () => {
-        // Stop all tracks on the stream to release the mic light
         if (mediaStream) {
           mediaStream.getTracks().forEach(track => track.stop());
           setMediaStream(null);
@@ -541,19 +571,18 @@ export default function ChatPage() {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate Meta WhatsApp API size limits
     const mediaType = getMediaType(file.type);
     let limitBytes = 100 * 1024 * 1024; // Default to document limit (100MB)
     let limitLabel = "100 MB";
 
     if (mediaType === 'image') {
-      limitBytes = 5 * 1024 * 1024; // 5MB
+      limitBytes = 5 * 1024 * 1024;
       limitLabel = "5 MB";
     } else if (mediaType === 'video') {
-      limitBytes = 16 * 1024 * 1024; // 16MB
+      limitBytes = 16 * 1024 * 1024;
       limitLabel = "16 MB";
     } else if (mediaType === 'audio') {
-      limitBytes = 16 * 1024 * 1024; // 16MB
+      limitBytes = 16 * 1024 * 1024;
       limitLabel = "16 MB";
     }
 
@@ -562,12 +591,13 @@ export default function ChatPage() {
         mediaType === 'image' ? 'imagens' : mediaType === 'video' ? 'vídeos' : mediaType === 'audio' ? 'áudios' : 'documentos'
       }, que é de ${limitLabel}. Por favor, selecione um arquivo menor.`);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""; // Clear file input
+        fileInputRef.current.value = "";
       }
       return;
     }
 
     setUploadProgress(true);
+    setShowAttachMenu(false);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -646,9 +676,11 @@ export default function ChatPage() {
     setLoading(true);
     const textToSend = inputText;
     const currentUpload = uploadFile;
+    const currentReplyTo = replyingTo;
     
     setInputText('');
     setUploadFile(null);
+    setReplyingTo(null);
 
     try {
       const res = await fetch('/api/chat', {
@@ -658,7 +690,9 @@ export default function ChatPage() {
           contactId: selectedContact.id,
           type: currentUpload ? currentUpload.type : 'text',
           content: textToSend, // used as caption for media
-          mediaUrl: currentUpload ? currentUpload.url : undefined
+          mediaUrl: currentUpload ? currentUpload.url : undefined,
+          replyToId: currentReplyTo ? currentReplyTo.id : undefined,
+          replyToContent: currentReplyTo ? (currentReplyTo.content || currentReplyTo.type) : undefined
         })
       });
 
@@ -673,6 +707,148 @@ export default function ChatPage() {
     } catch (err) {
       console.error('Error sending manual message:', err);
       alert('Erro de conexão ao enviar mensagem.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // React to a message
+  const handleReactToMessage = async (msgId, emoji) => {
+    try {
+      const res = await fetch('/api/chat/messages', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'react',
+          messageId: msgId,
+          emoji,
+          senderType: 'HUMAN'
+        })
+      });
+      if (res.ok) {
+        fetchMessages(selectedContact.id);
+      }
+    } catch (err) {
+      console.error('Error reacting to message:', err);
+    }
+  };
+
+  // Edit message
+  const handleEditMessageSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingMessage || !editInputText.trim()) return;
+
+    try {
+      setLoading(true);
+      const res = await fetch('/api/chat/messages', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'edit',
+          messageId: editingMessage.id,
+          newContent: editInputText
+        })
+      });
+      if (res.ok) {
+        setEditingMessage(null);
+        setEditInputText('');
+        fetchMessages(selectedContact.id);
+      } else {
+        const data = await res.json();
+        alert(`Erro ao editar: ${data.error || 'Desconhecido'}`);
+      }
+    } catch (err) {
+      console.error('Error editing message:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete message
+  const handleDeleteMessage = async (msgId, deleteType) => {
+    if (!confirm(deleteType === 'everyone' ? 'Apagar esta mensagem para TODOS?' : 'Apagar esta mensagem para mim?')) return;
+    try {
+      const res = await fetch(`/api/chat/messages?messageId=${msgId}&deleteType=${deleteType}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchMessages(selectedContact.id);
+      }
+    } catch (err) {
+      console.error('Error deleting message:', err);
+    }
+  };
+
+  // Forward message(s)
+  const handleForwardSubmit = async (targetContactId) => {
+    if (!messageToForward) return;
+    try {
+      setLoading(true);
+      const res = await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetContactIds: [targetContactId],
+          messageId: messageToForward.id
+        })
+      });
+      if (res.ok) {
+        setShowForwardModal(false);
+        setMessageToForward(null);
+        alert('Mensagem encaminhada com sucesso!');
+      } else {
+        alert('Erro ao encaminhar mensagem.');
+      }
+    } catch (err) {
+      console.error('Error forwarding message:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Forward multiple selected messages
+  const handleForwardSelectedSubmit = async (targetContactId) => {
+    if (selectedMessageIds.length === 0) return;
+    try {
+      setLoading(true);
+      for (const msgId of selectedMessageIds) {
+        await fetch('/api/chat/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetContactIds: [targetContactId],
+            messageId: msgId
+          })
+        });
+      }
+      setShowForwardModal(false);
+      setSelectedMessageIds([]);
+      setIsSelectMode(false);
+      alert('Mensagens encaminhadas com sucesso!');
+    } catch (err) {
+      console.error('Error forwarding messages:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete multiple selected messages
+  const handleDeleteSelected = async () => {
+    if (selectedMessageIds.length === 0) return;
+    if (!confirm(`Apagar as ${selectedMessageIds.length} mensagens selecionadas para você?`)) return;
+
+    try {
+      setLoading(true);
+      for (const msgId of selectedMessageIds) {
+        await fetch(`/api/chat/messages?messageId=${msgId}&deleteType=me`, {
+          method: 'DELETE'
+        });
+      }
+      setSelectedMessageIds([]);
+      setIsSelectMode(false);
+      fetchMessages(selectedContact.id);
+    } catch (err) {
+      console.error('Error deleting messages:', err);
     } finally {
       setLoading(false);
     }
@@ -738,7 +914,6 @@ export default function ChatPage() {
       console.error('Error setting simulated typing state:', err);
     }
 
-    // Atraso artificial de 2 segundos para ver a digitação fluida
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const payload = {
@@ -784,7 +959,6 @@ export default function ChatPage() {
       });
 
       if (res.ok) {
-        // Redefinir o status de digitação localmente para IDLE
         try {
           await fetch('/api/chat', {
             method: 'PUT',
@@ -875,6 +1049,27 @@ export default function ChatPage() {
       .substring(0, 2)
       .toUpperCase();
   };
+
+  // Open long-press / right-click menu
+  const handleMessageContextMenu = (e, msg) => {
+    e.preventDefault();
+    if (isSelectMode) return;
+    setActiveMenuMessage(msg);
+    // Position menu near cursor
+    setMenuPosition({
+      x: Math.min(e.clientX, window.innerWidth - 200),
+      y: Math.min(e.clientY, window.innerHeight - 300)
+    });
+  };
+
+  // Toggle select checkbox
+  const toggleSelectMessage = (msgId) => {
+    setSelectedMessageIds(prev => 
+      prev.includes(msgId) ? prev.filter(id => id !== msgId) : [...prev, msgId]
+    );
+  };
+
+  const totalUnreadBadge = contacts.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
   return (
     <div className="chat-page-container">
@@ -1036,81 +1231,67 @@ export default function ChatPage() {
       <div className={`chat-window-panel ${!selectedContact ? 'hidden-mobile' : ''} ${showSimulator ? 'simulator-open' : ''}`}>
         {selectedContact ? (
           <>
-            {/* Chat Header */}
-            <div className="chat-header">
+            {/* iOS-Style Chat Header */}
+            <div className="chat-header ios-chat-header">
               <div className="chat-header-info">
-                {/* Back button for mobile */}
+                {/* Back button for mobile with badge count */}
                 <button 
                   onClick={() => setSelectedContact(null)}
-                  className="btn btn-secondary back-btn-mobile"
-                  style={{ marginRight: '8px', padding: '6px 10px' }}
+                  className="back-btn-mobile ios-back-btn"
                 >
-                  ← Voltar
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="back-arrow-svg">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                  <span className="back-badge-count">{totalUnreadBadge > 0 ? totalUnreadBadge : 'Chats'}</span>
                 </button>
-                {selectedContact.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img 
-                    src={selectedContact.avatarUrl} 
-                    alt="Avatar" 
-                    style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} 
-                  />
-                ) : (
-                  <div className="contact-avatar" style={{ width: '36px', height: '36px' }}>
-                    {getInitials(selectedContact.name)}
+
+                <div 
+                  onClick={() => { setShowSimulator(true); setRightPanelTab('profile'); }}
+                  className="ios-contact-header-details"
+                  style={{ cursor: 'pointer' }}
+                >
+                  {selectedContact.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img 
+                      src={selectedContact.avatarUrl} 
+                      alt="Avatar" 
+                      className="ios-header-avatar"
+                    />
+                  ) : (
+                    <div className="contact-avatar ios-header-avatar">
+                      {getInitials(selectedContact.name)}
+                    </div>
+                  )}
+                  <div className="chat-header-text">
+                    <span className="chat-header-title">{selectedContact.name}</span>
+                    <span className="chat-header-sub clickable-sub">toque para dados do contato</span>
                   </div>
-                )}
-                <div className="chat-header-text">
-                  <span className="chat-header-title">{selectedContact.name}</span>
-                  <span className="chat-header-sub">
-                    {selectedContact.typingState === 'TYPING' ? (
-                      <span className="status-typing-green">digitando...</span>
-                    ) : selectedContact.typingState === 'RECORDING' ? (
-                      <span className="status-typing-green">🎙️ gravando áudio...</span>
-                    ) : (
-                      `online | WhatsApp: ${selectedContact.id}`
-                    )}
-                  </span>
                 </div>
               </div>
               
-              <div className="chat-header-actions">
-                <button
-                  onClick={() => { setShowSimulator(!showSimulator); setRightPanelTab('profile'); }}
-                  className={`btn ${showSimulator && rightPanelTab === 'profile' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '8px 12px', fontSize: '0.8rem' }}
-                  title="Ver Perfil do Lead"
-                >
-                  👤 Perfil
-                </button>
-                <button
+              <div className="chat-header-actions ios-header-actions">
+                <button 
                   onClick={() => { setShowCallModal(!showCallModal); setCallResult(null); }}
-                  className="btn btn-secondary"
-                  style={{ padding: '8px 12px', fontSize: '0.8rem' }}
-                  title="Ligar para o cliente com IA"
+                  className="ios-header-icon-btn"
+                  title="Ligar com IA"
                 >
-                  📞 Ligar
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="phone-icon-svg">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                  </svg>
                 </button>
+
                 <button 
                   onClick={handleToggleStatus}
-                  className={`btn ${selectedContact.status === 'AUTO' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                  className={`btn-pill ${selectedContact.status === 'AUTO' ? 'active-bot' : 'manual-bot'}`}
                 >
-                  {selectedContact.status === 'AUTO' ? '🤖 Robô Ativo' : '👤 Manual'}
+                  {selectedContact.status === 'AUTO' ? '🤖 Robô' : '👤 Manual'}
                 </button>
               </div>
             </div>
 
             {/* Call Modal */}
             {showCallModal && (
-              <div style={{
-                padding: '16px 24px',
-                borderBottom: '1px solid var(--border-glass)',
-                background: 'rgba(0,0,0,0.3)',
-                animation: 'fadeIn 0.2s ease',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-              }}>
+              <div className="call-modal-overlay">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h4 style={{ fontSize: '0.95rem', fontWeight: 600 }}>📞 Chamada com IA para {selectedContact.name}</h4>
                   <button onClick={() => setShowCallModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.1rem' }}>✕</button>
@@ -1134,7 +1315,7 @@ export default function ChatPage() {
                     style={{ padding: '8px 20px', whiteSpace: 'nowrap' }}
                     disabled={callLoading}
                   >
-                    {callLoading ? '⏳ Ligando...' : '📞 Iniciar Chamada'}
+                    {callLoading ? '⏳ Ligando...' : '📞 Ligar'}
                   </button>
                 </div>
 
@@ -1148,23 +1329,28 @@ export default function ChatPage() {
                     border: `1px solid ${callResult.success ? 'rgba(74,222,128,0.2)' : 'rgba(255,92,92,0.2)'}`,
                     color: callResult.success ? '#4ade80' : '#ff5c5c',
                   }}>
-                    {callResult.success ? '✓' : '✗'} {callResult.message}
+                    {callResult.success ? '✓' : '✓'} {callResult.message}
                   </div>
                 )}
-
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                  ℹ A IA usará a persona do agente ativo para conversar como um ser humano real. Requer Vapi.ai configurado em Agentes → Central de Chamadas.
-                </div>
               </div>
             )}
 
             {/* Message Area */}
-            <div className="messages-container">
+            <div className="messages-container whatsapp-wallpaper">
+              
+              {/* Safety encryption info bubble */}
+              <div className="safety-bubble-container">
+                <div className="safety-bubble">
+                  🔒 As mensagens e ligações são protegidas com criptografia de ponta a ponta. Somente as pessoas que fazem parte da conversa podem ler, ouvir e compartilhar esse conteúdo.
+                </div>
+              </div>
+
               {(() => {
                 let lastDateStr = null;
                 return messages.map((msg, index) => {
                   const isClient = msg.direction === 'INCOMING';
                   const isBot = msg.senderType === 'BOT';
+                  const isSelected = selectedMessageIds.includes(msg.id);
                   
                   let wrapperClass = 'message-wrapper';
                   if (isClient) {
@@ -1179,6 +1365,12 @@ export default function ChatPage() {
                   const showDateSeparator = dateStr !== lastDateStr;
                   lastDateStr = dateStr;
 
+                  // Parse Reactions JSON array
+                  let msgReactions = [];
+                  try {
+                    msgReactions = JSON.parse(msg.reactions || '[]');
+                  } catch (e) {}
+
                   return (
                     <div key={msg.id || index} style={{ display: 'contents' }}>
                       {showDateSeparator && (
@@ -1187,69 +1379,124 @@ export default function ChatPage() {
                         </div>
                       )}
                       
-                      <div className={wrapperClass}>
-                        <div className="message-bubble" style={{ position: 'relative' }}>
-                          {!isClient && (
-                            <div className="message-sender-tag">
-                              {msg.senderType === 'BOT' ? '🤖 Assistente IA' : 'Atendente'}
-                            </div>
-                          )}
-
-                          {/* Media Renderers */}
-                          {msg.type === 'image' && msg.mediaUrl && (
-                            <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden' }}>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={msg.mediaUrl} alt="WhatsApp Image" style={{ maxWidth: '100%', maxHeight: '250px', display: 'block' }} />
-                            </div>
-                          )}
-
-                          {msg.type === 'audio' && msg.mediaUrl && (
-                            <CustomAudioPlayer src={msg.mediaUrl} />
-                          )}
-
-                          {msg.type === 'video' && msg.mediaUrl && (
-                            <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden', maxWidth: '300px' }}>
-                              <video src={msg.mediaUrl} controls style={{ width: '100%', maxHeight: '200px' }} />
-                            </div>
-                          )}
-
-                          {msg.type === 'document' && msg.mediaUrl && (
-                            <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <svg style={{ width: '24px', height: '24px', color: '#ef4444' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                              </svg>
-                              <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', fontSize: '0.85rem', textDecoration: 'underline' }}>
-                                Ver Documento / Arquivo
-                              </a>
-                            </div>
-                          )}
-
-                          {msg.type !== 'audio' && msg.content}
-
-                          <span className="message-time-check">
-                            {msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            {!isClient && renderTicks(msg.status)}
-                          </span>
-                        </div>
-
-                        {/* Exibe erro de entrega se houver */}
-                        {msg.sendError && (
-                          <div 
-                            style={{ 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              gap: '4px', 
-                              fontSize: '0.72rem', 
-                              color: '#ff5c5c', 
-                              marginTop: '2px',
-                              alignSelf: isClient ? 'flex-start' : 'flex-end',
-                              cursor: 'help'
-                            }} 
-                            title={`Falha ao enviar via WhatsApp API: ${msg.sendError}`}
-                          >
-                            ⚠️ Não enviado ao lead ({msg.sendError})
+                      <div className="message-row-select-layout">
+                        {isSelectMode && (
+                          <div className="select-checkbox-container">
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected}
+                              onChange={() => toggleSelectMessage(msg.id)}
+                              className="message-select-checkbox"
+                            />
                           </div>
                         )}
+
+                        <div 
+                          className={wrapperClass}
+                          onContextMenu={(e) => handleMessageContextMenu(e, msg)}
+                          onClick={(e) => {
+                            // On mobile, trigger custom action sheet on single click to improve UX
+                            if (window.innerWidth <= 768 && !isSelectMode) {
+                              handleMessageContextMenu(e, msg);
+                            }
+                          }}
+                        >
+                          <div className={`message-bubble ${isSelected ? 'bubble-highlighted' : ''}`} style={{ position: 'relative' }}>
+                            {!isClient && (
+                              <div className="message-sender-tag">
+                                {msg.senderType === 'BOT' ? '🤖 Assistente IA' : 'Atendente'}
+                              </div>
+                            )}
+
+                            {/* Reply preview header inside bubble */}
+                            {msg.replyToId && (
+                              <div className="bubble-reply-header">
+                                <div className="reply-header-bar" />
+                                <div className="reply-header-body">
+                                  <span className="reply-header-sender">Mensagem Anterior</span>
+                                  <span className="reply-header-text">{msg.replyToContent}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Media Renderers */}
+                            {msg.type === 'image' && msg.mediaUrl && (
+                              <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden' }}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={msg.mediaUrl} alt="WhatsApp Image" style={{ maxWidth: '100%', maxHeight: '250px', display: 'block' }} />
+                              </div>
+                            )}
+
+                            {msg.type === 'audio' && msg.mediaUrl && (
+                              <CustomAudioPlayer src={msg.mediaUrl} />
+                            )}
+
+                            {msg.type === 'video' && msg.mediaUrl && (
+                              <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden', maxWidth: '300px' }}>
+                                <video src={msg.mediaUrl} controls style={{ width: '100%', maxHeight: '200px' }} />
+                              </div>
+                            )}
+
+                            {msg.type === 'document' && msg.mediaUrl && (
+                              <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <svg style={{ width: '24px', height: '24px', color: '#ef4444' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', fontSize: '0.85rem', textDecoration: 'underline' }}>
+                                  Ver Documento / Arquivo
+                                </a>
+                              </div>
+                            )}
+
+                            {/* Text content or deleted text */}
+                            {msg.isDeleted ? (
+                              <span className="msg-deleted-text">🚫 Esta mensagem foi apagada</span>
+                            ) : (
+                              msg.type !== 'audio' && (
+                                <span>
+                                  {msg.content}
+                                  {msg.isEdited && <span className="msg-edited-badge">(editada)</span>}
+                                </span>
+                              )
+                            )}
+
+                            {/* Ticks and time */}
+                            <span className="message-time-check">
+                              {msgDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              {!isClient && renderTicks(msg.status)}
+                            </span>
+
+                            {/* Floating emoji reactions badge */}
+                            {msgReactions.length > 0 && (
+                              <div className="bubble-reactions-badge">
+                                {msgReactions.map((react, rIdx) => (
+                                  <span key={rIdx} title={react.senderType} className="single-reaction-emoji">
+                                    {react.emoji}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Exibe erro de entrega se houver */}
+                          {msg.sendError && (
+                            <div 
+                              style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '4px', 
+                                fontSize: '0.72rem', 
+                                color: '#ff5c5c', 
+                                marginTop: '2px',
+                                alignSelf: isClient ? 'flex-start' : 'flex-end',
+                                cursor: 'help'
+                              }} 
+                              title={`Falha ao enviar via WhatsApp API: ${msg.sendError}`}
+                            >
+                              ⚠️ Não enviado ao lead ({msg.sendError})
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1258,17 +1505,32 @@ export default function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Editing mode banner */}
+            {editingMessage && (
+              <div className="editing-banner-row">
+                <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                  <span className="editing-title">Editando mensagem</span>
+                  <span className="editing-prev-text">{editingMessage.content}</span>
+                </div>
+                <button onClick={() => { setEditingMessage(null); setEditInputText(''); }} className="btn-close-banner">✕</button>
+              </div>
+            )}
+
+            {/* Reply mode preview banner */}
+            {replyingTo && (
+              <div className="reply-preview-banner">
+                <div className="reply-preview-bar" />
+                <div className="reply-preview-body">
+                  <span className="reply-preview-sender">{replyingTo.direction === 'INCOMING' ? 'Cliente' : 'Você'}</span>
+                  <span className="reply-preview-text">{replyingTo.content || '[Mídia]'}</span>
+                </div>
+                <button onClick={() => setReplyingTo(null)} className="btn-close-banner">✕</button>
+              </div>
+            )}
+
             {/* Upload File Preview */}
             {uploadFile && (
-              <div style={{
-                padding: '10px 16px',
-                background: 'rgba(255,255,255,0.02)',
-                borderTop: '1px solid var(--border-glass)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontSize: '0.82rem',
-              }}>
+              <div className="upload-preview-row">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>📎 <strong>Anexo ({uploadFile.type === 'image' ? 'Imagem' : uploadFile.type === 'video' ? 'Vídeo' : uploadFile.type === 'audio' ? 'Áudio' : 'Documento'}):</strong> {uploadFile.name}</span>
                 </div>
@@ -1282,101 +1544,365 @@ export default function ChatPage() {
               </div>
             )}
 
+            {/* iOS Action Sheet / Attachment Menu Popup */}
+            {showAttachMenu && (
+              <div className="ios-action-sheet-overlay" onClick={() => setShowAttachMenu(false)}>
+                <div className="ios-action-sheet" onClick={(e) => e.stopPropagation()}>
+                  <div className="ios-action-sheet-group">
+                    <button onClick={() => fileInputRef.current?.click()} className="ios-action-item">
+                      📷 Câmera (Fotos e Vídeos)
+                    </button>
+                    <button onClick={() => fileInputRef.current?.click()} className="ios-action-item">
+                      🖼️ Galeria de Fotos e Vídeos
+                    </button>
+                    <button onClick={() => fileInputRef.current?.click()} className="ios-action-item">
+                      📄 Documento
+                    </button>
+                    <button onClick={() => { 
+                      setInputText('/obrigado'); 
+                      setShowAttachMenu(false); 
+                    }} className="ios-action-item">
+                      🏷️ Resposta Rápida (/obrigado)
+                    </button>
+                  </div>
+                  <div className="ios-action-sheet-cancel">
+                    <button onClick={() => setShowAttachMenu(false)} className="ios-action-item cancel">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Input Bar */}
-            <form onSubmit={handleSendMessage} className="chat-input-form" style={{ alignItems: 'center' }}>
-              {/* Attachment Picker */}
-              <label htmlFor="file-upload" className="btn btn-secondary" style={{ padding: '10px 14px', cursor: 'pointer', margin: 0 }} title="Anexar Imagem, Vídeo ou Documento">
-                📎
-              </label>
-              <input 
-                type="file" 
-                id="file-upload" 
-                ref={fileInputRef}
-                style={{ display: 'none' }} 
-                onChange={handleFileChange}
-                disabled={uploadProgress || loading || isRecording}
-              />
-
-              {/* Text Input */}
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder={
-                  isRecording 
-                    ? "Gravando áudio..." 
-                    : uploadFile 
-                      ? "Digite uma legenda para o arquivo..." 
-                      : selectedContact.status === 'AUTO' 
-                        ? "Envie uma mensagem (desativará o bot automático)..." 
-                        : "Responda como agente humano..."
-                }
-                style={{ flexGrow: 1 }}
-                className="form-input"
-                disabled={loading || isRecording}
-              />
-
-              {/* Voice Changer Toggle */}
-              {!isRecording && (
+            {editingMessage ? (
+              <form onSubmit={handleEditMessageSubmit} className="chat-input-form ios-input-form">
+                <input 
+                  type="text"
+                  value={editInputText}
+                  onChange={(e) => setEditInputText(e.target.value)}
+                  className="form-input ios-input-field"
+                  style={{ flexGrow: 1 }}
+                  required
+                />
+                <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }}>Salvar</button>
+                <button type="button" onClick={() => { setEditingMessage(null); setEditInputText(''); }} className="btn btn-secondary" style={{ padding: '8px 16px' }}>Cancelar</button>
+              </form>
+            ) : (
+              <form onSubmit={handleSendMessage} className="chat-input-form ios-input-form">
+                {/* Plus (+) Button for iOS Action Sheet */}
                 <button 
                   type="button" 
-                  onClick={() => setUseVoiceChanger(!useVoiceChanger)}
-                  className={`btn ${useVoiceChanger ? 'btn-primary' : 'btn-secondary'}`} 
-                  style={{ padding: '10px 12px', margin: 0, fontSize: '0.9rem', borderRadius: 'var(--radius-md)' }}
-                  title={useVoiceChanger ? "Voice Changer ElevenLabs: ATIVO (Muda seu tom de voz ao gravar)" : "Voice Changer ElevenLabs: INATIVO (Envia áudio original)"}
-                  disabled={loading || uploadProgress}
+                  onClick={() => setShowAttachMenu(true)} 
+                  className="ios-plus-btn"
+                  title="Anexar arquivos"
                 >
-                  {useVoiceChanger ? '🎭' : '🗣️'}
+                  ＋
                 </button>
-              )}
 
-              {/* Microphone recorder */}
-              {!isRecording ? (
-                <button 
-                  type="button" 
-                  onClick={startRecording}
-                  className="btn btn-secondary" 
-                  style={{ padding: '10px 14px' }}
-                  title="Gravar Mensagem de Voz"
-                  disabled={loading || uploadProgress}
-                >
-                  🎙️
-                </button>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 12px', borderRadius: '8px', color: '#f87171', flexShrink: 0 }}>
-                  <span className="led-indicator active" style={{ background: '#f87171', boxShadow: '0 0 8px #f87171', margin: 0 }} />
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{formatTime(recordingSeconds)}</span>
+                <input 
+                  type="file" 
+                  id="file-upload" 
+                  ref={fileInputRef}
+                  style={{ display: 'none' }} 
+                  onChange={handleFileChange}
+                  disabled={uploadProgress || loading || isRecording}
+                />
+
+                {/* Text Input Container with internal Camera Icon */}
+                <div className="ios-input-field-wrapper">
+                  <input
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder={
+                      isRecording 
+                        ? "Gravando áudio..." 
+                        : uploadFile 
+                          ? "Legenda para o arquivo..." 
+                          : selectedContact.status === 'AUTO' 
+                            ? "Responder desativará o bot..." 
+                            : "Mensagem..."
+                    }
+                    className="form-input ios-input-field"
+                    disabled={loading || isRecording}
+                  />
                   <button 
                     type="button" 
-                    onClick={() => stopRecording(true)} 
-                    className="btn btn-primary" 
-                    style={{ padding: '4px 10px', fontSize: '0.75rem', background: '#ef4444', color: 'white', border: 'none' }}
+                    onClick={() => fileInputRef.current?.click()} 
+                    className="ios-inner-camera-btn"
+                    title="Enviar foto ou vídeo"
                   >
-                    Enviar
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => stopRecording(false)} 
-                    className="btn btn-secondary" 
-                    style={{ padding: '4px 10px', fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.1)' }}
-                  >
-                    Cancelar
+                    📷
                   </button>
                 </div>
-              )}
 
-              {/* Send Button */}
-              {!isRecording && (
+                {/* Voice Changer Toggle */}
+                {!isRecording && (
+                  <button 
+                    type="button" 
+                    onClick={() => setUseVoiceChanger(!useVoiceChanger)}
+                    className={`btn-changer-icon ${useVoiceChanger ? 'active' : ''}`}
+                    title={useVoiceChanger ? "Modulador de Voz: Ativo" : "Modulador de Voz: Inativo"}
+                  >
+                    {useVoiceChanger ? '🎭' : '🗣️'}
+                  </button>
+                )}
+
+                {/* Microphone recorder */}
+                {!isRecording ? (
+                  <button 
+                    type="button" 
+                    onClick={startRecording}
+                    className="ios-mic-btn" 
+                    title="Gravar Mensagem de Voz"
+                    disabled={loading || uploadProgress}
+                  >
+                    🎙️
+                  </button>
+                ) : (
+                  <div className="ios-recording-row">
+                    <span className="led-indicator active" />
+                    <span className="ios-rec-seconds">{formatTime(recordingSeconds)}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => stopRecording(true)} 
+                      className="btn btn-primary btn-rec-send"
+                    >
+                      Enviar
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => stopRecording(false)} 
+                      className="btn btn-secondary btn-rec-cancel"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+
+                {/* Send Button */}
+                {!isRecording && (
+                  <button 
+                    type="submit" 
+                    className="ios-send-button"
+                    disabled={loading || uploadProgress || (!inputText.trim() && !uploadFile)}
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="send-arrow-svg">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                  </button>
+                )}
+              </form>
+            )}
+
+            {/* Bottom Multi-Select Actions Bar */}
+            {isSelectMode && (
+              <div className="ios-select-mode-actions-bar">
                 <button 
-                  type="submit" 
-                  className="btn btn-primary" 
-                  disabled={loading || uploadProgress || (!inputText.trim() && !uploadFile)}
-                  style={{ padding: '10px 24px' }}
+                  onClick={handleDeleteSelected} 
+                  disabled={selectedMessageIds.length === 0} 
+                  className="ios-select-btn delete"
                 >
-                  {loading ? '...' : 'Enviar'}
+                  🗑️ Apagar ({selectedMessageIds.length})
                 </button>
-              )}
-            </form>
+                <button 
+                  onClick={() => {
+                    if (selectedMessageIds.length === 0) return;
+                    setMessageToForward(null);
+                    setShowForwardModal(true);
+                  }} 
+                  disabled={selectedMessageIds.length === 0} 
+                  className="ios-select-btn forward"
+                >
+                  ➡️ Encaminhar ({selectedMessageIds.length})
+                </button>
+                <button 
+                  onClick={() => {
+                    setSelectedMessageIds([]);
+                    setIsSelectMode(false);
+                  }} 
+                  className="ios-select-btn cancel"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+
+            {/* Floating Message Action Menu Overlay */}
+            {activeMenuMessage && (
+              <div 
+                className="ios-floating-menu-overlay"
+                style={{
+                  position: 'fixed',
+                  left: 0,
+                  top: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  zIndex: 9999,
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  backdropFilter: 'blur(10px)'
+                }}
+                onClick={() => setActiveMenuMessage(null)}
+              >
+                <div 
+                  className="ios-floating-menu-wrapper"
+                  style={{
+                    position: 'absolute',
+                    left: `${menuPosition.x}px`,
+                    top: `${menuPosition.y}px`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    width: '220px',
+                    animation: 'scaleIn 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Reactions Box */}
+                  <div className="ios-menu-reactions-box">
+                    {['❤️', '👍', '😂', '😮', '😢', '🙏'].map(emoji => (
+                      <button 
+                        key={emoji} 
+                        onClick={() => {
+                          handleReactToMessage(activeMenuMessage.id, emoji);
+                          setActiveMenuMessage(null);
+                        }} 
+                        className="ios-reaction-emoji-btn"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                    <button 
+                      onClick={() => {
+                        const emo = prompt('Digite o emoji desejado:');
+                        if (emo) handleReactToMessage(activeMenuMessage.id, emo);
+                        setActiveMenuMessage(null);
+                      }} 
+                      className="ios-reaction-emoji-btn"
+                    >
+                      ＋
+                    </button>
+                  </div>
+
+                  {/* Context options */}
+                  <div className="ios-menu-options-list">
+                    <button onClick={() => {
+                      setReplyingTo(activeMenuMessage);
+                      setActiveMenuMessage(null);
+                    }} className="ios-menu-option-item">
+                      Responder <span>↩️</span>
+                    </button>
+                    
+                    <button onClick={() => {
+                      navigator.clipboard.writeText(activeMenuMessage.content || '');
+                      alert('Copiado para a área de transferência!');
+                      setActiveMenuMessage(null);
+                    }} className="ios-menu-option-item">
+                      Copiar <span>📄</span>
+                    </button>
+
+                    <button onClick={() => {
+                      setMessageToForward(activeMenuMessage);
+                      setShowForwardModal(true);
+                      setActiveMenuMessage(null);
+                    }} className="ios-menu-option-item">
+                      Encaminhar <span>➡️</span>
+                    </button>
+
+                    {activeMenuMessage.direction === 'OUTGOING' && activeMenuMessage.senderType === 'HUMAN' && !activeMenuMessage.isDeleted && (
+                      <button onClick={() => {
+                        setEditingMessage(activeMenuMessage);
+                        setEditInputText(activeMenuMessage.content || '');
+                        setActiveMenuMessage(null);
+                      }} className="ios-menu-option-item">
+                        Editar <span>✏️</span>
+                      </button>
+                    )}
+
+                    <button onClick={() => {
+                      handleDeleteMessage(activeMenuMessage.id, 'me');
+                      setActiveMenuMessage(null);
+                    }} className="ios-menu-option-item text-danger">
+                      Apagar para Mim <span>🗑️</span>
+                    </button>
+
+                    {activeMenuMessage.direction === 'OUTGOING' && !activeMenuMessage.isDeleted && (
+                      <button onClick={() => {
+                        handleDeleteMessage(activeMenuMessage.id, 'everyone');
+                        setActiveMenuMessage(null);
+                      }} className="ios-menu-option-item text-danger">
+                        Apagar para Todos <span>🚫</span>
+                      </button>
+                    )}
+
+                    <button onClick={() => {
+                      setIsSelectMode(true);
+                      setSelectedMessageIds([activeMenuMessage.id]);
+                      setActiveMenuMessage(null);
+                    }} className="ios-menu-option-item">
+                      Selecionar <span>✔️</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Forward message modal */}
+            {showForwardModal && (
+              <div className="forward-modal-overlay">
+                <div className="forward-modal-container">
+                  <div className="forward-modal-header">
+                    <h3>Encaminhar mensagem</h3>
+                    <button onClick={() => {
+                      setShowForwardModal(false);
+                      setMessageToForward(null);
+                    }} className="btn-close-modal">✕</button>
+                  </div>
+                  
+                  <div className="forward-modal-search">
+                    <input 
+                      type="text" 
+                      placeholder="Buscar contatos..." 
+                      className="form-input"
+                      value={forwardSearchQuery}
+                      onChange={(e) => setForwardSearchQuery(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="forward-modal-contacts-list">
+                    {contacts
+                      .filter(c => c.name?.toLowerCase().includes(forwardSearchQuery.toLowerCase()))
+                      .map(contact => (
+                        <div key={contact.id} className="forward-modal-contact-row">
+                          <div className="forward-contact-left">
+                            <div className="contact-avatar small">
+                              {getInitials(contact.name)}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span className="contact-name">{contact.name}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{contact.id}</span>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              if (messageToForward) {
+                                handleForwardSubmit(contact.id);
+                              } else {
+                                handleForwardSelectedSubmit(contact.id);
+                              }
+                            }} 
+                            className="btn btn-primary btn-forward-send"
+                          >
+                            Enviar
+                          </button>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', color: 'var(--text-muted)' }}>
@@ -1528,6 +2054,14 @@ export default function ChatPage() {
                     style={{ justifyContent: 'center', marginTop: '8px' }}
                   >
                     ✏️ Editar Dados do Lead
+                  </button>
+                  
+                  <button 
+                    onClick={() => setShowSimulator(false)}
+                    className="btn btn-primary" 
+                    style={{ justifyContent: 'center', marginTop: '8px', background: '#3b82f6', color: 'white', border: 'none' }}
+                  >
+                    ✓ Fechar Dados
                   </button>
                 </div>
               </>

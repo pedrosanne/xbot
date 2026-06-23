@@ -113,7 +113,9 @@ export async function enqueueMessage(contactId, messageData) {
           content: messageData.content || '',
           mediaUrl: messageData.mediaUrl || '',
           status: 'received',
-          timestamp: new Date(messageData.timestamp)
+          timestamp: new Date(messageData.timestamp),
+          replyToId: messageData.replyToId || '',
+          replyToContent: messageData.replyToContent || ''
         }
       });
 

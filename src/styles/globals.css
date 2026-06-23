@@ -2314,4 +2314,838 @@ input:checked + .slider:before {
   background: rgba(0, 0, 0, 0.08);
 }
 
+/* ==========================================
+   WHATSAPP IOS PREMIUM STYLING SYSTEM
+   ========================================== */
+
+/* iOS-Style Chat Header overrides */
+.ios-chat-header {
+  height: 60px !important;
+  background: var(--bg-glass-active) !important;
+  backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid var(--border-glass) !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 0 12px !important;
+  z-index: 100 !important;
+}
+
+[data-theme='light'] .ios-chat-header {
+  background: rgba(240, 242, 245, 0.95) !important;
+  border-bottom-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.ios-back-btn {
+  background: none !important;
+  border: none !important;
+  color: #3b82f6 !important; /* iOS blue link color */
+  font-size: 1rem !important;
+  font-weight: 500 !important;
+  display: flex !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  padding: 4px 8px !important;
+  gap: 2px !important;
+  margin-right: 8px !important;
+}
+
+[data-theme='light'] .ios-back-btn {
+  color: #007aff !important;
+}
+
+.back-arrow-svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+.back-badge-count {
+  font-size: 0.92rem !important;
+}
+
+.ios-contact-header-details {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-grow: 1 !important;
+}
+
+.ios-header-avatar {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+}
+
+.clickable-sub {
+  font-size: 0.72rem !important;
+  color: #3b82f6 !important;
+  font-weight: 500 !important;
+  margin-top: 1px !important;
+}
+
+[data-theme='light'] .clickable-sub {
+  color: #007aff !important;
+}
+
+.ios-header-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.ios-header-icon-btn {
+  background: none !important;
+  border: none !important;
+  color: #3b82f6 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 6px !important;
+  border-radius: 50% !important;
+  transition: background 0.2s !important;
+}
+
+[data-theme='light'] .ios-header-icon-btn {
+  color: #007aff !important;
+}
+
+.ios-header-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.phone-icon-svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.btn-pill {
+  border: 1px solid var(--border-glass) !important;
+  padding: 4px 12px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  border-radius: 20px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  background: rgba(255,255,255,0.03) !important;
+  color: var(--text-primary) !important;
+}
+
+.btn-pill.active-bot {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  color: #60a5fa !important;
+}
+
+.btn-pill.manual-bot {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  color: #fbbf24 !important;
+}
+
+/* WhatsApp Wallpaper adaptation */
+.whatsapp-wallpaper {
+  background-color: #0b141a !important; /* Dark theme default */
+  background-image: 
+    radial-gradient(rgba(255, 255, 255, 0.02) 1.5px, transparent 1.5px),
+    radial-gradient(rgba(255, 255, 255, 0.015) 1.5px, transparent 1.5px) !important;
+  background-size: 32px 32px !important;
+  background-position: 0 0, 16px 16px !important;
+}
+
+[data-theme='light'] .whatsapp-wallpaper {
+  background-color: #efeae2 !important; /* Light theme classic WhatsApp wallpaper */
+  background-image: 
+    radial-gradient(rgba(0, 0, 0, 0.03) 1.5px, transparent 1.5px),
+    radial-gradient(rgba(0, 0, 0, 0.02) 1.5px, transparent 1.5px) !important;
+}
+
+/* Encryption / Safety Bubble */
+.safety-bubble-container {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+  margin: 12px 0 6px 0 !important;
+}
+
+.safety-bubble {
+  max-width: 420px !important;
+  background: #182229 !important;
+  border: 1px solid rgba(255, 255, 255, 0.02) !important;
+  border-radius: 10px !important;
+  color: #8696a0 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.4 !important;
+  padding: 8px 14px !important;
+  text-align: center !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  font-weight: 400 !important;
+}
+
+[data-theme='light'] .safety-bubble {
+  background: #ffeecd !important;
+  border-color: rgba(0, 0, 0, 0.02) !important;
+  color: #54656f !important;
+}
+
+/* Reply Inside Message Bubble */
+.bubble-reply-header {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-radius: 6px !important;
+  margin-bottom: 6px !important;
+  display: flex !important;
+  overflow: hidden !important;
+}
+
+[data-theme='light'] .bubble-reply-header {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+.reply-header-bar {
+  width: 4px !important;
+  background: #3b82f6 !important;
+  flex-shrink: 0 !important;
+}
+
+.reply-header-body {
+  padding: 6px 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+}
+
+.reply-header-sender {
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  color: #3b82f6 !important;
+}
+
+.reply-header-text {
+  font-size: 0.78rem !important;
+  color: var(--text-secondary) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.msg-deleted-text {
+  font-style: italic !important;
+  color: var(--text-muted) !important;
+  font-size: 0.88rem !important;
+}
+
+.msg-edited-badge {
+  font-size: 0.68rem !important;
+  color: var(--text-muted) !important;
+  margin-left: 5px !important;
+}
+
+/* Message Reactions Badge */
+.bubble-reactions-badge {
+  position: absolute !important;
+  bottom: -10px !important;
+  right: 12px !important;
+  background: #1f2c34 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  padding: 2px 6px !important;
+  display: flex !important;
+  gap: 2px !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+  z-index: 5 !important;
+}
+
+[data-theme='light'] .bubble-reactions-badge {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.06) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}
+
+.single-reaction-emoji {
+  font-size: 0.75rem !important;
+}
+
+/* Editing/Replying Banner Over Input */
+.editing-banner-row, .reply-preview-banner {
+  background: rgba(18, 25, 30, 0.98) !important;
+  border-top: 1px solid var(--border-glass) !important;
+  padding: 10px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  animation: slideUp 0.2s ease !important;
+}
+
+[data-theme='light'] .editing-banner-row, 
+[data-theme='light'] .reply-preview-banner {
+  background: #ffffff !important;
+}
+
+.editing-title, .reply-preview-sender {
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  color: #3b82f6 !important;
+}
+
+.editing-prev-text, .reply-preview-text {
+  font-size: 0.82rem !important;
+  color: var(--text-secondary) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.reply-preview-bar {
+  width: 4px !important;
+  background: #3b82f6 !important;
+  align-self: stretch !important;
+  border-radius: 2px !important;
+}
+
+.reply-preview-body {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-grow: 1 !important;
+  min-width: 0 !important;
+  gap: 2px !important;
+}
+
+.btn-close-banner {
+  background: none !important;
+  border: none !important;
+  color: var(--text-muted) !important;
+  cursor: pointer !important;
+  font-size: 1.1rem !important;
+  padding: 4px !important;
+}
+
+.upload-preview-row {
+  background: rgba(18, 25, 30, 0.9) !important;
+  border-top: 1px solid var(--border-glass) !important;
+  padding: 8px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 0.8rem !important;
+}
+
+/* iOS Attachment Sheet overlay & slide-up animation */
+.ios-action-sheet-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0,0,0,0.5) !important;
+  backdrop-filter: blur(6px) !important;
+  z-index: 10000 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+}
+
+.ios-action-sheet {
+  padding: 8px 8px 24px 8px !important;
+  background: transparent !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  margin: 0 auto !important;
+  animation: slideUp 0.3s cubic-bezier(0.1, 0.7, 0.1, 1) !important;
+}
+
+.ios-action-sheet-group {
+  background: rgba(30, 30, 30, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border-radius: 14px !important;
+  margin-bottom: 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+[data-theme='light'] .ios-action-sheet-group {
+  background: rgba(255, 255, 255, 0.95) !important;
+}
+
+.ios-action-item {
+  width: 100% !important;
+  background: none !important;
+  border: none !important;
+  color: #0a84ff !important;
+  padding: 16px !important;
+  font-size: 1.05rem !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  transition: background 0.1s !important;
+  font-weight: 500 !important;
+}
+
+[data-theme='light'] .ios-action-item {
+  color: #007aff !important;
+  border-bottom-color: rgba(0,0,0,0.06) !important;
+}
+
+.ios-action-item:last-child {
+  border-bottom: none !important;
+}
+
+.ios-action-item:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.ios-action-sheet-cancel {
+  background: rgba(30, 30, 30, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+
+[data-theme='light'] .ios-action-sheet-cancel {
+  background: rgba(255, 255, 255, 0.95) !important;
+}
+
+.ios-action-item.cancel {
+  font-weight: 600 !important;
+  color: #ef4444 !important;
+}
+
+/* Input Bar Redesign */
+.ios-input-form {
+  padding: 8px 12px !important;
+  background: #121b22 !important;
+  border-top: 1px solid var(--border-glass) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  position: relative !important;
+}
+
+[data-theme='light'] .ios-input-form {
+  background: #f0f2f5 !important;
+  border-top-color: rgba(0,0,0,0.08) !important;
+}
+
+.ios-plus-btn {
+  background: none !important;
+  border: none !important;
+  color: #3b82f6 !important;
+  font-size: 1.6rem !important;
+  cursor: pointer !important;
+  padding: 0 4px !important;
+  flex-shrink: 0 !important;
+}
+
+[data-theme='light'] .ios-plus-btn {
+  color: #007aff !important;
+}
+
+.ios-input-field-wrapper {
+  flex-grow: 1 !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.ios-input-field {
+  width: 100% !important;
+  background: #2a3942 !important;
+  border: none !important;
+  border-radius: 18px !important;
+  padding: 9px 40px 9px 14px !important;
+  font-size: 0.92rem !important;
+  color: white !important;
+  transition: all 0.2s !important;
+}
+
+[data-theme='light'] .ios-input-field {
+  background: #ffffff !important;
+  color: #111b21 !important;
+}
+
+.ios-input-field:focus {
+  outline: none !important;
+}
+
+.ios-inner-camera-btn {
+  position: absolute !important;
+  right: 12px !important;
+  background: none !important;
+  border: none !important;
+  color: var(--text-muted) !important;
+  cursor: pointer !important;
+  font-size: 1.1rem !important;
+  padding: 2px !important;
+}
+
+.btn-changer-icon {
+  background: none !important;
+  border: none !important;
+  color: var(--text-muted) !important;
+  font-size: 1.25rem !important;
+  cursor: pointer !important;
+  padding: 4px !important;
+  border-radius: 50% !important;
+  transition: all 0.2s !important;
+  flex-shrink: 0 !important;
+}
+.btn-changer-icon.active {
+  color: #3b82f6 !important;
+}
+
+.ios-mic-btn {
+  background: none !important;
+  border: none !important;
+  color: #3b82f6 !important;
+  font-size: 1.35rem !important;
+  cursor: pointer !important;
+  padding: 4px !important;
+  flex-shrink: 0 !important;
+}
+
+[data-theme='light'] .ios-mic-btn {
+  color: #007aff !important;
+}
+
+.ios-send-button {
+  background: #3b82f6 !important;
+  border: none !important;
+  color: white !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.1s ease !important;
+}
+
+[data-theme='light'] .ios-send-button {
+  background: #007aff !important;
+}
+
+.ios-send-button:active {
+  transform: scale(0.9) !important;
+}
+
+.send-arrow-svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* Voice recording interface inside input bar */
+.ios-recording-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+  padding: 4px 10px !important;
+  border-radius: 18px !important;
+  flex-grow: 1 !important;
+  color: #f87171 !important;
+}
+
+.ios-rec-seconds {
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+}
+
+.btn-rec-send {
+  background: #ef4444 !important;
+  color: white !important;
+  border: none !important;
+  padding: 4px 10px !important;
+  border-radius: 12px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+.btn-rec-cancel {
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  padding: 4px 10px !important;
+  border-radius: 12px !important;
+  font-size: 0.72rem !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+}
+
+/* Floating Actions Context Menu items */
+.ios-floating-menu-wrapper {
+  background: rgba(30, 30, 30, 0.95) !important;
+  backdrop-filter: blur(25px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5) !important;
+  overflow: hidden !important;
+}
+
+[data-theme='light'] .ios-floating-menu-wrapper {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(0,0,0,0.06) !important;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15) !important;
+}
+
+.ios-menu-reactions-box {
+  display: flex !important;
+  justify-content: space-around !important;
+  padding: 10px 6px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  gap: 4px !important;
+}
+
+[data-theme='light'] .ios-menu-reactions-box {
+  border-bottom-color: rgba(0,0,0,0.06) !important;
+}
+
+.ios-reaction-emoji-btn {
+  background: none !important;
+  border: none !important;
+  font-size: 1.35rem !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease !important;
+  padding: 4px !important;
+}
+
+.ios-reaction-emoji-btn:hover {
+  transform: scale(1.25) !important;
+}
+
+.ios-menu-options-list {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.ios-menu-option-item {
+  width: 100% !important;
+  background: none !important;
+  border: none !important;
+  color: var(--text-primary) !important;
+  padding: 12px 16px !important;
+  font-size: 0.92rem !important;
+  font-weight: 500 !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  text-align: left !important;
+}
+
+.ios-menu-option-item:last-child {
+  border-bottom: none !important;
+}
+
+.ios-menu-option-item:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+[data-theme='light'] .ios-menu-option-item:hover {
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+
+.ios-menu-option-item.text-danger {
+  color: #ef4444 !important;
+}
+
+/* Multi-select styling layout */
+.message-row-select-layout {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+.select-checkbox-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.message-select-checkbox {
+  width: 20px !important;
+  height: 20px !important;
+  accent-color: #3b82f6 !important;
+  cursor: pointer !important;
+}
+
+/* Select Mode Actions Bar */
+.ios-select-mode-actions-bar {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 60px !important;
+  background: #121b22 !important;
+  border-top: 1px solid var(--border-glass) !important;
+  display: flex !important;
+  justify-content: space-around !important;
+  align-items: center !important;
+  z-index: 150 !important;
+  padding: 0 16px !important;
+}
+
+[data-theme='light'] .ios-select-mode-actions-bar {
+  background: #f0f2f5 !important;
+  border-top-color: rgba(0,0,0,0.08) !important;
+}
+
+.ios-select-btn {
+  background: none !important;
+  border: none !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  color: #3b82f6 !important;
+  padding: 8px 16px !important;
+}
+
+[data-theme='light'] .ios-select-btn {
+  color: #007aff !important;
+}
+
+.ios-select-btn.delete {
+  color: #ef4444 !important;
+}
+
+.ios-select-btn.cancel {
+  color: var(--text-secondary) !important;
+}
+
+/* Forward Modal Overlay */
+.forward-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(10px) !important;
+  z-index: 20000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+}
+
+.forward-modal-container {
+  background: rgba(30, 30, 30, 0.98) !important;
+  border: 1px solid var(--border-glass) !important;
+  border-radius: 14px !important;
+  width: 100% !important;
+  max-width: 420px !important;
+  max-height: 80vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5) !important;
+  overflow: hidden !important;
+}
+
+[data-theme='light'] .forward-modal-container {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+.forward-modal-header {
+  padding: 16px 20px !important;
+  border-bottom: 1px solid var(--border-glass) !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+[data-theme='light'] .forward-modal-header {
+  border-bottom-color: rgba(0,0,0,0.06) !important;
+}
+
+.btn-close-modal {
+  background: none !important;
+  border: none !important;
+  color: var(--text-muted) !important;
+  cursor: pointer !important;
+  font-size: 1.25rem !important;
+}
+
+.forward-modal-search {
+  padding: 12px 20px !important;
+}
+
+.forward-modal-contacts-list {
+  flex-grow: 1 !important;
+  overflow-y: auto !important;
+  padding: 0 20px 20px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.forward-modal-contact-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 8px 0 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.03) !important;
+}
+
+[data-theme='light'] .forward-modal-contact-row {
+  border-bottom-color: rgba(0,0,0,0.03) !important;
+}
+
+.forward-contact-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+}
+
+.contact-avatar.small {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 0.78rem !important;
+}
+
+.btn-forward-send {
+  padding: 6px 14px !important;
+  font-size: 0.78rem !important;
+}
+
+/* Animations */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Responsive Overrides */
+@media (max-width: 768px) {
+  .ios-chat-header {
+    height: 60px !important;
+  }
+  
+  .back-badge-count {
+    display: inline-block !important; /* Force visible on mobile */
+  }
+
+  .ios-back-btn {
+    display: flex !important;
+  }
+
+  .whatsapp-wallpaper {
+    background-size: 26px 26px !important;
+  }
+  
+  .ios-select-mode-actions-bar {
+    position: fixed !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+  }
+}
+
+
 

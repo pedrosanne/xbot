@@ -92,17 +92,23 @@ model WhatsAppConnection {
 }
 
 model Message {
-  id          String   @id // Message ID retornado pelo WhatsApp
-  contactId   String
-  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  direction   String   // "INCOMING" (cliente para bot) ou "OUTGOING" (bot/humano para cliente)
-  senderType  String   // "BOT", "HUMAN", "CLIENT"
-  type        String   // "text", "image", "audio", "video", "document"
-  content     String   // Texto ou legenda da mídia
-  mediaUrl    String   @default("") // Caminho local do arquivo salvo no Next.js public
-  sendError   String   @default("") // Erro de entrega se falhar
-  status      String   @default("sent")
-  timestamp   DateTime @default(now())
+  id              String   @id // Message ID retornado pelo WhatsApp
+  contactId       String
+  contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  direction       String   // "INCOMING" (cliente para bot) ou "OUTGOING" (bot/humano para cliente)
+  senderType      String   // "BOT", "HUMAN", "CLIENT"
+  type            String   // "text", "image", "audio", "video", "document"
+  content         String   // Texto ou legenda da mídia
+  mediaUrl        String   @default("") // Caminho local do arquivo salvo no Next.js public
+  sendError       String   @default("") // Erro de entrega se falhar
+  status          String   @default("sent")
+  timestamp       DateTime @default(now())
+  replyToId       String   @default("")
+  replyToContent  String   @default("")
+  reactions       String   @default("[]")
+  isEdited        Boolean  @default(false)
+  isDeleted       Boolean  @default(false)
+  deletedFor      String   @default("")
 }
 
 model ProcessedWebhook {

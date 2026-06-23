@@ -383,3 +383,52 @@ export async function markWhatsAppMessageAsRead(messageId, connection = null) {
 
   return result;
 }
+
+export async function sendReaction(to, messageId, emoji, connection = null) {
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'reaction',
+    reaction: {
+      message_id: messageId,
+      emoji: emoji
+    }
+  };
+  return sendWhatsAppMessage(payload, connection);
+}
+
+export async function deleteWhatsAppMessage(messageId, connection = null) {
+  let whatsappToken, whatsappPhoneId;
+  if (connection) {
+    whatsappToken = connection.whatsappToken;
+    whatsappPhoneId = connection.whatsappPhoneId;
+  } else {
+    const settings = await getSystemSettings();
+    whatsappToken = settings.whatsappToken;
+    whatsappPhoneId = settings.whatsappPhoneId;
+  }
+
+  if (!whatsappToken || !whatsappPhoneId) {
+    return null;
+  }
+
+  // If it's a simulated message, we do nothing on Meta
+  if (messageId.includes('simulated') || messageId.includes('manual_')) {
+    return { success: true };
+  }
+
+  const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${messageId}`;
+  try {
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${whatsappToken}`
+      }
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting WhatsApp message:', error);
+    return null;
+  }
+}

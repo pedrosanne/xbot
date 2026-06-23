@@ -131,6 +131,63 @@ export async function POST(request) {
     
     // 3. Process media
     const type = message.type;
+    
+    // Handle incoming reactions
+    if (type === 'reaction') {
+      const reactionData = message.reaction;
+      if (reactionData) {
+        const targetMessageId = reactionData.message_id;
+        const emoji = reactionData.emoji;
+        
+        try {
+          const targetMessage = await prisma.message.findUnique({
+            where: { id: targetMessageId }
+          });
+          
+          if (targetMessage) {
+            let currentReactions = [];
+            try {
+              currentReactions = JSON.parse(targetMessage.reactions || '[]');
+            } catch (e) {
+              currentReactions = [];
+            }
+            
+            // Remove any existing reaction by the client, and add the new one (if emoji is not empty)
+            currentReactions = currentReactions.filter(r => r.senderType !== 'CLIENT');
+            if (emoji) {
+              currentReactions.push({ emoji, senderType: 'CLIENT' });
+            }
+            
+            await prisma.message.update({
+              where: { id: targetMessageId },
+              data: { reactions: JSON.stringify(currentReactions) }
+            });
+            await logToDb('INFO', 'WEBHOOK', `Reação '${emoji}' processada para a mensagem ${targetMessageId}`);
+          }
+        } catch (err) {
+          console.error('Error processing incoming reaction:', err);
+        }
+      }
+      return NextResponse.json({ status: 'success' });
+    }
+
+    let replyToId = '';
+    let replyToContent = '';
+    if (message.context?.id) {
+      replyToId = message.context.id;
+      try {
+        const parentMsg = await prisma.message.findUnique({
+          where: { id: replyToId },
+          select: { content: true }
+        });
+        if (parentMsg) {
+          replyToContent = parentMsg.content;
+        }
+      } catch (err) {
+        console.error('Error fetching parent message for context:', err);
+      }
+    }
+
     let content = '';
     let mediaUrl = '';
     let buttonId = '';
@@ -179,6 +236,8 @@ export async function POST(request) {
       timestamp: parseInt(message.timestamp) * 1000,
       profileName,
       name: profileName || contactId,
+      replyToId,
+      replyToContent,
       ...(buttonId && { buttonId })
     };
 
