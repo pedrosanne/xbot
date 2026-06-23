@@ -129,17 +129,35 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
 
   // Se houver anexo de mídia ativo
   if (mediaUrl && mimeType) {
-    let localFilePath;
+    let fileBuffer = null;
+    
     if (mediaUrl.startsWith('/api/uploads/')) {
       const filename = mediaUrl.replace('/api/uploads/', '');
-      localFilePath = path.join('/tmp', filename);
+      try {
+        const upload = await prisma.upload.findUnique({
+          where: { filename }
+        });
+        if (upload) {
+          fileBuffer = Buffer.from(upload.data);
+        } else {
+          console.warn(`Attachment not found in database: ${filename}`);
+        }
+      } catch (err) {
+        console.error('Error fetching upload media from DB for Gemini:', err);
+      }
     } else {
-      localFilePath = path.join(process.cwd(), 'public', mediaUrl);
+      const localFilePath = path.join(process.cwd(), 'public', mediaUrl);
+      if (fs.existsSync(localFilePath)) {
+        try {
+          fileBuffer = fs.readFileSync(localFilePath);
+        } catch (err) {
+          console.error('Error reading local file for Gemini:', err);
+        }
+      }
     }
 
-    if (fs.existsSync(localFilePath)) {
+    if (fileBuffer) {
       try {
-        const fileBuffer = fs.readFileSync(localFilePath);
         const generativePart = {
           inlineData: {
             data: fileBuffer.toString('base64'),
@@ -147,9 +165,9 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
           }
         };
         promptParts.push(generativePart);
-        console.log(`Sending file part to Gemini: ${mediaUrl} (${mimeType})`);
+        console.log(`Sending file part to Gemini from DB/Local: ${mediaUrl} (${mimeType})`);
       } catch (err) {
-        console.error('Error loading media for Gemini:', err);
+        console.error('Error constructing generative part for Gemini:', err);
       }
     }
   }
