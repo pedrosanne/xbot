@@ -185,6 +185,9 @@ export default function ChatPage() {
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL', 'AUTO', 'MANUAL'
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const lastMessagesLengthRef = useRef(0);
+  const lastContactIdRef = useRef(null);
 
   // Voice Recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -352,10 +355,34 @@ export default function ChatPage() {
     };
   }, [selectedContact?.id, selectedConnectionId]);
 
-  // Scroll to bottom when messages load
+  // Scroll to bottom only when contact changes or a new message arrives and the user is near the bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!selectedContact) return;
+
+    const container = messagesContainerRef.current;
+    const contactChanged = lastContactIdRef.current !== selectedContact.id;
+    const messagesCountChanged = lastMessagesLengthRef.current !== messages.length;
+
+    lastContactIdRef.current = selectedContact.id;
+    lastMessagesLengthRef.current = messages.length;
+
+    if (contactChanged) {
+      // Scroll to bottom immediately on contact change
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    } else if (messagesCountChanged) {
+      if (container) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+        const lastMsg = messages[messages.length - 1];
+        const isOutgoing = lastMsg && lastMsg.direction === 'OUTGOING';
+
+        if (isNearBottom || isOutgoing) {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [messages, selectedContact?.id]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -1336,7 +1363,7 @@ export default function ChatPage() {
             )}
 
             {/* Message Area */}
-            <div className="messages-container whatsapp-wallpaper">
+            <div ref={messagesContainerRef} className="messages-container whatsapp-wallpaper">
               
               {/* Safety encryption info bubble */}
               <div className="safety-bubble-container">

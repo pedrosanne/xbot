@@ -1777,10 +1777,14 @@ input:checked + .slider:before {
 
 .message-wrapper.incoming {
   align-self: flex-start !important;
+  margin-right: auto !important;
+  margin-left: 0 !important;
 }
 
 .message-wrapper.outgoing {
   align-self: flex-end !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
 }
 
 .message-bubble {
