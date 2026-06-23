@@ -242,23 +242,9 @@ export async function sendPixPaymentRequest(to, amountInCents, pixCode, merchant
 }
 
 export async function sendTypingIndicator(to, connection = null) {
-  if (!to) return null;
-  const payload = {
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to,
-    type: 'typing_indicator',
-    typing_indicator: {
-      type: 'text'
-    }
-  };
-  try {
-    return await sendWhatsAppMessage(payload, connection);
-  } catch (err) {
-    console.warn('Failed to send typing indicator (ignoring to prevent crash):', err.message);
-    await logToDb('WARN', 'API', `Erro ignorado ao enviar indicador de digitação (para evitar travamento do fluxo): ${err.message}`);
-    return null;
-  }
+  // Official WhatsApp Cloud API does not support typing_indicator.
+  // We return null immediately to avoid HTTP 400 errors and database log pollution.
+  return null;
 }
 
 

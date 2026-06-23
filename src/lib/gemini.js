@@ -188,6 +188,29 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
 
     return textResponse;
   } catch (error) {
+    // If it is a transient error on gemini-2.5 models, try calling stable gemini-1.5-flash as fallback
+    if (modelName !== 'gemini-1.5-flash' && (error.message.includes('503') || error.message.includes('demand') || error.message.includes('Unavailable'))) {
+      console.warn(`Transient error on model ${modelName}. Retrying with stable gemini-1.5-flash...`);
+      try {
+        const fallbackModel = genAI.getGenerativeModel({
+          model: 'gemini-1.5-flash',
+          generationConfig: {
+            temperature: agent.temperature || 0.7,
+          }
+        });
+        const result = await fallbackModel.generateContent(promptParts);
+        const response = await result.response;
+        let textResponse = response.text().trim();
+        if (textResponse.startsWith('Atendente:')) {
+          textResponse = textResponse.replace(/^Atendente:\s*/, '');
+        }
+        await logToDb('WARN', 'AI', `Recuperado com sucesso usando fallback para gemini-1.5-flash após erro 503 no modelo principal ${modelName}`);
+        return textResponse;
+      } catch (fallbackError) {
+        console.error('Fallback model gemini-1.5-flash also failed:', fallbackError);
+      }
+    }
+
     console.error('Error generating AI response:', error);
     await logToDb('ERROR', 'AI', `Erro ao gerar resposta do Gemini para o agente ${agent.name}: ${error.message}`, {
       error: error.message,
