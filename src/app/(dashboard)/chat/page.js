@@ -1109,10 +1109,13 @@ export default function ChatPage() {
             <button 
               onClick={() => { setShowSimulator(!showSimulator); setRightPanelTab('simulator'); }} 
               className={`btn ${showSimulator && rightPanelTab === 'simulator' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+              style={{ padding: '6px 12px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
               title="Abrir Simulador de Clientes"
             >
-              🧪 Simulador
+              <svg style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+              Simulador
             </button>
           </div>
 
@@ -1124,7 +1127,7 @@ export default function ChatPage() {
               className="form-select"
               style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem', margin: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-glass)' }}
             >
-              <option value="all">📞 Todos os Números</option>
+              <option value="all">Todos os Números</option>
               {connections.map((conn) => (
                 <option key={conn.id} value={conn.id}>
                   {conn.name} ({conn.phoneNumber || conn.whatsappPhoneId})
@@ -1232,7 +1235,10 @@ export default function ChatPage() {
                     </div>
                     {contact.assignedUser && (
                       <div style={{ fontSize: '0.7rem', color: 'var(--color-primary-hover)', display: 'flex', alignItems: 'center', gap: '3px', margin: '2px 0' }}>
-                        <span>👤 {contact.assignedUser.name}</span>
+                        <svg style={{ width: '10px', height: '10px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span>{contact.assignedUser.name}</span>
                       </div>
                     )}
                     <div className="contact-msg-row">
@@ -1240,7 +1246,12 @@ export default function ChatPage() {
                         {contact.typingState === 'TYPING' ? (
                           <span className="status-typing-green">digitando...</span>
                         ) : contact.typingState === 'RECORDING' ? (
-                          <span className="status-typing-green">🎙️ gravando áudio...</span>
+                          <span className="status-typing-green" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <svg style={{ width: '12px', height: '12px', verticalAlign: 'middle' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                            </svg>
+                            gravando áudio...
+                          </span>
                         ) : (
                           contact.lastMessage?.content || '(Sem mensagens)'
                         )}
@@ -1310,8 +1321,23 @@ export default function ChatPage() {
                 <button 
                   onClick={handleToggleStatus}
                   className={`btn-pill ${selectedContact.status === 'AUTO' ? 'active-bot' : 'manual-bot'}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
-                  {selectedContact.status === 'AUTO' ? '🤖 Robô' : '👤 Manual'}
+                  {selectedContact.status === 'AUTO' ? (
+                    <>
+                      <svg style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                      </svg>
+                      Robô
+                    </>
+                  ) : (
+                    <>
+                      <svg style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Manual
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -1320,7 +1346,12 @@ export default function ChatPage() {
             {showCallModal && (
               <div className="call-modal-overlay">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 600 }}>📞 Chamada com IA para {selectedContact.name}</h4>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <svg style={{ width: '16px', height: '16px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    Chamada com IA para {selectedContact.name}
+                  </h4>
                   <button onClick={() => setShowCallModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.1rem' }}>✕</button>
                 </div>
                 
@@ -1342,7 +1373,21 @@ export default function ChatPage() {
                     style={{ padding: '8px 20px', whiteSpace: 'nowrap' }}
                     disabled={callLoading}
                   >
-                    {callLoading ? '⏳ Ligando...' : '📞 Ligar'}
+                    {callLoading ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <svg className="animate-spin" style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3 3L22 4" />
+                        </svg>
+                        Ligando...
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        Ligar
+                      </span>
+                    )}
                   </button>
                 </div>
 
@@ -1953,16 +1998,22 @@ export default function ChatPage() {
               <button 
                 className={`filter-tab ${rightPanelTab === 'profile' ? 'active' : ''}`}
                 onClick={() => setRightPanelTab('profile')}
-                style={{ flex: 1, textAlign: 'center', paddingBottom: '12px' }}
+                style={{ flex: 1, textAlign: 'center', paddingBottom: '12px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                👤 Perfil do Lead
+                <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Perfil do Lead
               </button>
               <button 
                 className={`filter-tab ${rightPanelTab === 'simulator' ? 'active' : ''}`}
                 onClick={() => setRightPanelTab('simulator')}
-                style={{ flex: 1, textAlign: 'center', paddingBottom: '12px' }}
+                style={{ flex: 1, textAlign: 'center', paddingBottom: '12px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                🧪 Simulador
+                <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+                Simulador
               </button>
             </div>
           </div>
@@ -1990,8 +2041,22 @@ export default function ChatPage() {
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'white', margin: 0, textAlign: 'center' }}>
                     {selectedContact.name || 'Sem Nome'}
                   </h3>
-                  <span className={`badge ${selectedContact.status === 'MANUAL' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.75rem' }}>
-                    {selectedContact.status === 'MANUAL' ? '👤 Atendimento Manual' : '🤖 Robô Ativo'}
+                  <span className={`badge ${selectedContact.status === 'MANUAL' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    {selectedContact.status === 'MANUAL' ? (
+                      <>
+                        <svg style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Atendimento Manual
+                      </>
+                    ) : (
+                      <>
+                        <svg style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                        </svg>
+                        Robô Ativo
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -2048,10 +2113,10 @@ export default function ChatPage() {
                         borderRadius: '6px'
                       }}
                     >
-                      <option value="" style={{ background: '#1c1c24', color: 'white' }}>👤 Sem Responsável (Fila Geral)</option>
+                      <option value="" style={{ background: '#1c1c24', color: 'white' }}>Sem Responsável (Fila Geral)</option>
                       {collaborators.map((user) => (
                         <option key={user.id} value={user.id} style={{ background: '#1c1c24', color: 'white' }}>
-                          👤 {user.name} ({user.email})
+                          {user.name} ({user.email})
                         </option>
                       ))}
                     </select>
@@ -2078,17 +2143,23 @@ export default function ChatPage() {
                   <button 
                     onClick={() => setEditProfileMode(true)}
                     className="btn btn-secondary" 
-                    style={{ justifyContent: 'center', marginTop: '8px' }}
+                    style={{ justifyContent: 'center', marginTop: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
-                    ✏️ Editar Dados do Lead
+                    <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    Editar Dados do Lead
                   </button>
                   
                   <button 
                     onClick={() => setShowSimulator(false)}
                     className="btn btn-primary" 
-                    style={{ justifyContent: 'center', marginTop: '8px', background: '#3b82f6', color: 'white', border: 'none' }}
+                    style={{ justifyContent: 'center', marginTop: '8px', background: '#3b82f6', color: 'white', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
-                    ✓ Fechar Dados
+                    <svg style={{ width: '14px', height: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Fechar Dados
                   </button>
                 </div>
               </>
@@ -2292,25 +2363,36 @@ export default function ChatPage() {
                   type="button" 
                   onClick={() => handleSimulateTyping('TYPING', 3000)}
                   className="btn btn-secondary"
-                  style={{ flex: 1, padding: '8px', fontSize: '0.75rem', justifyContent: 'center', margin: 0 }}
+                  style={{ flex: 1, padding: '8px', fontSize: '0.75rem', justifyContent: 'center', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                   title="Simula cliente digitando por 3 segundos"
                 >
-                  💬 Digitando (3s)
+                  <svg style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Digitando (3s)
                 </button>
                 <button 
                   type="button" 
                   onClick={() => handleSimulateTyping('RECORDING', 5000)}
                   className="btn btn-secondary"
-                  style={{ flex: 1, padding: '8px', fontSize: '0.75rem', justifyContent: 'center', margin: 0 }}
+                  style={{ flex: 1, padding: '8px', fontSize: '0.75rem', justifyContent: 'center', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                   title="Simula cliente gravando áudio por 5 segundos"
                 >
-                  🎙️ Gravando (5s)
+                  <svg style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                  Gravando (5s)
                 </button>
               </div>
             </div>
             
-            <div style={{ margin: 'auto 16px 16px', padding: '12px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-              💡 <strong>Dica de Teste:</strong> Clique em "Simular" para receber a mensagem. A IA responderá na fila em 3 segundos.
+            <div style={{ margin: 'auto 16px 16px', padding: '12px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <svg style={{ width: '16px', height: '16px', flexShrink: 0, marginTop: '2px', color: '#fbbf24' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364.364l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              <div>
+                <strong>Dica de Teste:</strong> Clique em "Simular" para receber a mensagem. A IA responderá na fila em 3 segundos.
+              </div>
             </div>
           </div>
         )}
