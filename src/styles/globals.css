@@ -1728,6 +1728,18 @@ input:checked + .slider:before {
     height: 100dvh !important;
   }
 
+  /* Prevent iOS auto-zoom on input/textarea/select focus by forcing font size to 16px */
+  input, 
+  textarea, 
+  select,
+  .form-input, 
+  .form-textarea, 
+  .form-select, 
+  .contacts-search-input, 
+  .ios-input-field {
+    font-size: 16px !important;
+  }
+
   .page-header {
     padding: 12px 16px !important;
     flex-direction: column !important;
