@@ -331,12 +331,12 @@ async function processSingleMessage(contact, messageData) {
 
               // Repete o menu de opções
               await logToDb('INFO', 'FLOW', `Reenviando opções da etapa '${currentStep.id}' após resposta da IA.`);
-              await sendStepResponse(contactId, currentStep, steps, messageData.id, freshContact.connection);
+              await sendStepResponse(contactId, currentStep, steps, messageData.id, freshContact.connection, true);
               return;
             } else {
               await logToDb('WARN', 'FLOW', `Entrada inválida. Nenhuma opção selecionada e nenhum Agente IA designado para este fluxo. Repetindo etapa.`);
               await sendText(contactId, "Desculpe, não entendi. Por favor, escolha uma das opções abaixo:", messageData.id, freshContact.connection);
-              await sendStepResponse(contactId, currentStep, steps, messageData.id, freshContact.connection);
+              await sendStepResponse(contactId, currentStep, steps, messageData.id, freshContact.connection, true);
               return;
             }
           }
@@ -687,7 +687,7 @@ async function generateGatewayPixCode({ gatewayId, amount, contact, stepId, prod
   }
 }
 
-export async function sendStepResponse(contactId, step, steps, incomingMessageId = null, connection = null) {
+export async function sendStepResponse(contactId, step, steps, incomingMessageId = null, connection = null, skipPix = false) {
   let contact = null;
   try {
     contact = await prisma.contact.findUnique({
@@ -864,8 +864,8 @@ export async function sendStepResponse(contactId, step, steps, incomingMessageId
   }
 
   // Send Pix billing request if enabled
-  const isGatewayPix = step.pixEnabled && step.pixGatewayEnabled && step.pixGatewayId && step.pixAmount > 0;
-  const isStaticPix = step.pixEnabled && !step.pixGatewayEnabled && step.pixKey && step.pixAmount > 0;
+  const isGatewayPix = !skipPix && step.pixEnabled && step.pixGatewayEnabled && step.pixGatewayId && step.pixAmount > 0;
+  const isStaticPix = !skipPix && step.pixEnabled && !step.pixGatewayEnabled && step.pixKey && step.pixAmount > 0;
 
   if (isGatewayPix || isStaticPix) {
     try {
