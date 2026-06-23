@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { getSystemSettings } from './settings';
 import { prisma } from './prisma';
+import { logToDb } from './log';
 
 export async function textToSpeech(text, customAgentId = null) {
   const settings = await getSystemSettings();
@@ -124,6 +125,7 @@ export async function voiceChanger(audioBuffer, mimeType = 'audio/mpeg', customA
     if (!response.ok) {
       const errText = await response.text();
       console.error('ElevenLabs Speech-to-Speech API Error:', errText);
+      await logToDb('ERROR', 'API', `Erro na API ElevenLabs Speech-to-Speech: ${errText}`);
       return null;
     }
 
