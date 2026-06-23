@@ -302,6 +302,29 @@ async function processSingleMessage(contact, messageData) {
               } catch (e) {}
               const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, freshContact.designatedAgentId);
               
+              const flowTriggerRegex = /\[DISPARAR_FLUXO:\s*([^\]]+)\]/i;
+              const flowTriggerMatch = aiTextResponse.match(flowTriggerRegex);
+              
+              if (flowTriggerMatch) {
+                const flowId = flowTriggerMatch[1].trim();
+                let cleanedResponse = aiTextResponse.replace(flowTriggerRegex, '').trim();
+                
+                await logToDb('INFO', 'FLOW', `IA Híbrida solicitou disparo/troca automática de fluxo para ID: ${flowId} para ${contactId}`);
+                
+                const targetFlow = await prisma.flow.findUnique({
+                  where: { id: flowId }
+                });
+                
+                if (targetFlow) {
+                  if (cleanedResponse) {
+                    await sendText(contactId, cleanedResponse, messageData.id, freshContact.connection);
+                    await saveOutgoingMessage(`bot_${Date.now()}_ai_guide`, contactId, 'text', '', cleanedResponse);
+                  }
+                  await startFlowForContact(freshContact, targetFlow, messageData.id);
+                  return;
+                }
+              }
+
               // Envia resposta da IA
               await sendText(contactId, aiTextResponse, messageData.id, freshContact.connection);
               await saveOutgoingMessage(`bot_${Date.now()}_ai_hybrid`, contactId, 'text', '', aiTextResponse);
@@ -354,6 +377,30 @@ async function processSingleMessage(contact, messageData) {
           });
         } catch (e) {}
         const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, agent.id);
+        
+        const flowTriggerRegex = /\[DISPARAR_FLUXO:\s*([^\]]+)\]/i;
+        const flowTriggerMatch = aiTextResponse.match(flowTriggerRegex);
+        
+        if (flowTriggerMatch) {
+          const flowId = flowTriggerMatch[1].trim();
+          let cleanedResponse = aiTextResponse.replace(flowTriggerRegex, '').trim();
+          
+          await logToDb('INFO', 'FLOW', `IA em modo puro solicitou disparo de fluxo para ID: ${flowId} para ${contactId}`);
+          
+          const targetFlow = await prisma.flow.findUnique({
+            where: { id: flowId }
+          });
+          
+          if (targetFlow) {
+            if (cleanedResponse) {
+              await sendText(contactId, cleanedResponse, messageData.id, freshContact.connection);
+              await saveOutgoingMessage(`bot_${Date.now()}_ai_guide`, contactId, 'text', '', cleanedResponse);
+            }
+            await startFlowForContact(freshContact, targetFlow, messageData.id);
+            return;
+          }
+        }
+
         await sendBotResponse(contactId, aiTextResponse, messageData.id, freshContact.connection);
         return;
       }
@@ -364,6 +411,62 @@ async function processSingleMessage(contact, messageData) {
     if (welcomeFlow) {
       await logToDb('INFO', 'FLOW', `Disparando fluxo de boas-vindas padrão (Welcome Flow) para o contato ${contactId}`);
       await startFlowForContact(freshContact, welcomeFlow, messageData.id);
+      return;
+    }
+
+    // 6.5. Tenta acionar a IA de atendimento inicial/roteador
+    let agent = null;
+    // Prioriza o agente ativo vinculado a esta conexão
+    agent = await prisma.agent.findFirst({
+      where: { isActive: true, connectionId: freshContact.connectionId || null }
+    });
+    // Se não houver, busca o agente ativo global
+    if (!agent) {
+      agent = await prisma.agent.findFirst({
+        where: { isActive: true, connectionId: null }
+      });
+    }
+
+    if (agent) {
+      await logToDb('INFO', 'AI', `Mensagem inicial sem palavra-chave. Acionando IA roteadora '${agent.name}' para guiar o contato ${contactId}`);
+      if (messageData.id) {
+        await markWhatsAppMessageAsRead(messageData.id, freshContact.connection);
+      }
+      await sendTypingIndicator(contactId, freshContact.connection);
+      try {
+        await prisma.contact.update({
+          where: { id: contactId },
+          data: { typingState: 'TYPING' }
+        });
+      } catch (e) {}
+      
+      const aiTextResponse = await generateAIResponse(contactId, text, mediaUrl, mimeType, agent.id);
+      
+      const flowTriggerRegex = /\[DISPARAR_FLUXO:\s*([^\]]+)\]/i;
+      const flowTriggerMatch = aiTextResponse.match(flowTriggerRegex);
+      
+      if (flowTriggerMatch) {
+        const flowId = flowTriggerMatch[1].trim();
+        let cleanedResponse = aiTextResponse.replace(flowTriggerRegex, '').trim();
+        
+        await logToDb('INFO', 'FLOW', `IA Roteadora solicitou disparo automático do fluxo ID: ${flowId} para ${contactId}`);
+        
+        const targetFlow = await prisma.flow.findUnique({
+          where: { id: flowId }
+        });
+        
+        if (targetFlow) {
+          if (cleanedResponse) {
+            await sendText(contactId, cleanedResponse, messageData.id, freshContact.connection);
+            await saveOutgoingMessage(`bot_${Date.now()}_ai_guide`, contactId, 'text', '', cleanedResponse);
+          }
+          await startFlowForContact(freshContact, targetFlow, messageData.id);
+          return;
+        }
+      }
+      
+      // Se não disparou fluxo, envia a resposta normal da IA
+      await sendBotResponse(contactId, aiTextResponse, messageData.id, freshContact.connection);
       return;
     }
 

@@ -61,11 +61,45 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
     take: 15
   });
 
+  // Fetch active flows for context routing
+  let activeFlows = [];
+  try {
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId }
+    });
+    const connectionId = contact?.connectionId || null;
+    activeFlows = await prisma.flow.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { connectionId: null },
+          { connectionId: connectionId }
+        ]
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching active flows for Gemini context:', err);
+  }
+
   // 4. Construct prompt and parts
   const promptParts = [];
 
   // System Prompt / Persona Instruction
   let systemPrompt = `INSTRUÇÕES DE PERSONA/SISTEMA:\n${agent.systemPrompt}\n\n`;
+
+  if (activeFlows.length > 0) {
+    systemPrompt += `FLUXOS DE ATENDIMENTO/CONTEÚDOS DISPONÍVEIS NO SISTEMA:\n`;
+    activeFlows.forEach(f => {
+      systemPrompt += `- Nome do Fluxo: "${f.name}" | ID do Fluxo: "${f.id}" | Palavras-chave de ativação: "${f.keywords}"\n`;
+    });
+    systemPrompt += `\nINSTRUÇÕES DE DIRECIONAMENTO INTELIGENTE DE FLUXO:\n`;
+    systemPrompt += `- Como atendente, seu papel inicial é acolher o cliente e entender o que ele precisa.\n`;
+    systemPrompt += `- Se o cliente demonstrar interesse óbvio ou confirmar que deseja receber o conteúdo, livro, produto ou atendimento de algum dos fluxos acima, você deve confirmar simpaticamente que vai direcioná-lo e adicionar EXATAMENTE ao final de sua resposta o marcador [DISPARAR_FLUXO: id_do_fluxo].\n`;
+    systemPrompt += `- Exemplo de uso: se o cliente disser "quero o livro", responda algo como "Perfeito! Vou iniciar o envio do livro Segredos do Trade agora mesmo. [DISPARAR_FLUXO: ${activeFlows[0]?.id}]"\n`;
+    systemPrompt += `- ATENÇÃO: NUNCA mostre a estrutura do marcador ou mencione o ID do fluxo para o cliente. Use o marcador de forma silenciosa e invisível para o cliente final, apenas anexando a tag no fim do texto.\n`;
+    systemPrompt += `- IMPORTANTE: Se o cliente estiver apenas tirando dúvidas gerais ou saudando ("bom dia", "olá"), responda amigavelmente ajudando e guiando-o a escolher um dos serviços/fluxos oferecidos, SEM incluir o marcador [DISPARAR_FLUXO: ...]. Só inclua o marcador quando ele de fato desejar o fluxo ou o conteúdo correspondente.\n\n`;
+  }
+
   systemPrompt += `INSTRUÇÕES IMPORTANTES DE RESPOSTA:\n`;
   systemPrompt += `- Você é um agente humano. Seja natural, simpático e informal quando apropriado.\n`;
   systemPrompt += `- Nunca admita que é um robô ou inteligência artificial.\n`;
