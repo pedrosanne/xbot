@@ -708,7 +708,16 @@ export default function ChatPage() {
       });
 
       if (!uploadRes.ok) {
-        throw new Error('Falha ao enviar arquivo para o armazenamento.');
+        let details = '';
+        try {
+          const errData = await uploadRes.json();
+          details = errData.message || errData.error || JSON.stringify(errData);
+        } catch (e) {
+          try {
+            details = await uploadRes.text();
+          } catch (e2) {}
+        }
+        throw new Error(`Falha ao enviar arquivo para o armazenamento: ${details || uploadRes.statusText} (Status: ${uploadRes.status})`);
       }
 
       setUploadFile({
@@ -718,7 +727,7 @@ export default function ChatPage() {
       });
     } catch (err) {
       console.error('Error uploading file:', err);
-      alert('Erro ao fazer upload do arquivo.');
+      alert(err.message || 'Erro ao fazer upload do arquivo.');
     } finally {
       setUploadProgress(false);
     }

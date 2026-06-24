@@ -868,7 +868,16 @@ export default function AgentsPage() {
       });
 
       if (!uploadRes.ok) {
-        throw new Error('Falha ao enviar arquivo para o armazenamento.');
+        let details = '';
+        try {
+          const errData = await uploadRes.json();
+          details = errData.message || errData.error || JSON.stringify(errData);
+        } catch (e) {
+          try {
+            details = await uploadRes.text();
+          } catch (e2) {}
+        }
+        throw new Error(`Falha ao enviar arquivo para o armazenamento: ${details || uploadRes.statusText} (Status: ${uploadRes.status})`);
       }
 
       const currentNode = nodes.find(n => n.id === nodeId);
