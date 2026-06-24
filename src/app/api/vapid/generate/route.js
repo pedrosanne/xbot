@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import webPush from 'web-push';
 import { logToDb } from '@/lib/log';
+import { clearSettingsCache } from '@/lib/settings';
 
 // GET or POST: Generate VAPID keys
 export async function POST(request) {
@@ -19,6 +20,8 @@ export async function POST(request) {
         vapidPrivateKey: vapidKeys.privateKey
       }
     });
+
+    clearSettingsCache();
 
     await logToDb('INFO', 'API', 'Novas chaves VAPID geradas e salvas com sucesso.');
 

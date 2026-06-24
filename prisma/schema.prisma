@@ -73,6 +73,12 @@ model Contact {
   typingState       String              @default("IDLE")
   assignedUserId    String?
   assignedUser      User?               @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@index([connectionId])
+  @@index([assignedUserId])
+  @@index([lastInteraction])
+  @@index([clientPhone])
+  @@index([email])
 }
 
 model WhatsAppConnection {
@@ -109,6 +115,9 @@ model Message {
   isEdited        Boolean  @default(false)
   isDeleted       Boolean  @default(false)
   deletedFor      String   @default("")
+
+  @@index([contactId])
+  @@index([timestamp])
 }
 
 model ProcessedWebhook {
@@ -156,6 +165,8 @@ model Log {
   message   String
   details   String   @default("") // Trace do erro ou dados do payload
   timestamp DateTime @default(now())
+
+  @@index([timestamp])
 }
 
 model PushSubscription {
@@ -167,6 +178,8 @@ model PushSubscription {
   
   userId     String?
   user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Call {
@@ -183,13 +196,14 @@ model Call {
   cost          Float    @default(0)
   endedReason   String   @default("")
   createdAt     DateTime @default(now())
+
+  @@index([contactId])
 }
 
 model Upload {
   id        String   @id @default(uuid())
   filename  String   @unique
   mimeType  String
-  data      Bytes
   createdAt DateTime @default(now())
 }
 
@@ -223,6 +237,11 @@ model Payment {
   seller        User?          @relation("PaymentSeller", fields: [sellerId], references: [id], onDelete: SetNull)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  @@index([contactId])
+  @@index([gatewayId])
+  @@index([sellerId])
+  @@index([externalId])
 }
 
 model Product {

@@ -4,15 +4,18 @@ import { verifyToken, getTokenFromCookies } from '@/lib/auth';
 // Define which paths should NOT be redirected/intercepted
 const PUBLIC_PATHS = ['/login', '/register'];
 
-export async function proxy(req) {
+export async function middleware(req) {
   const { pathname } = req.nextUrl;
 
   // 1. Bypass public API endpoints and static assets
   if (
     pathname.startsWith('/api/webhook') ||
+    pathname.startsWith('/api/calls/webhook') ||
     pathname.startsWith('/api/auth/login') ||
     pathname.startsWith('/api/auth/register') ||
-    pathname.startsWith('/api/auth/logout')
+    pathname.startsWith('/api/auth/logout') ||
+    pathname.startsWith('/api/uploads') ||
+    pathname.startsWith('/api/cron')
   ) {
     return NextResponse.next();
   }
@@ -39,7 +42,7 @@ export async function proxy(req) {
   return NextResponse.next();
 }
 
-// Next.js proxy config to specify matching paths
+// Next.js middleware config to specify matching paths
 export const config = {
   matcher: [
     /*

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import path from 'path';
 import { logToDb } from '@/lib/log';
+import { uploadToSupabaseStorage } from '@/lib/storage';
 
 export async function POST(request) {
   try {
@@ -26,15 +27,17 @@ export async function POST(request) {
     const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const filename = `${sanitizedBase}___${uniqueId}${extension}`;
 
-    // Save to database
+    // Save to Supabase Storage
+    await uploadToSupabaseStorage(filename, file.type || 'application/octet-stream', buffer);
+
+    // Save metadata to database
     await prisma.upload.create({
       data: {
         filename,
-        mimeType: file.type || 'application/octet-stream',
-        data: buffer
+        mimeType: file.type || 'application/octet-stream'
       }
     });
-    console.log(`Manual upload saved to database: ${filename}`);
+    console.log(`Manual upload saved to Supabase Storage: ${filename}`);
 
     const fileUrl = `/api/uploads/${filename}`;
     return NextResponse.json({ success: true, url: fileUrl, filename: file.name });

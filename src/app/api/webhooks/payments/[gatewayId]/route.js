@@ -55,6 +55,33 @@ export async function POST(request, { params }) {
 
     // 1. Parse fields based on provider type
     if (gateway.type === 'stripe') {
+      // Signature verification
+      const sig = request.headers.get('stripe-signature');
+      if (gateway.webhookSecret && sig) {
+        const parts = sig.split(',');
+        const timestampPart = parts.find(p => p.trim().startsWith('t='));
+        const signaturePart = parts.find(p => p.trim().startsWith('v1='));
+        if (timestampPart && signaturePart) {
+          const timestamp = timestampPart.split('=')[1];
+          const signature = signaturePart.split('=')[1];
+          const expectedPayload = `${timestamp}.${rawBody}`;
+          const expected = crypto.createHmac('sha256', gateway.webhookSecret).update(expectedPayload).digest('hex');
+          let isValid = false;
+          try {
+            isValid = crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
+          } catch (e) {
+            isValid = false;
+          }
+          if (!isValid) {
+            await logToDb('WARN', 'WEBHOOK', `Assinatura de webhook inválida para gateway Stripe: ${gateway.name}`);
+            return NextResponse.json({ error: 'Assinatura inválida.' }, { status: 401 });
+          }
+        } else {
+          await logToDb('WARN', 'WEBHOOK', `Assinatura de webhook Stripe malformada para: ${gateway.name}`);
+          return NextResponse.json({ error: 'Assinatura inválida.' }, { status: 401 });
+        }
+      }
+
       const stripeEvent = body.type;
       const stripeObj = body.data?.object;
 
@@ -134,6 +161,12 @@ export async function POST(request, { params }) {
       }
     } 
     else if (gateway.type === 'asaas') {
+      const asaasToken = request.headers.get('asaas-access-token');
+      if (gateway.webhookSecret && asaasToken !== gateway.webhookSecret) {
+        await logToDb('WARN', 'WEBHOOK', `Token de webhook Asaas inválido ou ausente para: ${gateway.name}`);
+        return NextResponse.json({ error: 'Token de webhook inválido.' }, { status: 401 });
+      }
+
       const event = body.event;
       const paymentObj = body.payment;
 

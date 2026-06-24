@@ -56,7 +56,7 @@ export default function ProductsPage() {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  async function fetchData() {
     setFetching(true);
     try {
       const [resProd, resOff, resBump, resUp, resPix] = await Promise.all([
@@ -508,7 +508,7 @@ export default function ProductsPage() {
                     <h3 style={{ marginBottom: '16px', fontSize: '1.05rem', fontWeight: 600 }}>
                       Editar Produto: {editingProduct.name}
                     </h3>
-                    <form onSubmit={handleProductUpdate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <form onSubmit={handleProductUpdate} className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                       <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label">Nome do Produto</label>
                         <input
@@ -586,6 +586,7 @@ export default function ProductsPage() {
                         {products.map(p => (
                           <div 
                             key={p.id} 
+                            className="responsive-list-row"
                             style={{ 
                               padding: '16px', 
                               background: 'rgba(255,255,255,0.01)', 
@@ -708,7 +709,7 @@ export default function ProductsPage() {
                     <h3 style={{ marginBottom: '16px', fontSize: '1.05rem', fontWeight: 600 }}>
                       Editar Oferta: {editingOffer.name}
                     </h3>
-                    <form onSubmit={handleOfferUpdate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <form onSubmit={handleOfferUpdate} className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                       <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label">Produto Vinculado</label>
                         <select
@@ -787,6 +788,7 @@ export default function ProductsPage() {
                         {offers.map(o => (
                           <div 
                             key={o.id} 
+                            className="responsive-list-row"
                             style={{ 
                               padding: '16px', 
                               background: 'rgba(255,255,255,0.01)', 
@@ -914,6 +916,7 @@ export default function ProductsPage() {
                       {bumps.map(b => (
                         <div 
                           key={b.id} 
+                          className="responsive-list-row"
                           style={{ 
                             padding: '16px', 
                             background: 'rgba(255,255,255,0.01)', 
@@ -1040,6 +1043,7 @@ export default function ProductsPage() {
                       {upsells.map(u => (
                         <div 
                           key={u.id} 
+                          className="responsive-list-row"
                           style={{ 
                             padding: '16px', 
                             background: 'rgba(255,255,255,0.01)', 
@@ -1166,6 +1170,7 @@ export default function ProductsPage() {
                       {pixels.map(pix => (
                         <div 
                           key={pix.id} 
+                          className="responsive-list-row"
                           style={{ 
                             padding: '16px', 
                             background: 'rgba(255,255,255,0.01)', 

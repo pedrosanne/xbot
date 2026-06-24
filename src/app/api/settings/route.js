@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSystemSettings } from '@/lib/settings';
+import { getSystemSettings, clearSettingsCache } from '@/lib/settings';
 
 // GET: Retrieve system settings
 export async function GET() {
@@ -35,6 +35,8 @@ export async function POST(request) {
         publicBaseUrl: data.publicBaseUrl !== undefined ? data.publicBaseUrl : undefined
       }
     });
+
+    clearSettingsCache();
 
     return NextResponse.json(updatedSettings);
   } catch (error) {

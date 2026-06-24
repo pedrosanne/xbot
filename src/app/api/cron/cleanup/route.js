@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logToDb } from '@/lib/log';
+import { deleteFromSupabaseStorage } from '@/lib/storage';
 
 export async function GET(request) {
   // Authentication header recommended by Vercel
@@ -47,6 +48,20 @@ export async function GET(request) {
       }
     });
 
+    // 2.5. Collect media URLs from active chat messages (less than 30 days old)
+    const messages = await prisma.message.findMany({
+      where: {
+        mediaUrl: { startsWith: '/api/uploads/' }
+      },
+      select: { mediaUrl: true }
+    });
+    messages.forEach(msg => {
+      if (msg.mediaUrl) {
+        const filename = msg.mediaUrl.replace('/api/uploads/', '');
+        activeMediaFilenames.add(filename);
+      }
+    });
+
     // 3. Define age thresholds
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
@@ -65,6 +80,10 @@ export async function GET(request) {
 
     let deletedUploadsCount = 0;
     if (filenamesToDelete.length > 0) {
+      // 1. Delete binary files from Supabase Storage
+      await deleteFromSupabaseStorage(filenamesToDelete);
+
+      // 2. Delete metadata records from database
       const deleteRes = await prisma.upload.deleteMany({
         where: {
           filename: { in: filenamesToDelete }

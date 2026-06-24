@@ -3,6 +3,7 @@ import path from 'path';
 import { getSystemSettings } from './settings';
 import { logToDb } from './log';
 import { prisma } from './prisma';
+import { uploadToSupabaseStorage } from './storage';
 
 const WHATSAPP_API_VERSION = 'v20.0';
 
@@ -109,6 +110,15 @@ export async function sendAudio(to, audioUrl, contextMessageId = null, connectio
 }
 
 export async function sendImage(to, imageUrl, caption = '', contextMessageId = null, connection = null) {
+  let targetImageUrl = imageUrl;
+  if (targetImageUrl && typeof targetImageUrl === 'string') {
+    if (targetImageUrl.toLowerCase().endsWith('.webp')) {
+      targetImageUrl = targetImageUrl.slice(0, -5) + '.png';
+    } else if (targetImageUrl.toLowerCase().includes('.webp?')) {
+      targetImageUrl = targetImageUrl.replace(/\.webp\?/i, '.png?');
+    }
+  }
+
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
@@ -116,7 +126,7 @@ export async function sendImage(to, imageUrl, caption = '', contextMessageId = n
     ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'image',
     image: {
-      link: imageUrl,
+      link: targetImageUrl,
       ...(caption && { caption }),
     },
   };
@@ -292,21 +302,22 @@ export async function downloadWhatsAppMedia(mediaId, mimeType, customToken = nul
     const extension = getExtensionFromMimeType(mimeType);
     const filename = `${mediaId}${extension}`;
     
-    // Save to database
+    // Save to Supabase Storage
+    await uploadToSupabaseStorage(filename, mimeType, buffer);
+
+    // Save metadata record in DB
     await prisma.upload.upsert({
       where: { filename },
       update: {
-        mimeType,
-        data: buffer
+        mimeType
       },
       create: {
         filename,
-        mimeType,
-        data: buffer
+        mimeType
       }
     });
 
-    console.log(`Saved WhatsApp media to database: ${filename}`);
+    console.log(`Saved WhatsApp media to Supabase Storage: ${filename}`);
 
     return `/api/uploads/${filename}`;
   } catch (error) {
@@ -344,44 +355,54 @@ function getExtensionFromMimeType(mimeType) {
 
 export async function markWhatsAppMessageAsRead(messageId, connection = null) {
   if (!messageId) return null;
-  const payload = {
-    messaging_product: 'whatsapp',
-    status: 'read',
-    message_id: messageId
-  };
-  const result = await sendWhatsAppMessage(payload, connection);
-
   try {
-    const message = await prisma.message.findUnique({
-      where: { id: messageId },
-      select: { type: true }
-    });
+    const payload = {
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: messageId
+    };
+    const result = await sendWhatsAppMessage(payload, connection);
 
-    if (message) {
-      if (message.type === 'audio') {
-        const payloadPlayed = {
-          messaging_product: 'whatsapp',
-          status: 'played',
-          message_id: messageId
-        };
-        await sendWhatsAppMessage(payloadPlayed, connection);
-        
-        await prisma.message.update({
-          where: { id: messageId },
-          data: { status: 'played' }
-        });
-      } else {
-        await prisma.message.update({
-          where: { id: messageId },
-          data: { status: 'read' }
-        });
+    try {
+      const message = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { type: true }
+      });
+
+      if (message) {
+        if (message.type === 'audio') {
+          const payloadPlayed = {
+            messaging_product: 'whatsapp',
+            status: 'played',
+            message_id: messageId
+          };
+          try {
+            await sendWhatsAppMessage(payloadPlayed, connection);
+          } catch (playedErr) {
+            console.error('Failed to send played indicator:', playedErr);
+          }
+          
+          await prisma.message.update({
+            where: { id: messageId },
+            data: { status: 'played' }
+          });
+        } else {
+          await prisma.message.update({
+            where: { id: messageId },
+            data: { status: 'read' }
+          });
+        }
       }
+    } catch (dbError) {
+      console.error('Error handling database message status update:', dbError);
     }
-  } catch (error) {
-    console.error('Error handling played/read status update:', error);
-  }
 
-  return result;
+    return result;
+  } catch (error) {
+    await logToDb('WARN', 'API', `Erro ignorado ao marcar mensagem como lida (para evitar travamento do fluxo): ${error.message}`);
+    console.error('Failed to mark message as read:', error);
+    return null;
+  }
 }
 
 export async function sendReaction(to, messageId, emoji, connection = null) {

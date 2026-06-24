@@ -58,12 +58,6 @@ export default function SettingsPage() {
   const [testTitle, setTestTitle] = useState('Mensagem do Xbot ⚡');
   const [testBody, setTestBody] = useState('Uma nova mensagem precisa de atendimento humano no painel!');
 
-  // Fetch settings & check push status on mount
-  useEffect(() => {
-    fetchSettings();
-    checkPushCapability();
-  }, []);
-
   const fetchSettings = async () => {
     try {
       const res = await fetch('/api/settings');
@@ -102,6 +96,14 @@ export default function SettingsPage() {
       }
     }
   };
+
+  // Fetch settings & check push status on mount
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      fetchSettings();
+      checkPushCapability();
+    });
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -322,7 +324,7 @@ export default function SettingsPage() {
 
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Access Token</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="input-with-buttons" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     type={showWhatsappToken ? 'text' : 'password'}
                     value={whatsappToken}
@@ -400,7 +402,7 @@ export default function SettingsPage() {
 
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Gemini API Key</label>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div className="input-with-buttons" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input
                   type={showGeminiKey ? 'text' : 'password'}
                   value={geminiApiKey}
@@ -448,7 +450,7 @@ export default function SettingsPage() {
 
             <div className="form-group">
               <label className="form-label">ElevenLabs API Key (Opcional)</label>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div className="input-with-buttons" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input
                   type={showElevenKey ? 'text' : 'password'}
                   value={elevenLabsApiKey}
@@ -589,7 +591,7 @@ export default function SettingsPage() {
 
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Chave Privada VAPID (VAPID Private Key)</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="input-with-buttons" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     type={showPrivateKey ? 'text' : 'password'}
                     value={vapidPrivateKey}
@@ -679,7 +681,7 @@ export default function SettingsPage() {
         </form>
 
         <div className="glass-panel" style={{ padding: '20px', marginTop: '24px', background: 'rgba(255,255,255,0.01)', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-          💡 <strong>Como funciona o PWA:</strong> Clique na barra de endereços do seu navegador (no botão de instalação "+" ou "Instalar aplicativo") para adicionar o Xbot à tela inicial do seu computador ou celular. Após salvar as chaves VAPID e clicar em "Ativar Notificações", você receberá notificações pop-up nativas mesmo se a aba do sistema estiver fechada!
+          💡 <strong>Como funciona o PWA:</strong> Clique na barra de endereços do seu navegador (no botão de instalação &quot;+&quot; ou &quot;Instalar aplicativo&quot;) para adicionar o Xbot à tela inicial do seu computador ou celular. Após salvar as chaves VAPID e clicar em &quot;Ativar Notificações&quot;, você receberá notificações pop-up nativas mesmo se a aba do sistema estiver fechada!
         </div>
 
       </div>

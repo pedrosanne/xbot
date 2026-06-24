@@ -3190,5 +3190,103 @@ input:checked + .slider:before {
   }
 }
 
+/* ==========================================
+   MOBILE LIGHT THEME ADAPTATIONS
+   ========================================== */
+[data-theme='light'] .mobile-header-bar {
+  background: rgba(245, 245, 247, 0.85) !important;
+}
+
+[data-theme='light'] .sidebar-nav-drawer {
+  background: #ffffff !important;
+  border-right-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme='light'] .hamburger-btn:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme='light'] .conversation-row {
+  background: rgba(0, 0, 0, 0.01) !important;
+}
+
+[data-theme='light'] .conversation-row:hover {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme='light'] .ios-menu-option-item {
+  border-bottom-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ==========================================
+   GENERIC MOBILE RESPONSIVENESS UTILITIES
+   ========================================== */
+
+.responsive-list-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.input-with-buttons {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+}
+
+.responsive-grid-2 {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+}
+
+@media (max-width: 768px) {
+  .responsive-list-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+  
+  .responsive-list-row > div:first-child {
+    width: 100% !important;
+  }
+  
+  /* Select buttons/actions area on mobile and stack it below */
+  .responsive-list-row > .actions-cell,
+  .responsive-list-row > div[style*="gap"],
+  .responsive-list-row > div:last-child {
+    width: 100% !important;
+    justify-content: flex-end !important;
+    margin-left: 0 !important;
+    border-top: 1px solid var(--border-glass) !important;
+    padding-top: 10px !important;
+    display: flex !important;
+    flex-direction: row !important;
+  }
+
+  .responsive-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 580px) {
+  .input-with-buttons {
+    flex-wrap: wrap !important;
+  }
+  
+  .input-with-buttons > input {
+    width: 100% !important;
+    flex: none !important;
+  }
+  
+  .input-with-buttons > button {
+    flex-grow: 1 !important;
+    justify-content: center !important;
+    padding: 8px 12px !important;
+  }
+}
+
+
 
 

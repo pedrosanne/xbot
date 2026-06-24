@@ -25,7 +25,9 @@ export default function LogsPage() {
   };
 
   useEffect(() => {
-    fetchLogs();
+    Promise.resolve().then(() => {
+      fetchLogs();
+    });
   }, []);
 
   const handleClearLogs = async () => {

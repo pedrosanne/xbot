@@ -198,6 +198,7 @@ export default function ChatPage() {
   const [mediaStream, setMediaStream] = useState(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const onStopCallbackRef = useRef(null);
 
   // Advanced Message Actions States
   const [selectedMessageIds, setSelectedMessageIds] = useState([]);
@@ -243,7 +244,7 @@ export default function ChatPage() {
   const [connections, setConnections] = useState([]);
   const [selectedConnectionId, setSelectedConnectionId] = useState('all');
 
-  const fetchCollaborators = async () => {
+  async function fetchCollaborators() {
     try {
       const res = await fetch('/api/collaborators');
       if (res.ok) {
@@ -254,7 +255,7 @@ export default function ChatPage() {
     }
   };
 
-  const fetchLoggedUser = async () => {
+  async function fetchLoggedUser() {
     try {
       const res = await fetch('/api/auth/me');
       if (res.ok) {
@@ -267,7 +268,7 @@ export default function ChatPage() {
   };
 
   // Fetch all WhatsApp Connections
-  const fetchConnections = async () => {
+  async function fetchConnections() {
     try {
       const res = await fetch('/api/connections');
       if (res.ok) {
@@ -279,7 +280,7 @@ export default function ChatPage() {
   };
 
   // 1. Fetch Contact List (with connection scoping filter)
-  const fetchContacts = async (connId = selectedConnectionId) => {
+  async function fetchContacts(connId = selectedConnectionId) {
     try {
       const url = connId && connId !== 'all' ? `/api/chat?connectionId=${connId}` : '/api/chat';
       const res = await fetch(url);
@@ -293,7 +294,7 @@ export default function ChatPage() {
   };
 
   // 2. Fetch Messages for Selected Contact
-  const fetchMessages = async (contactId) => {
+  async function fetchMessages(contactId) {
     try {
       const res = await fetch(`/api/chat?contactId=${contactId}`);
       if (res.ok) {
@@ -316,26 +317,34 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    fetchConnections();
-    fetchCollaborators();
-    fetchLoggedUser();
+    Promise.resolve().then(() => {
+      fetchConnections();
+      fetchCollaborators();
+      fetchLoggedUser();
+    });
   }, []);
 
   useEffect(() => {
-    fetchContacts(selectedConnectionId);
+    Promise.resolve().then(() => {
+      fetchContacts(selectedConnectionId);
+    });
   }, [selectedConnectionId]);
 
   useEffect(() => {
     if (selectedContact) {
-      setProfileNameInput(selectedContact.name || '');
-      setProfileEmailInput(selectedContact.email || '');
-      setProfileTagsInput(selectedContact.tags || '');
-      setProfileNotesInput(selectedContact.notes || '');
-      setProfileAvatarInput(selectedContact.avatarUrl || '');
+      Promise.resolve().then(() => {
+        setProfileNameInput(selectedContact.name || '');
+        setProfileEmailInput(selectedContact.email || '');
+        setProfileTagsInput(selectedContact.tags || '');
+        setProfileNotesInput(selectedContact.notes || '');
+        setProfileAvatarInput(selectedContact.avatarUrl || '');
+      });
     } else {
-      setEditProfileMode(false);
+      Promise.resolve().then(() => {
+        setEditProfileMode(false);
+      });
     }
-  }, [selectedContact?.id]);
+  }, [selectedContact]);
 
   useEffect(() => {
     const load = async () => {
@@ -447,6 +456,12 @@ export default function ChatPage() {
           }
         };
 
+        mediaRec.onstop = () => {
+          if (onStopCallbackRef.current) {
+            onStopCallbackRef.current();
+          }
+        };
+
         mediaRec.start();
         setNativeRecorder(mediaRec);
         return;
@@ -470,10 +485,10 @@ export default function ChatPage() {
       setIsRecording(false);
       clearInterval(recordingTimerRef.current);
     }
-  };
+  }
 
   // Stop recording audio
-  const stopRecording = (shouldSend = true) => {
+  function stopRecording(shouldSend = true) {
     clearInterval(recordingTimerRef.current);
     setIsRecording(false);
 
@@ -481,7 +496,7 @@ export default function ChatPage() {
       const rec = nativeRecorder;
       setNativeRecorder(null);
       
-      rec.onstop = async () => {
+      onStopCallbackRef.current = async () => {
         if (mediaStream) {
           mediaStream.getTracks().forEach(track => track.stop());
           setMediaStream(null);
@@ -523,13 +538,14 @@ export default function ChatPage() {
             fetchMessages(selectedContact.id);
             fetchContacts();
           } catch (err) {
-            console.error('Error uploading/sending native audio:', err);
-            alert('Erro ao gravar ou enviar áudio.');
+            console.error('Failed to upload/send audio:', err);
+            alert('Falha ao enviar mensagem de voz.');
           } finally {
             setLoading(false);
           }
         }
       };
+      
       rec.stop();
       return;
     }
@@ -593,12 +609,53 @@ export default function ChatPage() {
     return `${m}:${s}`;
   };
 
+  const convertWebPToPNG = (file) => {
+    return new Promise((resolve) => {
+      const isWebP = file.type === 'image/webp' || file.name.toLowerCase().endsWith('.webp');
+      if (!isWebP) {
+        resolve(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            const baseName = file.name.replace(/\.[^/.]+$/, "");
+            const newName = `${baseName}.png`;
+            const convertedFile = new File([blob], newName, { type: 'image/png' });
+            resolve(convertedFile);
+          }, 'image/png');
+        };
+        img.onerror = () => resolve(file);
+        img.src = event.target.result;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Handle file upload
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+    let file = e.target.files[0];
     if (!file) return;
 
-    const mediaType = getMediaType(file.type);
+    let mediaType = getMediaType(file.type);
+    if (mediaType === 'image') {
+      file = await convertWebPToPNG(file);
+      mediaType = getMediaType(file.type);
+    }
+
     let limitBytes = 100 * 1024 * 1024; // Default to document limit (100MB)
     let limitLabel = "100 MB";
 
@@ -626,25 +683,39 @@ export default function ChatPage() {
     setUploadProgress(true);
     setShowAttachMenu(false);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const res = await fetch('/api/uploads', {
+      // 1. Get signed upload URL from backend
+      const signRes = await fetch('/api/uploads/sign', {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, mimeType: file.type })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setUploadFile({
-          name: file.name,
-          url: data.url,
-          type: mediaType
-        });
-      } else {
-        alert('Falha ao fazer upload do arquivo.');
+      if (!signRes.ok) {
+        throw new Error('Falha ao gerar URL de upload assinado.');
       }
+
+      const signData = await signRes.json();
+      const { signedUrl, localUrl } = signData;
+
+      // 2. Upload file directly to Supabase Storage (PUT request bypasses Vercel payload limit)
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type
+        },
+        body: file
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error('Falha ao enviar arquivo para o armazenamento.');
+      }
+
+      setUploadFile({
+        name: file.name,
+        url: localUrl,
+        type: mediaType
+      });
     } catch (err) {
       console.error('Error uploading file:', err);
       alert('Erro ao fazer upload do arquivo.');
@@ -1101,7 +1172,7 @@ export default function ChatPage() {
   return (
     <div className="chat-page-container">
       
-      {/* 1. Contact List Panel */}
+      {/* 1. Contacts Sidebar Panel */}
       <div className={`contacts-panel ${selectedContact ? 'hidden-mobile' : ''}`}>
         <div className="contacts-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2034,11 +2105,11 @@ export default function ChatPage() {
                       style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.1)' }} 
                     />
                   ) : (
-                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02))', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 600, color: 'white' }}>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-glass-active)', border: '1px solid var(--border-glass)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {getInitials(selectedContact.name)}
                     </div>
                   )}
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'white', margin: 0, textAlign: 'center' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, textAlign: 'center' }}>
                     {selectedContact.name || 'Sem Nome'}
                   </h3>
                   <span className={`badge ${selectedContact.status === 'MANUAL' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -2064,12 +2135,12 @@ export default function ChatPage() {
                 <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div>
                     <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>WhatsApp ID (Número)</label>
-                    <span style={{ fontSize: '0.9rem', color: 'white', fontWeight: 500 }}>{selectedContact.id}</span>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 500 }}>{selectedContact.id}</span>
                   </div>
 
                   <div>
                     <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>E-mail</label>
-                    <span style={{ fontSize: '0.9rem', color: selectedContact.email ? 'white' : 'var(--text-muted)', fontWeight: 500 }}>
+                    <span style={{ fontSize: '0.9rem', color: selectedContact.email ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: 500 }}>
                       {selectedContact.email || 'Não informado'}
                     </span>
                   </div>
@@ -2107,15 +2178,15 @@ export default function ChatPage() {
                         width: '100%', 
                         padding: '8px 12px', 
                         fontSize: '0.85rem', 
-                        background: 'rgba(255,255,255,0.03)', 
+                        background: 'var(--bg-glass)', 
                         border: '1px solid var(--border-glass)',
-                        color: 'white',
+                        color: 'var(--text-primary)',
                         borderRadius: '6px'
                       }}
                     >
-                      <option value="" style={{ background: '#1c1c24', color: 'white' }}>Sem Responsável (Fila Geral)</option>
+                      <option value="" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Sem Responsável (Fila Geral)</option>
                       {collaborators.map((user) => (
-                        <option key={user.id} value={user.id} style={{ background: '#1c1c24', color: 'white' }}>
+                        <option key={user.id} value={user.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
                           {user.name} ({user.email})
                         </option>
                       ))}
@@ -2166,7 +2237,7 @@ export default function ChatPage() {
             ) : (
               /* Edit Mode */
               <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'white', marginBottom: '8px' }}>Editar Perfil do Lead</h3>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Editar Perfil do Lead</h3>
                 
                 <div className="form-group" style={{ marginBottom: '12px' }}>
                   <label className="form-label">Nome do Lead</label>
@@ -2391,7 +2462,7 @@ export default function ChatPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364.364l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
               <div>
-                <strong>Dica de Teste:</strong> Clique em "Simular" para receber a mensagem. A IA responderá na fila em 3 segundos.
+                <strong>Dica de Teste:</strong> Clique em &quot;Simular&quot; para receber a mensagem. A IA responderá na fila em 3 segundos.
               </div>
             </div>
           </div>

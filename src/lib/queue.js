@@ -4,6 +4,8 @@ import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, s
 import { textToSpeech } from './tts';
 import { logToDb } from './log';
 import { sendPushNotification } from './push';
+import { redis } from './redis';
+import { getCachedSettings, getCachedActiveFlows } from './cache';
 
 const contactLocks = new Map();
 
@@ -57,149 +59,189 @@ function getFilenameFromUrl(urlPath, defaultName = 'documento') {
 
 // Removida a fila de debounce em memória que causava timeouts e instabilidade na Vercel
 
-export async function enqueueMessage(contactId, messageData) {
-  return serializeProcessing(contactId, async () => {
-    try {
-      await logToDb('INFO', 'SYSTEM', `Mensagem recebida do contato ${contactId}. Tipo: ${messageData.type}`, { content: messageData.content });
+export async function processSingleMessageWrapper(contactId, messageData) {
+  try {
+    await logToDb('INFO', 'SYSTEM', `Processando mensagem recebida do contato ${contactId}. Tipo: ${messageData.type}`, { content: messageData.content });
 
-      const isMultiNumber = contactId.includes(':');
-      const [phoneId, clientPhone] = isMultiNumber ? contactId.split(':') : [null, contactId];
+    const isMultiNumber = contactId.includes(':');
+    const [phoneId, clientPhone] = isMultiNumber ? contactId.split(':') : [null, contactId];
 
-      // Find corresponding connection
-      let connection = null;
-      if (phoneId && phoneId !== 'system') {
-        connection = await prisma.whatsAppConnection.findUnique({
-          where: { whatsappPhoneId: phoneId }
-        });
-      }
-
-      // 1. Garante que o contato existe no banco de dados
-      let contact = await prisma.contact.findUnique({
-        where: { id: contactId },
-        include: { connection: true }
-      });
-
-      if (!contact) {
-        await logToDb('INFO', 'DATABASE', `Criando novo contato para o número: ${contactId}`);
-        contact = await prisma.contact.create({
-          data: {
-            id: contactId,
-            name: messageData.name || messageData.profileName || 'Cliente WhatsApp',
-            profileName: messageData.profileName || '',
-            status: 'AUTO',
-            phoneNumberId: phoneId || '',
-            clientPhone: clientPhone || contactId,
-            connectionId: connection?.id || null
-          },
-          include: { connection: true }
-        });
-      } else if (messageData.profileName && contact.profileName !== messageData.profileName) {
-        await logToDb('INFO', 'DATABASE', `Atualizando nome de perfil do contato ${contactId}: ${messageData.profileName}`);
-        contact = await prisma.contact.update({
-          where: { id: contactId },
-          data: { profileName: messageData.profileName },
-          include: { connection: true }
-        });
-      }
-
-      // 2. Salva a mensagem recebida no banco de dados
-      await prisma.message.create({
-        data: {
-          id: messageData.id,
-          contactId,
-          direction: 'INCOMING',
-          senderType: 'CLIENT',
-          type: messageData.type,
-          content: messageData.content || '',
-          mediaUrl: messageData.mediaUrl || '',
-          status: 'received',
-          timestamp: new Date(messageData.timestamp),
-          replyToId: messageData.replyToId || '',
-          replyToContent: messageData.replyToContent || ''
-        }
-      });
-
-      // Atualiza a última interação do contato
-      contact = await prisma.contact.update({
-        where: { id: contactId },
-        data: { lastInteraction: new Date() },
-        include: { connection: true }
-      });
-
-      // 3. Verifica se o contato está em modo MANUAL (atendimento humano)
-      if (contact.status === 'MANUAL') {
-        // Check if message is a flow keyword trigger to release from MANUAL
-        const activeFlows = await prisma.flow.findMany({
-          where: {
-            isActive: true,
-            OR: [
-              { connectionId: null },
-              { connectionId: contact.connectionId || null }
-            ]
-          }
-        });
-        const normalizedInput = (messageData.content || '').trim().toLowerCase();
-        let triggeredFlow = null;
-        if (messageData.type === 'text' && normalizedInput) {
-          triggeredFlow = activeFlows.find(f => {
-            if (f.trigger !== 'keyword') return false;
-            if (f.keywords.trim().toLowerCase() === normalizedInput) return true;
-            const keywordsArray = f.keywords.split(',').map(k => k.trim().toLowerCase());
-            return keywordsArray.includes(normalizedInput);
-          });
-        }
-
-        if (triggeredFlow && !contact.passedFlows) {
-          await logToDb('INFO', 'FLOW', `Contato ${contactId} estava em MANUAL mas enviou a palavra-chave do fluxo '${triggeredFlow.name}'. Retornando para AUTO.`);
-          contact = await prisma.contact.update({
-            where: { id: contactId },
-            data: { status: 'AUTO' },
-            include: { connection: true }
-          });
-        } else {
-          await logToDb('INFO', 'SYSTEM', `Contato ${contactId} está em modo MANUAL. Resposta automática pausada.`);
-          
-          // Busca os colaboradores vinculados a esta conexão de WhatsApp para segmentar
-          let targetUserIds = null;
-          if (contact.connectionId) {
-            try {
-              const connWithUsers = await prisma.whatsAppConnection.findUnique({
-                where: { id: contact.connectionId },
-                include: { users: { select: { id: true } } }
-              });
-              if (connWithUsers && connWithUsers.users.length > 0) {
-                targetUserIds = connWithUsers.users.map(u => u.id);
-              }
-            } catch (err) {
-              console.error('Error fetching connection users for manual override push:', err);
-            }
-          }
-
-          const contactName = contact.name || contact.profileName || contactId;
-          const messageSnippet = messageData.content 
-            ? (messageData.content.length > 60 ? messageData.content.substring(0, 60) + '...' : messageData.content) 
-            : 'Mídia recebida';
-
-          await sendPushNotification(
-            `Atendimento Manual: ${contactName} 💬`,
-            messageSnippet,
-            `/chat?contactId=${contactId}`,
-            targetUserIds
-          );
-          return;
-        }
-      }
-
-      // 4. Processa a mensagem de forma síncrona e imediata
-      await processSingleMessage(contact, messageData);
-
-    } catch (err) {
-      await logToDb('ERROR', 'SYSTEM', `Erro ao enfileirar mensagem para o contato ${contactId}: ${err.message}`, {
-        error: err.message,
-        stack: err.stack
+    // Find corresponding connection
+    let connection = null;
+    if (phoneId && phoneId !== 'system') {
+      connection = await prisma.whatsAppConnection.findUnique({
+        where: { whatsappPhoneId: phoneId }
       });
     }
-  });
+
+    // 1. Garante que o contato existe no banco de dados
+    let contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      include: { connection: true }
+    });
+
+    if (!contact) {
+      await logToDb('INFO', 'DATABASE', `Criando novo contato para o número: ${contactId}`);
+      contact = await prisma.contact.create({
+        data: {
+          id: contactId,
+          name: messageData.name || messageData.profileName || 'Cliente WhatsApp',
+          profileName: messageData.profileName || '',
+          status: 'AUTO',
+          phoneNumberId: phoneId || '',
+          clientPhone: clientPhone || contactId,
+          connectionId: connection?.id || null
+        },
+        include: { connection: true }
+      });
+    } else if (messageData.profileName && contact.profileName !== messageData.profileName) {
+      await logToDb('INFO', 'DATABASE', `Atualizando nome de perfil do contato ${contactId}: ${messageData.profileName}`);
+      contact = await prisma.contact.update({
+        where: { id: contactId },
+        data: { profileName: messageData.profileName },
+        include: { connection: true }
+      });
+    }
+
+    // 2. Salva a mensagem recebida no banco de dados
+    await prisma.message.create({
+      data: {
+        id: messageData.id,
+        contactId,
+        direction: 'INCOMING',
+        senderType: 'CLIENT',
+        type: messageData.type,
+        content: messageData.content || '',
+        mediaUrl: messageData.mediaUrl || '',
+        status: 'received',
+        timestamp: new Date(messageData.timestamp),
+        replyToId: messageData.replyToId || '',
+        replyToContent: messageData.replyToContent || ''
+      }
+    });
+
+    // Atualiza a última interação do contato
+    contact = await prisma.contact.update({
+      where: { id: contactId },
+      data: { lastInteraction: new Date() },
+      include: { connection: true }
+    });
+
+    // 3. Verifica se o contato está em modo MANUAL (atendimento humano)
+    if (contact.status === 'MANUAL') {
+      // Check if message is a flow keyword trigger to release from MANUAL
+      const allActiveFlows = await getCachedActiveFlows();
+      const activeFlows = allActiveFlows.filter(f => 
+        f.connectionId === null || f.connectionId === contact.connectionId
+      );
+      const normalizedInput = (messageData.content || '').trim().toLowerCase();
+      let triggeredFlow = null;
+      if (messageData.type === 'text' && normalizedInput) {
+        triggeredFlow = activeFlows.find(f => {
+          if (f.trigger !== 'keyword') return false;
+          if (f.keywords.trim().toLowerCase() === normalizedInput) return true;
+          const keywordsArray = f.keywords.split(',').map(k => k.trim().toLowerCase());
+          return keywordsArray.includes(normalizedInput);
+        });
+      }
+
+      if (triggeredFlow && !contact.passedFlows) {
+        await logToDb('INFO', 'FLOW', `Contato ${contactId} estava em MANUAL mas enviou a palavra-chave do fluxo '${triggeredFlow.name}'. Retornando para AUTO.`);
+        contact = await prisma.contact.update({
+          where: { id: contactId },
+          data: { status: 'AUTO' },
+          include: { connection: true }
+        });
+      } else {
+        await logToDb('INFO', 'SYSTEM', `Contato ${contactId} está em modo MANUAL. Resposta automática pausada.`);
+        
+        // Busca os colaboradores vinculados a esta conexão de WhatsApp para segmentar
+        let targetUserIds = null;
+        if (contact.connectionId) {
+          try {
+            const connWithUsers = await prisma.whatsAppConnection.findUnique({
+              where: { id: contact.connectionId },
+              include: { users: { select: { id: true } } }
+            });
+            if (connWithUsers && connWithUsers.users.length > 0) {
+              targetUserIds = connWithUsers.users.map(u => u.id);
+            }
+          } catch (err) {
+            console.error('Error fetching connection users for manual override push:', err);
+          }
+        }
+
+        const contactName = contact.name || contact.profileName || contactId;
+        const messageSnippet = messageData.content 
+          ? (messageData.content.length > 60 ? messageData.content.substring(0, 60) + '...' : messageData.content) 
+          : 'Mídia recebida';
+
+        await sendPushNotification(
+          `Atendimento Manual: ${contactName} 💬`,
+          messageSnippet,
+          `/chat?contactId=${contactId}`,
+          targetUserIds
+        );
+        return;
+      }
+    }
+
+    // 4. Processa a mensagem de forma síncrona e imediata
+    await processSingleMessage(contact, messageData);
+
+  } catch (err) {
+    await logToDb('ERROR', 'SYSTEM', `Erro ao processar mensagem para o contato ${contactId}: ${err.message}`, {
+      error: err.message,
+      stack: err.stack
+    });
+  }
+}
+
+export async function enqueueMessage(contactId, messageData) {
+  if (!redis) {
+    // Fallback to in-memory processing serialization when Redis is not available
+    return serializeProcessing(contactId, async () => {
+      await processSingleMessageWrapper(contactId, messageData);
+    });
+  }
+
+  try {
+    const queueKey = `queue:contact:${contactId}`;
+    const lockKey = `lock:contact:${contactId}`;
+    const lockTtlMs = 45000; // 45 seconds lock expiry to prevent deadlocks on slow LLM/TTS actions
+
+    // Push the new message onto the Redis queue
+    await redis.rpush(queueKey, JSON.stringify(messageData));
+    await logToDb('INFO', 'SYSTEM', `[Redis Queue] Mensagem adicionada à fila Redis para o contato ${contactId}`);
+
+    // Try to acquire the processing lock for this contact
+    const acquired = await redis.set(lockKey, '1', 'NX', 'PX', lockTtlMs);
+
+    if (acquired === 'OK') {
+      try {
+        while (true) {
+          const rawMessage = await redis.lpop(queueKey);
+          if (!rawMessage) break;
+
+          const currentMessage = JSON.parse(rawMessage);
+          await logToDb('INFO', 'SYSTEM', `[Redis Queue] Iniciando processamento de mensagem para o contato ${contactId}`);
+          await processSingleMessageWrapper(contactId, currentMessage);
+        }
+      } finally {
+        // Always delete the lock once the queue has been drained
+        await redis.del(lockKey);
+      }
+    } else {
+      await logToDb('INFO', 'SYSTEM', `[Redis Queue] Outra instância está processando mensagens para o contato ${contactId}. Enfileirada com sucesso.`);
+    }
+  } catch (err) {
+    await logToDb('ERROR', 'SYSTEM', `Falha crítica no tratamento de fila Redis para o contato ${contactId}: ${err.message}`, {
+      error: err.message,
+      stack: err.stack
+    });
+    // Fallback direct execution to prevent message drop in case of Redis failure
+    await processSingleMessageWrapper(contactId, messageData);
+  }
 }
 
 async function processSingleMessage(contact, messageData) {
@@ -339,15 +381,10 @@ async function processSingleMessage(contact, messageData) {
     }
 
     // 2. Carrega os fluxos ativos (escopados por conexão do WhatsApp ou globais)
-    const activeFlows = await prisma.flow.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          { connectionId: null },
-          { connectionId: freshContact.connectionId || null }
-        ]
-      }
-    });
+    const allActiveFlows = await getCachedActiveFlows();
+    const activeFlows = allActiveFlows.filter(f => 
+      f.connectionId === null || f.connectionId === freshContact.connectionId
+    );
 
     // 3. Verifica se o usuário digitou uma palavra-chave para iniciar um NOVO fluxo
     let triggeredFlow = null;
@@ -394,6 +431,12 @@ async function processSingleMessage(contact, messageData) {
             await executeFlowOption(freshContact, currentFlow, steps, matchedOption, text, mediaUrl, mimeType, messageData.id);
             return;
           } else {
+            // Se a etapa atual tem botões, ignoramos qualquer entrada de texto livre irrelevante
+            if (options.length > 0) {
+              await logToDb('INFO', 'FLOW', `Entrada irrelevante ("${text}") ignorada para a etapa com botões '${currentStep.id}'. Mantendo o contato na etapa atual.`);
+              return;
+            }
+
             // Se houver transição direta configurada para entrada livre / fallback
             if (currentStep.nextStepId) {
               const nextStep = steps.find(s => s.id === currentStep.nextStepId);
@@ -403,7 +446,7 @@ async function processSingleMessage(contact, messageData) {
                   where: { id: contactId },
                   data: { currentStepId: nextStep.id }
                 });
-                await sendStepResponse(contactId, nextStep, steps, messageData.id);
+                await sendStepResponse(contactId, nextStep, steps, messageData.id, freshContact.connection);
                 return;
               }
             }
@@ -819,10 +862,15 @@ export async function sendStepResponse(contactId, step, steps, incomingMessageId
   let contact = null;
   try {
     contact = await prisma.contact.findUnique({
-      where: { id: contactId }
+      where: { id: contactId },
+      include: { connection: true }
     });
   } catch (err) {
     console.error('Error fetching contact in sendStepResponse:', err);
+  }
+
+  if (!connection && contact?.connection) {
+    connection = contact.connection;
   }
 
   const extractRealName = (name) => {
@@ -1338,9 +1386,7 @@ async function getAbsoluteUrl(urlPath) {
   
   // Try fetching publicBaseUrl from database Settings first
   try {
-    const settings = await prisma.setting.findUnique({
-      where: { id: 'system' }
-    });
+    const settings = await getCachedSettings();
     if (settings && settings.publicBaseUrl) {
       return `${settings.publicBaseUrl}${urlPath}`;
     }

@@ -6,7 +6,12 @@ export default function GatewaysPage() {
   const [activeTab, setActiveTab] = useState('config'); // 'config' or 'history'
   const [gateways, setGateways] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [origin, setOrigin] = useState('');
+  const [origin, setOrigin] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.origin;
+    }
+    return '';
+  });
 
   // Form states
   const [name, setName] = useState('');
@@ -26,12 +31,11 @@ export default function GatewaysPage() {
   const [copiedId, setCopiedId] = useState('');
 
   useEffect(() => {
-    setOrigin(window.location.origin);
     fetchGateways();
     fetchPayments();
   }, []);
 
-  const fetchGateways = async () => {
+  async function fetchGateways() {
     setFetching(true);
     try {
       const res = await fetch('/api/gateways');
@@ -49,7 +53,7 @@ export default function GatewaysPage() {
     }
   };
 
-  const fetchPayments = async () => {
+  async function fetchPayments() {
     try {
       const res = await fetch('/api/gateways/payments');
       if (res.ok) {
@@ -224,7 +228,7 @@ export default function GatewaysPage() {
                 <h3 style={{ marginBottom: '16px', fontSize: '1.1rem', fontWeight: 600 }}>
                   Editar Gateway: {editingGateway.name}
                 </h3>
-                <form onSubmit={handleUpdate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <form onSubmit={handleUpdate} className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Nome de Identificação</label>
                     <input
@@ -339,7 +343,7 @@ export default function GatewaysPage() {
                           gap: '12px'
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div className="responsive-list-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <span style={{ fontWeight: 600, fontSize: '0.95rem', marginRight: '8px' }}>{g.name}</span>
                             <span style={{ fontSize: '0.75rem', padding: '2px 6px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', color: 'var(--text-secondary)' }}>

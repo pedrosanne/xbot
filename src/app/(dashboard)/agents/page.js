@@ -75,11 +75,26 @@ export default function AgentsPage() {
 
   // Canvas state
   const canvasRef = useRef(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [canvasOffset, setCanvasOffset] = useState({ x: 60, y: 80 });
   const [canvasZoom, setCanvasZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [dragNode, setDragNode] = useState(null); // { id, offsetX, offsetY }
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !canvasRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        setCanvasSize({
+          width: entry.contentRect.width || 800,
+          height: entry.contentRect.height || 600
+        });
+      }
+    });
+    observer.observe(canvasRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   // ==========================================
   // STATE: Vapi.ai & Calls
@@ -121,10 +136,12 @@ export default function AgentsPage() {
   // LIFECYCLE & DATA FETCHING
   // ==========================================
   useEffect(() => {
-    setMounted(true);
-    if (typeof window !== 'undefined') {
-      setCallbackUrl(`${window.location.protocol}//${window.location.host}/api/webhook`);
-    }
+    Promise.resolve().then(() => {
+      setMounted(true);
+      if (typeof window !== 'undefined') {
+        setCallbackUrl(`${window.location.protocol}//${window.location.host}/api/webhook`);
+      }
+    });
     fetchSettings();
     fetchConnections();
     fetchAgents();
@@ -134,7 +151,7 @@ export default function AgentsPage() {
     fetchGateways();
   }, []);
 
-  const fetchSettings = async () => {
+  async function fetchSettings() {
     try {
       const res = await fetch('/api/settings');
       if (res.ok) {
@@ -154,7 +171,7 @@ export default function AgentsPage() {
     }
   };
 
-  const fetchConnections = async () => {
+  async function fetchConnections() {
     try {
       const res = await fetch('/api/connections');
       if (res.ok) setConnections(await res.json());
@@ -358,7 +375,7 @@ export default function AgentsPage() {
     }
   };
 
-  const fetchProducts = async () => {
+  async function fetchProducts() {
     try {
       const res = await fetch('/api/products');
       if (res.ok) setProductsList(await res.json());
@@ -367,7 +384,7 @@ export default function AgentsPage() {
     }
   };
 
-  const fetchGateways = async () => {
+  async function fetchGateways() {
     try {
       const res = await fetch('/api/gateways');
       if (res.ok) setGatewaysList(await res.json());
@@ -379,7 +396,7 @@ export default function AgentsPage() {
   // ==========================================
   // METHODS: AI AGENTS
   // ==========================================
-  const fetchAgents = async () => {
+  async function fetchAgents() {
     try {
       const res = await fetch('/api/agents');
       if (res.ok) setAgents(await res.json());
@@ -468,7 +485,7 @@ export default function AgentsPage() {
   // ==========================================
   // METHODS: CALLS
   // ==========================================
-  const fetchCalls = async () => {
+  async function fetchCalls() {
     try {
       const res = await fetch('/api/calls');
       if (res.ok) setCalls(await res.json());
@@ -525,7 +542,7 @@ export default function AgentsPage() {
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
   };
 
-  const fetchFlows = async () => {
+  async function fetchFlows() {
     try {
       const res = await fetch('/api/flows');
       if (res.ok) setFlows(await res.json());
@@ -780,46 +797,88 @@ export default function AgentsPage() {
     }));
   };
 
+  const convertWebPToPNG = (file) => {
+    return new Promise((resolve) => {
+      const isWebP = file.type === 'image/webp' || file.name.toLowerCase().endsWith('.webp');
+      if (!isWebP) {
+        resolve(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            const baseName = file.name.replace(/\.[^/.]+$/, "");
+            const newName = `${baseName}.png`;
+            const convertedFile = new File([blob], newName, { type: 'image/png' });
+            resolve(convertedFile);
+          }, 'image/png');
+        };
+        img.onerror = () => resolve(file);
+        img.src = event.target.result;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleMediaUpload = async (e, nodeId, mediaType) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     if (!file) return;
 
     setUploadingMedia(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const res = await fetch('/api/uploads', {
+      if (mediaType === 'image') {
+        file = await convertWebPToPNG(file);
+      }
+
+      // 1. Get signed upload URL from backend
+      const signRes = await fetch('/api/uploads/sign', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, mimeType: file.type })
       });
 
-      let errorMsg = 'Ocorreu um erro ao enviar o arquivo.';
-      if (!res.ok) {
-        if (res.status === 413) {
-          errorMsg = 'Arquivo muito grande! O limite de tamanho permitido é de 4.5 MB.';
-        } else {
-          try {
-            const errorData = await res.json();
-            if (errorData?.error) errorMsg = errorData.error;
-          } catch (e) {}
-        }
-        throw new Error(errorMsg);
+      if (!signRes.ok) {
+        throw new Error('Falha ao gerar URL de upload assinado.');
       }
 
-      const data = await res.json();
-      if (data.success && data.url) {
-        const currentNode = nodes.find(n => n.id === nodeId);
-        updateNode(nodeId, {
-          media: {
-            type: mediaType,
-            url: data.url,
-            caption: currentNode?.media?.caption || ''
-          }
-        });
-      } else {
-        alert(data.error || 'Erro ao realizar upload do arquivo.');
+      const signData = await signRes.json();
+      const { signedUrl, localUrl } = signData;
+
+      // 2. Upload file directly to Supabase Storage (PUT request bypasses Vercel payload limit)
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type
+        },
+        body: file
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error('Falha ao enviar arquivo para o armazenamento.');
       }
+
+      const currentNode = nodes.find(n => n.id === nodeId);
+      updateNode(nodeId, {
+        media: {
+          type: mediaType,
+          url: localUrl,
+          caption: currentNode?.media?.caption || ''
+        }
+      });
     } catch (err) {
       console.error('Error uploading file:', err);
       alert(err.message || 'Ocorreu um erro ao enviar o arquivo.');
@@ -926,7 +985,6 @@ export default function AgentsPage() {
     const mx = (e.clientX - wrapperRect.left - canvasOffset.x) / canvasZoom;
     const my = (e.clientY - wrapperRect.top - canvasOffset.y) / canvasZoom;
     setDragNode({ id: nodeId, offsetX: mx - node.x, offsetY: my - node.y });
-    setSelectedNodeId(nodeId);
   };
 
   const fitAllNodes = () => {
@@ -1024,9 +1082,8 @@ export default function AgentsPage() {
     const rangeH = maxY - minY || 1;
     const scale = Math.min(160 / rangeW, 100 / rangeH);
 
-    const wrapperRect = canvasRef.current?.getBoundingClientRect();
-    const vw = wrapperRect ? wrapperRect.width : 800;
-    const vh = wrapperRect ? wrapperRect.height : 600;
+    const vw = canvasSize.width;
+    const vh = canvasSize.height;
 
     return (
       <div className="flow-minimap">
@@ -1319,7 +1376,7 @@ export default function AgentsPage() {
                 style={{ left: node.x, top: node.y }}
                 onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
                 onMouseUp={(e) => handleNodeMouseUp(e, node.id)}
-                onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
+                onClick={(e) => { e.stopPropagation(); }}
               >
                 {/* Input port */}
                 <div className="flow-port port-in" onMouseUp={(e) => handleNodeMouseUp(e, node.id)} />
@@ -1330,6 +1387,31 @@ export default function AgentsPage() {
                     {idx === 0 ? 'Início' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'IA' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'Humano' : 'Msg'}
                   </span>
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.id}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setSelectedNodeId(node.id);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      color: 'var(--text-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.25s ease',
+                      zIndex: 20
+                    }}
+                    title="Propriedades do Nó"
+                  >
+                    ⚙️
+                  </button>
                 </div>
 
                 {/* Body text */}
@@ -2576,7 +2658,7 @@ export default function AgentsPage() {
                 <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-glass)', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                   <strong>Webhook URL para o Vapi.ai:</strong><br/>
                   <code style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>{callbackUrl ? callbackUrl.replace('/api/webhook', '/api/calls/webhook') : '...'}</code>
-                  <br/>Configure esta URL no dashboard do Vapi.ai em "Server URL" para receber transcrições e eventos.
+                  <br/>Configure esta URL no dashboard do Vapi.ai em &quot;Server URL&quot; para receber transcrições e eventos.
                 </div>
               </div>
 

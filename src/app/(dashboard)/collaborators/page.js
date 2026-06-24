@@ -28,7 +28,7 @@ export default function CollaboratorsPage() {
     fetchConnections();
   }, []);
 
-  const fetchLoggedUser = async () => {
+  async function fetchLoggedUser() {
     try {
       const res = await fetch('/api/auth/me');
       if (res.ok) {
@@ -40,7 +40,7 @@ export default function CollaboratorsPage() {
     }
   };
 
-  const fetchConnections = async () => {
+  async function fetchConnections() {
     try {
       const res = await fetch('/api/connections');
       if (res.ok) {
@@ -51,7 +51,7 @@ export default function CollaboratorsPage() {
     }
   };
 
-  const fetchCollaborators = async () => {
+  async function fetchCollaborators() {
     setFetching(true);
     try {
       const res = await fetch('/api/collaborators');
@@ -296,6 +296,7 @@ export default function CollaboratorsPage() {
                   return (
                     <div 
                       key={collab.id} 
+                      className="responsive-list-row"
                       style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
