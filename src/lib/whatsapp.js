@@ -93,7 +93,8 @@ export async function sendText(to, text, contextMessageId = null, connection = n
 }
 
 export async function sendAudio(to, audioUrl, contextMessageId = null, connection = null) {
-  const isOgg = typeof audioUrl === 'string' && audioUrl.toLowerCase().split('?')[0].endsWith('.ogg');
+  const resolvedUrl = resolveSupabaseUrl(audioUrl);
+  const isOgg = typeof resolvedUrl === 'string' && resolvedUrl.toLowerCase().split('?')[0].endsWith('.ogg');
 
   const payload = {
     messaging_product: 'whatsapp',
@@ -102,7 +103,7 @@ export async function sendAudio(to, audioUrl, contextMessageId = null, connectio
     ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'audio',
     audio: { 
-      link: audioUrl,
+      link: resolvedUrl,
       ...(isOgg && { voice: true })
     },
   };
@@ -110,7 +111,7 @@ export async function sendAudio(to, audioUrl, contextMessageId = null, connectio
 }
 
 export async function sendImage(to, imageUrl, caption = '', contextMessageId = null, connection = null) {
-  let targetImageUrl = imageUrl;
+  let targetImageUrl = resolveSupabaseUrl(imageUrl);
   if (targetImageUrl && typeof targetImageUrl === 'string') {
     if (targetImageUrl.toLowerCase().endsWith('.webp')) {
       targetImageUrl = targetImageUrl.slice(0, -5) + '.png';
@@ -134,6 +135,7 @@ export async function sendImage(to, imageUrl, caption = '', contextMessageId = n
 }
 
 export async function sendDocument(to, docUrl, filename = 'document', caption = '', contextMessageId = null, connection = null) {
+  const resolvedUrl = resolveSupabaseUrl(docUrl);
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
@@ -141,7 +143,7 @@ export async function sendDocument(to, docUrl, filename = 'document', caption = 
     ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'document',
     document: {
-      link: docUrl,
+      link: resolvedUrl,
       filename,
       ...(caption && { caption }),
     },
@@ -150,6 +152,7 @@ export async function sendDocument(to, docUrl, filename = 'document', caption = 
 }
 
 export async function sendVideo(to, videoUrl, caption = '', contextMessageId = null, connection = null) {
+  const resolvedUrl = resolveSupabaseUrl(videoUrl);
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
@@ -157,7 +160,7 @@ export async function sendVideo(to, videoUrl, caption = '', contextMessageId = n
     ...(contextMessageId && { context: { message_id: contextMessageId } }),
     type: 'video',
     video: {
-      link: videoUrl,
+      link: resolvedUrl,
       ...(caption && { caption }),
     },
   };
@@ -452,4 +455,33 @@ export async function deleteWhatsAppMessage(messageId, connection = null) {
     console.error('Error deleting WhatsApp message:', error);
     return null;
   }
+}
+
+function resolveSupabaseUrl(mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== 'string') return mediaUrl;
+
+  let filename = '';
+  if (mediaUrl.startsWith('/api/uploads/')) {
+    filename = mediaUrl.replace('/api/uploads/', '');
+  } else if (mediaUrl.includes('/api/uploads/')) {
+    const parts = mediaUrl.split('/api/uploads/');
+    filename = parts[1]?.split('?')[0];
+  }
+
+  if (filename) {
+    // If it's webp, we MUST let it go through Vercel proxy for sharp PNG conversion
+    if (filename.toLowerCase().endsWith('.webp')) {
+      return mediaUrl;
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const bucket = process.env.SUPABASE_BUCKET || 'media';
+    if (supabaseUrl) {
+      const directUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${filename}`;
+      console.log(`Resolved local media url ${mediaUrl} to direct Supabase URL: ${directUrl}`);
+      return directUrl;
+    }
+  }
+
+  return mediaUrl;
 }
