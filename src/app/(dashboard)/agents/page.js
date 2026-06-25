@@ -1546,7 +1546,7 @@ export default function AgentsPage() {
                       borderBottomRightRadius: '13px'
                     }}
                   >
-                    <span>💰 Se Pago</span>
+                    <span>{node.pixDynamicAmount ? '💰 Se Pago (IA)' : '💰 Se Pago'}</span>
                     <span style={{ marginLeft: 'auto', opacity: 0.8 }}>
                       {node.nextStepId ? `→ ${node.nextStepId}` : '→ Fim / Aguarda'}
                     </span>
@@ -1833,6 +1833,24 @@ export default function AgentsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '8px', marginBottom: '4px' }}>
                       <input
                         type="checkbox"
+                        id="pix-dynamic-amount"
+                        checked={!!selectedNode.pixDynamicAmount}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          updateNode(selectedNodeId, { 
+                            pixDynamicAmount: isChecked,
+                            ...(isChecked && { pixAmount: 0 })
+                          });
+                        }}
+                      />
+                      <label htmlFor="pix-dynamic-amount" style={{ fontSize: '0.82rem', cursor: 'pointer', fontWeight: '600', color: '#2ed573', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        🧠 Coletar valor digitado pelo cliente (IA)
+                      </label>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '8px', marginBottom: '4px' }}>
+                      <input
+                        type="checkbox"
                         id="pix-gateway-enabled"
                         checked={!!selectedNode.pixGatewayEnabled}
                         onChange={(e) => {
@@ -1886,16 +1904,22 @@ export default function AgentsPage() {
                           </div>
                           <div style={{ flex: 1 }}>
                             <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Valor (R$)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              className="form-input"
-                              style={{ padding: '6px 10px', fontSize: '0.82rem' }}
-                              placeholder="0.00"
-                              value={selectedNode.pixAmount || ''}
-                              onChange={(e) => updateNode(selectedNodeId, { pixAmount: parseFloat(e.target.value) || 0 })}
-                            />
+                            {selectedNode.pixDynamicAmount ? (
+                              <div style={{ fontSize: '0.72rem', color: '#2ed573', border: '1px dashed rgba(46, 213, 115, 0.3)', padding: '6px 8px', borderRadius: '6px', background: 'rgba(46, 213, 115, 0.05)', height: '34px', display: 'flex', alignItems: 'center', boxSizing: 'border-box' }}>
+                                🤖 Definido por IA
+                              </div>
+                            ) : (
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                className="form-input"
+                                style={{ padding: '6px 10px', fontSize: '0.82rem', margin: 0, height: '34px' }}
+                                placeholder="0.00"
+                                value={selectedNode.pixAmount || ''}
+                                onChange={(e) => updateNode(selectedNodeId, { pixAmount: parseFloat(e.target.value) || 0 })}
+                              />
+                            )}
                           </div>
                         </div>
 
@@ -1945,16 +1969,22 @@ export default function AgentsPage() {
                           </div>
                           <div style={{ flex: 1 }}>
                             <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Valor (R$)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              className="form-input"
-                              style={{ padding: '6px 10px', fontSize: '0.82rem' }}
-                              placeholder="0.00"
-                              value={selectedNode.pixAmount || ''}
-                              onChange={(e) => updateNode(selectedNodeId, { pixAmount: parseFloat(e.target.value) || 0 })}
-                            />
+                            {selectedNode.pixDynamicAmount ? (
+                              <div style={{ fontSize: '0.72rem', color: '#2ed573', border: '1px dashed rgba(46, 213, 115, 0.3)', padding: '6px 8px', borderRadius: '6px', background: 'rgba(46, 213, 115, 0.05)', height: '34px', display: 'flex', alignItems: 'center', boxSizing: 'border-box' }}>
+                                🤖 Definido por IA
+                              </div>
+                            ) : (
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                className="form-input"
+                                style={{ padding: '6px 10px', fontSize: '0.82rem', margin: 0, height: '34px' }}
+                                placeholder="0.00"
+                                value={selectedNode.pixAmount || ''}
+                                onChange={(e) => updateNode(selectedNodeId, { pixAmount: parseFloat(e.target.value) || 0 })}
+                              />
+                            )}
                           </div>
                         </div>
 

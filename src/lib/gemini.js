@@ -234,3 +234,53 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
     return 'Desculpe, tive um problema ao processar sua resposta. Por favor, tente novamente.';
   }
 }
+
+export async function extractAmountFromText(incomingText, customAgentId = null) {
+  try {
+    let agent = null;
+    if (customAgentId) {
+      agent = await prisma.agent.findUnique({
+        where: { id: customAgentId }
+      });
+    }
+    if (!agent) {
+      agent = await prisma.agent.findFirst({
+        where: { isActive: true }
+      });
+    }
+    const settings = await getSystemSettings();
+    let apiKeyToUse = agent?.geminiApiKey || settings.geminiApiKey;
+
+    if (!apiKeyToUse) {
+      console.error('Gemini API key is not configured for extractAmount.');
+      return null;
+    }
+
+    const modelName = agent?.model === 'gemini-1.5-flash' || agent?.model === 'gemini-1.5-pro' 
+      ? 'gemini-2.5-flash' 
+      : (agent?.model || 'gemini-2.5-flash');
+
+    const genAI = new GoogleGenerativeAI(apiKeyToUse);
+    const model = genAI.getGenerativeModel({ model: modelName });
+
+    const prompt = `Analise o seguinte texto enviado por um cliente que quer fazer um pagamento e extraia o valor numérico em reais (BRL).
+Responda APENAS com o número decimal puro (ex: 150.00 ou 30.50), usando ponto como separador decimal.
+Se o texto não contiver nenhuma menção de valor ou quantidade financeira, responda EXATAMENTE "null" (sem aspas).
+
+Texto do cliente: "${incomingText}"`;
+
+    const result = await model.generateContent(prompt);
+    const textResponse = (await result.response).text().trim().toLowerCase();
+    
+    if (textResponse === 'null' || textResponse.includes('null')) {
+      return null;
+    }
+
+    const cleanNumStr = textResponse.replace(/[^0-9.]/g, '');
+    const amount = parseFloat(cleanNumStr);
+    return isNaN(amount) ? null : amount;
+  } catch (err) {
+    console.error('Error in extractAmountFromText:', err);
+    return null;
+  }
+}

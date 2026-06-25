@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { generateAIResponse } from './gemini';
+import { generateAIResponse, extractAmountFromText } from './gemini';
 import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton, sendTypingIndicator, markWhatsAppMessageAsRead, sendPixPaymentRequest } from './whatsapp';
 import { textToSpeech } from './tts';
 import { logToDb } from './log';
@@ -417,6 +417,30 @@ async function processSingleMessage(contact, messageData) {
 
         if (currentStep) {
           await logToDb('INFO', 'FLOW', `Contato está no fluxo '${currentFlow.name}', etapa atual: '${currentStep.id}'`);
+          
+          // Check if this is a dynamic Pix amount collection step (IA)
+          if (currentStep.pixEnabled && currentStep.pixDynamicAmount) {
+            await logToDb('INFO', 'FLOW', `Contato ${contactId} na etapa de Pix Dinâmico '${currentStep.id}'. Tentando extrair valor do texto: "${text}"`);
+            const parsedAmount = await extractAmountFromText(text, freshContact.designatedAgentId);
+            
+            if (parsedAmount && parsedAmount > 0) {
+              await logToDb('INFO', 'FLOW', `Valor extraído pela IA: R$ ${parsedAmount.toFixed(2)}. Gerando e enviando cobrança Pix.`);
+              const tempStep = {
+                ...currentStep,
+                pixDynamicAmount: false,
+                pixAmount: parsedAmount
+              };
+              await sendStepResponse(contactId, tempStep, steps, messageData.id, freshContact.connection, false);
+              return;
+            } else {
+              await logToDb('WARN', 'FLOW', `Não foi possível extrair um valor de Pix válido do texto: "${text}". Solicitando nova digitação.`);
+              const promptMsg = "Desculpe, não entendi o valor. Por favor, digite o valor que gostaria de pagar (exemplo: R$ 50 ou 150 reais):";
+              await sendText(contactId, promptMsg, messageData.id, freshContact.connection);
+              await saveOutgoingMessage(`bot_${Date.now()}_pix_retry`, contactId, 'text', '', promptMsg);
+              return;
+            }
+          }
+
           const options = currentStep.buttons || [];
           let matchedOption = null;
 
@@ -1045,8 +1069,8 @@ export async function sendStepResponse(contactId, step, steps, incomingMessageId
   }
 
   // Send Pix billing request if enabled
-  const isGatewayPix = !skipPix && step.pixEnabled && step.pixGatewayEnabled && step.pixGatewayId && step.pixAmount > 0;
-  const isStaticPix = !skipPix && step.pixEnabled && !step.pixGatewayEnabled && step.pixKey && step.pixAmount > 0;
+  const isGatewayPix = !skipPix && step.pixEnabled && !step.pixDynamicAmount && step.pixGatewayEnabled && step.pixGatewayId && step.pixAmount > 0;
+  const isStaticPix = !skipPix && step.pixEnabled && !step.pixDynamicAmount && !step.pixGatewayEnabled && step.pixKey && step.pixAmount > 0;
 
   if (isGatewayPix || isStaticPix) {
     try {
