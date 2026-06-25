@@ -1041,6 +1041,7 @@ export default function AgentsPage() {
         if (target) {
           conns.push({
             type: 'direct',
+            isPix: !!node.pixEnabled,
             fromId: node.id,
             toId: target.id,
             fromX: node.x + 130,
@@ -1073,6 +1074,7 @@ export default function AgentsPage() {
     if (node.text) h += Math.min(node.text.length / 3, 60);
     if (node.media) h += 28;
     h += (node.buttons || []).length * 28;
+    if (node.pixEnabled) h += 26;
     return Math.max(h, 100);
   };
 
@@ -1351,14 +1353,48 @@ export default function AgentsPage() {
                   ? `M ${conn.fromX} ${conn.fromY} C ${conn.fromX + cp} ${conn.fromY}, ${conn.toX} ${conn.toY - cp}, ${conn.toX} ${conn.toY}`
                   : `M ${conn.fromX} ${conn.fromY} C ${conn.fromX} ${conn.fromY + cp}, ${conn.toX} ${conn.toY - cp}, ${conn.toX} ${conn.toY}`;
                 const isHighlighted = selectedNodeId === conn.fromId || selectedNodeId === conn.toId;
+
+                // Calculate Bezier midpoint (t = 0.5)
+                const p0 = { x: conn.fromX, y: conn.fromY };
+                const p1 = conn.type === 'button' ? { x: conn.fromX + cp, y: conn.fromY } : { x: conn.fromX, y: conn.fromY + cp };
+                const p2 = { x: conn.toX, y: conn.toY - cp };
+                const p3 = { x: conn.toX, y: conn.toY };
+                const midX = 0.125 * p0.x + 0.375 * p1.x + 0.375 * p2.x + 0.125 * p3.x;
+                const midY = 0.125 * p0.y + 0.375 * p1.y + 0.375 * p2.y + 0.125 * p3.y;
+
                 return (
                   <g key={i}>
                     <path 
                       d={path} 
                       className={`flow-connection-path animated ${isHighlighted ? 'highlighted' : ''}`} 
-                      style={conn.type === 'direct' ? { stroke: 'rgba(96,165,250,0.5)', strokeDasharray: '4 4' } : undefined}
+                      style={conn.isPix
+                        ? { stroke: '#2ed573', strokeWidth: '2.5px' }
+                        : (conn.type === 'direct' ? { stroke: 'rgba(96,165,250,0.5)', strokeDasharray: '4 4' } : undefined)
+                      }
                     />
                     <circle cx={conn.toX} cy={conn.toY} r="3" fill={isHighlighted ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)'} />
+                    {conn.isPix && (
+                      <g transform={`translate(${midX}, ${midY})`}>
+                        <rect 
+                          x="-45" 
+                          y="-10" 
+                          width="90" 
+                          height="20" 
+                          rx="10" 
+                          fill="#2ed573" 
+                          style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.25))' }}
+                        />
+                        <text 
+                          x="0" 
+                          y="4" 
+                          textAnchor="middle" 
+                          fill="#ffffff" 
+                          style={{ fontSize: '9px', fontWeight: 'bold', fontFamily: 'Inter, sans-serif' }}
+                        >
+                          SE PAGO 💰
+                        </text>
+                      </g>
+                    )}
                   </g>
                 );
               })}
@@ -1466,6 +1502,29 @@ export default function AgentsPage() {
                         />
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {node.pixEnabled && (
+                  <div 
+                    style={{
+                      background: 'rgba(46, 213, 115, 0.15)',
+                      borderTop: '1px solid rgba(46, 213, 115, 0.3)',
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      color: '#2ed573',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontWeight: '600',
+                      borderBottomLeftRadius: '13px',
+                      borderBottomRightRadius: '13px'
+                    }}
+                  >
+                    <span>💰 Se Pago</span>
+                    <span style={{ marginLeft: 'auto', opacity: 0.8 }}>
+                      {node.nextStepId ? `→ ${node.nextStepId}` : '→ Fim / Aguarda'}
+                    </span>
                   </div>
                 )}
 
@@ -1588,7 +1647,7 @@ export default function AgentsPage() {
                   />
                 </div>
                 <div style={{ flex: 2 }}>
-                  <h4>Próxima Etapa (Fallback)</h4>
+                  <h4>{selectedNode.pixEnabled ? 'Próxima Etapa (Se Pago) 💰' : 'Próxima Etapa (Fallback)'}</h4>
                   <select
                     className="form-select"
                     style={{ padding: '8px 12px', fontSize: '0.85rem' }}
@@ -1600,6 +1659,11 @@ export default function AgentsPage() {
                       <option key={n.id} value={n.id}>{n.id}</option>
                     ))}
                   </select>
+                  {selectedNode.pixEnabled && (
+                    <span style={{ fontSize: '0.7rem', color: '#2ed573', marginTop: '4px', display: 'block', fontWeight: '500' }}>
+                      Este nó disparará assim que o pagamento Pix for confirmado.
+                    </span>
+                  )}
                 </div>
               </div>
 
