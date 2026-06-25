@@ -8,7 +8,11 @@ export async function GET(request, { params }) {
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const bucket = process.env.SUPABASE_BUCKET || 'media';
-    let publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${filename}`;
+    
+    // Ensure filename is encoded for URL compatibility (accents, spaces, etc.)
+    const decodedFilename = decodeURIComponent(filename);
+    const encodedFilename = encodeURIComponent(decodedFilename).replace(/%2F/g, '/');
+    let publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${encodedFilename}`;
 
     // Redirect non-webp files directly to Supabase public URL if they exist (bypasses 4.5MB Vercel response payload limit)
     const ext = path.extname(filename).toLowerCase();
@@ -34,7 +38,9 @@ export async function GET(request, { params }) {
       if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
         const webpFilename = filename.slice(0, -ext.length) + '.webp';
         console.log(`File not found for ${filename}. Trying fallback to WebP: ${webpFilename}`);
-        const fallbackUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${webpFilename}`;
+        const decodedWebp = decodeURIComponent(webpFilename);
+        const encodedWebp = encodeURIComponent(decodedWebp).replace(/%2F/g, '/');
+        const fallbackUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${encodedWebp}`;
         const fallbackRes = await fetch(fallbackUrl);
         if (fallbackRes.ok) {
           storageRes = fallbackRes;

@@ -460,28 +460,46 @@ export async function deleteWhatsAppMessage(messageId, connection = null) {
 function resolveSupabaseUrl(mediaUrl) {
   if (!mediaUrl || typeof mediaUrl !== 'string') return mediaUrl;
 
-  let filename = '';
-  if (mediaUrl.startsWith('/api/uploads/')) {
-    filename = mediaUrl.replace('/api/uploads/', '');
-  } else if (mediaUrl.includes('/api/uploads/')) {
+  // 1. Ensure the mediaUrl itself is correctly URL-encoded if it contains /api/uploads/
+  let sanitizedMediaUrl = mediaUrl;
+  if (mediaUrl.includes('/api/uploads/')) {
     const parts = mediaUrl.split('/api/uploads/');
+    const prefix = parts[0] + '/api/uploads/';
+    const remaining = parts[1];
+    if (remaining) {
+      const [pathPart, queryPart] = remaining.split('?');
+      const decodedPath = decodeURIComponent(pathPart);
+      const encodedPath = encodeURIComponent(decodedPath).replace(/%2F/g, '/');
+      sanitizedMediaUrl = prefix + encodedPath;
+      if (queryPart) {
+        sanitizedMediaUrl += '?' + queryPart;
+      }
+    }
+  }
+
+  // 2. Resolve to direct Supabase URL if it's not a WebP (which must go through the proxy for conversion)
+  let filename = '';
+  if (sanitizedMediaUrl.includes('/api/uploads/')) {
+    const parts = sanitizedMediaUrl.split('/api/uploads/');
     filename = parts[1]?.split('?')[0];
   }
 
   if (filename) {
-    // If it's webp, we MUST let it go through Vercel proxy for sharp PNG conversion
-    if (filename.toLowerCase().endsWith('.webp')) {
-      return mediaUrl;
+    // Decoded filename check for webp extension
+    const decodedFilename = decodeURIComponent(filename);
+    if (decodedFilename.toLowerCase().endsWith('.webp')) {
+      return sanitizedMediaUrl;
     }
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const bucket = process.env.SUPABASE_BUCKET || 'media';
     if (supabaseUrl) {
+      // Filename is already URL-encoded since we derived it from sanitizedMediaUrl
       const directUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${filename}`;
       console.log(`Resolved local media url ${mediaUrl} to direct Supabase URL: ${directUrl}`);
       return directUrl;
     }
   }
 
-  return mediaUrl;
+  return sanitizedMediaUrl;
 }
