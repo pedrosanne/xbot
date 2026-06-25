@@ -2,7 +2,52 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import path from 'path';
 import { logToDb } from '@/lib/log';
-import { uploadToSupabaseStorage } from '@/lib/storage';
+import { uploadToSupabaseStorage, deleteFromSupabaseStorage } from '@/lib/storage';
+
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get('category'); // 'image', 'video', 'audio', 'document'
+    const search = searchParams.get('search');
+
+    const where = {};
+
+    if (category) {
+      if (category === 'image') {
+        where.mimeType = { startsWith: 'image/' };
+      } else if (category === 'video') {
+        where.mimeType = { startsWith: 'video/' };
+      } else if (category === 'audio') {
+        where.mimeType = { startsWith: 'audio/' };
+      } else if (category === 'document') {
+        where.NOT = [
+          { mimeType: { startsWith: 'image/' } },
+          { mimeType: { startsWith: 'video/' } },
+          { mimeType: { startsWith: 'audio/' } }
+        ];
+      }
+    }
+
+    if (search) {
+      where.filename = {
+        contains: search,
+        mode: 'insensitive'
+      };
+    }
+
+    const uploads = await prisma.upload.findMany({
+      where,
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return NextResponse.json({ success: true, uploads });
+  } catch (error) {
+    console.error('Error fetching uploads:', error);
+    return NextResponse.json({ error: 'Erro ao listar mídias da galeria.' }, { status: 500 });
+  }
+}
 
 export async function POST(request) {
   try {
@@ -55,3 +100,39 @@ export async function POST(request) {
   }
 }
 
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID do arquivo é obrigatório.' }, { status: 400 });
+    }
+
+    const upload = await prisma.upload.findUnique({
+      where: { id }
+    });
+
+    if (!upload) {
+      return NextResponse.json({ error: 'Arquivo não encontrado.' }, { status: 404 });
+    }
+
+    // 1. Delete physical file from Supabase Storage
+    try {
+      await deleteFromSupabaseStorage([upload.filename]);
+    } catch (storageErr) {
+      console.warn(`Could not delete file ${upload.filename} from storage:`, storageErr);
+      // Proceed to delete DB record anyway to avoid orphan records in DB
+    }
+
+    // 2. Delete database record
+    await prisma.upload.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true, message: 'Arquivo excluído com sucesso.' });
+  } catch (error) {
+    console.error('Error deleting upload:', error);
+    return NextResponse.json({ error: 'Erro ao excluir mídia.' }, { status: 500 });
+  }
+}

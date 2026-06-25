@@ -69,6 +69,31 @@ export default function AgentsPage() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // Gallery Media Selector States
+  const [gallerySelectorOpen, setGallerySelectorOpen] = useState(false);
+  const [selectorMediaType, setSelectorMediaType] = useState('');
+  const [selectorUploads, setSelectorUploads] = useState([]);
+  const [loadingSelector, setLoadingSelector] = useState(false);
+
+  useEffect(() => {
+    if (!gallerySelectorOpen || !selectorMediaType) return;
+    async function loadSelectorMedia() {
+      setLoadingSelector(true);
+      try {
+        const res = await fetch(`/api/uploads?category=${selectorMediaType}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSelectorUploads(data.uploads || []);
+        }
+      } catch (err) {
+        console.error('Error fetching selector media:', err);
+      } finally {
+        setLoadingSelector(false);
+      }
+    }
+    loadSelectorMedia();
+  }, [gallerySelectorOpen, selectorMediaType]);
+
   // States for visual drag-to-connect
   const [connectingFrom, setConnectingFrom] = useState(null); // { nodeId, buttonId }
   const [connectingMousePos, setConnectingMousePos] = useState(null); // { x, y }
@@ -1724,6 +1749,28 @@ export default function AgentsPage() {
                           disabled={uploadingMedia}
                           onChange={(e) => handleMediaUpload(e, selectedNodeId, selectedNode.media.type)}
                         />
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            gap: '8px', 
+                            padding: '8px 12px',
+                            fontSize: '0.82rem',
+                            border: '1px solid var(--border-glass)',
+                            borderRadius: '6px',
+                            background: 'rgba(255, 255, 255, 0.04)',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => {
+                            setSelectorMediaType(selectedNode.media.type);
+                            setGallerySelectorOpen(true);
+                          }}
+                        >
+                          📂 Selecionar da Galeria
+                        </button>
                         {selectedNode.media.type === 'audio' && (
                           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '2px 0 4px 0', lineHeight: '1.3' }}>
                             ⚠️ <strong>Dica Xbot:</strong> Para o áudio chegar como gravação nativa (humana), use arquivos no formato <strong>.ogg (codec Opus)</strong>.
@@ -2035,6 +2082,158 @@ export default function AgentsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gallery Selector Modal */}
+        {gallerySelectorOpen && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.85)',
+              zIndex: 999999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px'
+            }}
+            onClick={() => setGallerySelectorOpen(false)}
+          >
+            <div 
+              className="glass-panel"
+              style={{
+                width: '100%',
+                maxWidth: '600px',
+                maxHeight: '80vh',
+                background: 'rgba(12, 12, 12, 0.98)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                  Selecionar {selectorMediaType === 'image' ? 'Imagem' : selectorMediaType === 'video' ? 'Vídeo' : selectorMediaType === 'audio' ? 'Áudio' : 'Documento'} da Galeria
+                </h3>
+                <button 
+                  onClick={() => setGallerySelectorOpen(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: 'none',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div style={{ flexGrow: 1, overflowY: 'auto', minHeight: '200px' }}>
+                {loadingSelector ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Carregando mídias...</span>
+                  </div>
+                ) : selectorUploads.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 10px', color: 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '12px' }}>📂</span>
+                    <p style={{ fontSize: '0.85rem' }}>Nenhum arquivo deste tipo encontrado na galeria.</p>
+                    <p style={{ fontSize: '0.75rem', marginTop: '4px', opacity: 0.7 }}>Mídias recebidas no chat ou carregadas na aba Galeria aparecerão aqui.</p>
+                  </div>
+                ) : (
+                  <div 
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                      gap: '12px'
+                    }}
+                  >
+                    {selectorUploads.map((upload) => {
+                      const name = upload.filename.includes('___') 
+                        ? `${upload.filename.split('___')[0]}${upload.filename.substring(upload.filename.lastIndexOf('.'))}`
+                        : upload.filename;
+                      const isImg = upload.mimeType.startsWith('image/');
+                      
+                      return (
+                        <div 
+                          key={upload.id}
+                          onClick={() => {
+                            updateNode(selectedNodeId, {
+                              media: {
+                                ...selectedNode.media,
+                                url: `/api/uploads/${upload.filename}`
+                              }
+                            });
+                            setGallerySelectorOpen(false);
+                          }}
+                          style={{
+                            background: 'rgba(255,255,255,0.02)',
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            transition: 'border-color 0.2s ease, background 0.2s ease',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                          }}
+                        >
+                          <div 
+                            style={{
+                              height: '80px',
+                              background: 'rgba(0,0,0,0.2)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderBottom: '1px solid rgba(255,255,255,0.05)'
+                            }}
+                          >
+                            {isImg ? (
+                              <img 
+                                src={`/api/uploads/${upload.filename}`} 
+                                alt={name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : selectorMediaType === 'video' ? (
+                              <span style={{ fontSize: '1.5rem' }}>🎬</span>
+                            ) : selectorMediaType === 'audio' ? (
+                              <span style={{ fontSize: '1.5rem' }}>🔊</span>
+                            ) : (
+                              <span style={{ fontSize: '1.5rem' }}>📄</span>
+                            )}
+                          </div>
+                          <div style={{ padding: '8px', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }} title={name}>
+                            {name}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
