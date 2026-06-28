@@ -139,6 +139,29 @@ export default function GalleryPage() {
     }
   };
 
+  // Handle delete ALL uploads
+  const handleDeleteAll = async () => {
+    if (!confirm('🚨 ATENÇÃO: Tem certeza de que deseja apagar TODOS os arquivos da galeria e do servidor? Esta ação é irreversível!')) {
+      return;
+    }
+
+    setStatusMsg({ type: '', text: '' });
+    try {
+      const res = await fetch(`/api/uploads?id=all`, { method: 'DELETE' });
+      if (res.ok) {
+        setStatusMsg({ type: 'success', text: 'Todos os arquivos foram excluídos com sucesso!' });
+        setUploads([]);
+        setPreviewMedia(null);
+      } else {
+        const err = await res.json();
+        setStatusMsg({ type: 'error', text: err.error || 'Erro ao excluir todas as mídias.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setStatusMsg({ type: 'error', text: 'Erro ao conectar com o servidor.' });
+    }
+  };
+
   // Helper to format dates nicely
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -188,11 +211,21 @@ export default function GalleryPage() {
           <p className="page-description">Gerencie, filtre e reutilize imagens, vídeos e documentos recebidos ou carregados no sistema.</p>
         </div>
         
-        <div>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {uploads.length > 0 && (
+            <button 
+              onClick={handleDeleteAll}
+              className="btn btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f87171', borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)', margin: 0 }}
+            >
+              🗑️ Apagar Tudo
+            </button>
+          )}
+
           <label 
             htmlFor="gallery-file-upload" 
             className={`btn btn-primary ${uploading ? 'disabled' : ''}`}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}
           >
             {uploading ? (
               <>

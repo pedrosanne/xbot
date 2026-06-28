@@ -109,6 +109,20 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'ID do arquivo é obrigatório.' }, { status: 400 });
     }
 
+    if (id === 'all') {
+      const allUploads = await prisma.upload.findMany();
+      if (allUploads.length > 0) {
+        const filenames = allUploads.map(u => u.filename);
+        try {
+          await deleteFromSupabaseStorage(filenames);
+        } catch (storageErr) {
+          console.warn('Alguns ou todos os arquivos não puderam ser deletados do storage:', storageErr);
+        }
+        await prisma.upload.deleteMany();
+      }
+      return NextResponse.json({ success: true, message: 'Todos os arquivos foram excluídos com sucesso.' });
+    }
+
     const upload = await prisma.upload.findUnique({
       where: { id }
     });
