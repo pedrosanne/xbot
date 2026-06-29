@@ -43,7 +43,11 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
-    const { id, name, phoneNumber, whatsappToken, whatsappPhoneId, whatsappVerifyToken, isActive } = await request.json();
+    const { 
+      id, name, phoneNumber, whatsappToken, whatsappPhoneId, whatsappVerifyToken, isActive,
+      isDistributionEnabled, distributionWeight, dailyLeadLimit, currentDayLeads,
+      qualityRating, messagingTier, statusMeta
+    } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: 'ID é obrigatório' }, { status: 400 });
@@ -52,12 +56,19 @@ export async function PUT(request) {
     const connection = await prisma.whatsAppConnection.update({
       where: { id },
       data: {
-        name,
-        phoneNumber,
-        whatsappToken,
-        whatsappPhoneId,
-        whatsappVerifyToken,
-        isActive
+        ...(name !== undefined && { name }),
+        ...(phoneNumber !== undefined && { phoneNumber }),
+        ...(whatsappToken !== undefined && { whatsappToken }),
+        ...(whatsappPhoneId !== undefined && { whatsappPhoneId }),
+        ...(whatsappVerifyToken !== undefined && { whatsappVerifyToken }),
+        ...(isActive !== undefined && { isActive }),
+        ...(isDistributionEnabled !== undefined && { isDistributionEnabled }),
+        ...(distributionWeight !== undefined && { distributionWeight: parseInt(distributionWeight) }),
+        ...(dailyLeadLimit !== undefined && { dailyLeadLimit: parseInt(dailyLeadLimit) }),
+        ...(currentDayLeads !== undefined && { currentDayLeads: parseInt(currentDayLeads) }),
+        ...(qualityRating !== undefined && { qualityRating }),
+        ...(messagingTier !== undefined && { messagingTier }),
+        ...(statusMeta !== undefined && { statusMeta }),
       }
     });
 

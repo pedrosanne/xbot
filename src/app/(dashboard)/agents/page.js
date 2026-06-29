@@ -2311,6 +2311,9 @@ export default function AgentsPage() {
           <button onClick={() => { setActiveTab('calls'); closeBuilder(); }} className={`btn ${activeTab === 'calls' ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '8px 16px', fontSize: '0.85rem', border: activeTab === 'calls' ? 'none' : undefined }}>
             📞 Central de Chamadas
           </button>
+          <button onClick={() => { setActiveTab('distribution'); closeBuilder(); }} className={`btn ${activeTab === 'distribution' ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '8px 16px', fontSize: '0.85rem', border: activeTab === 'distribution' ? 'none' : undefined }}>
+            🔀 Distribuição de Leads
+          </button>
         </div>
       </header>
 
@@ -3103,6 +3106,228 @@ export default function AgentsPage() {
                             </div>
                           </div>
                         )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* =====================================================================
+            TAB 5: LEAD DISTRIBUTION (LOAD BALANCER)
+            ===================================================================== */}
+        {activeTab === 'distribution' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Top Info Panel */}
+            <div className="glass-panel" style={{ padding: '24px' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>🔀 Distribuidor Inteligente de Leads (Load Balancer)</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.6', marginBottom: '16px' }}>
+                Evite bloqueios e banimentos da Meta distribuindo o fluxo de novos leads entre múltiplos números de WhatsApp. 
+                Utilize o link abaixo em seus anúncios, botões de checkout ou páginas de vendas para realizar o redirecionamento automático.
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Link de Rotação (Copie este link para os anúncios)</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    readOnly 
+                    value={typeof window !== 'undefined' ? `${window.location.origin}/api/redirect/whatsapp` : ''} 
+                    style={{ background: 'rgba(0,0,0,0.2)', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                  />
+                  <button 
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        navigator.clipboard.writeText(`${window.location.origin}/api/redirect/whatsapp`);
+                        alert('Link copiado para a área de transferência!');
+                      }
+                    }}
+                    className="btn btn-primary" 
+                    style={{ padding: '0 20px', whiteSpace: 'nowrap' }}
+                  >
+                    Copiar Link
+                  </button>
+                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px' }}>
+                  Dica: Você pode passar um texto inicial opcional adicionando o parâmetro <code>?text=Olá</code> ao final do link.
+                </p>
+              </div>
+            </div>
+
+            {/* List and Configuration of Numbers */}
+            <div className="glass-panel" style={{ padding: '28px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '16px' }}>Configuração de Números na Rotação</h3>
+              
+              {connections.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                  Nenhum número de WhatsApp conectado. Vá na aba &quot;Conexão WhatsApp&quot; para conectar um número primeiro.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {connections.map((conn) => {
+                    const pct = conn.dailyLeadLimit > 0 ? Math.min(100, Math.round((conn.currentDayLeads || 0) / conn.dailyLeadLimit * 100)) : 0;
+                    
+                    return (
+                      <div 
+                        key={conn.id} 
+                        style={{ 
+                          padding: '20px', 
+                          background: 'rgba(255,255,255,0.01)', 
+                          border: '1px solid var(--border-glass)', 
+                          borderRadius: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '16px'
+                        }}
+                      >
+                        {/* Header of Connection row */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div className="agent-avatar" style={{ width: '40px', height: '40px', fontSize: '1.1rem' }}>📞</div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{conn.name}</div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{conn.phoneNumber || 'Sem número'}</div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {/* Health status */}
+                            <span className="badge" style={{ 
+                              background: conn.qualityRating === 'GREEN' ? 'rgba(74,222,128,0.15)' : conn.qualityRating === 'YELLOW' ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)',
+                              color: conn.qualityRating === 'GREEN' ? '#4ade80' : conn.qualityRating === 'YELLOW' ? '#fbbf24' : '#f87171',
+                              border: `1px solid ${conn.qualityRating === 'GREEN' ? 'rgba(74,222,128,0.3)' : conn.qualityRating === 'YELLOW' ? 'rgba(251,191,36,0.3)' : 'rgba(239,68,68,0.3)'}`
+                            }}>
+                              Qualidade: {conn.qualityRating === 'GREEN' ? 'Alta 🟢' : conn.qualityRating === 'YELLOW' ? 'Média 🟡' : 'Baixa 🔴'}
+                            </span>
+
+                            {/* Messaging tier */}
+                            <span className="badge" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }}>
+                              Tier: {conn.messagingTier || 'TIER_1K'}
+                            </span>
+
+                            {/* Status meta */}
+                            <span className="badge" style={{ 
+                              background: conn.statusMeta === 'CONNECTED' ? 'rgba(74,222,128,0.1)' : 'rgba(239,68,68,0.1)',
+                              color: conn.statusMeta === 'CONNECTED' ? '#4ade80' : '#f87171',
+                            }}>
+                              {conn.statusMeta || 'CONNECTED'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Stats & Progress */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Leads hoje</div>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>
+                              {conn.currentDayLeads || 0} <span style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--text-muted)' }}>/ {conn.dailyLeadLimit || 1000}</span>
+                            </div>
+                          </div>
+
+                          <div style={{ width: '100%' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                              <span>Uso diário</span>
+                              <span>{pct}%</span>
+                            </div>
+                            <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: pct > 85 ? '#ff5c5c' : pct > 60 ? '#fbbf24' : '#4ade80', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Settings inputs */}
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                          gap: '16px',
+                          paddingTop: '12px',
+                          borderTop: '1px solid var(--border-glass)'
+                        }}>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Participar da Rotação</label>
+                            <div style={{ display: 'flex', alignItems: 'center', height: '40px' }}>
+                              <button 
+                                onClick={async () => {
+                                  await fetch('/api/connections', {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: conn.id, isDistributionEnabled: !conn.isDistributionEnabled })
+                                  });
+                                  fetchConnections();
+                                }}
+                                className={`btn ${conn.isDistributionEnabled ? 'btn-primary' : 'btn-secondary'}`}
+                                style={{ width: '100%', height: '38px', fontSize: '0.82rem', padding: '6px 12px' }}
+                              >
+                                {conn.isDistributionEnabled ? '✓ Ativo na Rotação' : 'Inativo'}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Peso da Distribuição</label>
+                            <input 
+                              type="number" 
+                              className="form-input" 
+                              min="1" 
+                              max="100"
+                              value={conn.distributionWeight || 1} 
+                              disabled={!conn.isDistributionEnabled}
+                              onChange={async (e) => {
+                                const val = parseInt(e.target.value) || 1;
+                                await fetch('/api/connections', {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ id: conn.id, distributionWeight: val })
+                                });
+                                fetchConnections();
+                              }}
+                            />
+                          </div>
+
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Limite de Leads/Dia</label>
+                            <input 
+                              type="number" 
+                              className="form-input" 
+                              min="10" 
+                              value={conn.dailyLeadLimit || 1000} 
+                              disabled={!conn.isDistributionEnabled}
+                              onChange={async (e) => {
+                                const val = parseInt(e.target.value) || 1000;
+                                await fetch('/api/connections', {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ id: conn.id, dailyLeadLimit: val })
+                                });
+                                fetchConnections();
+                              }}
+                            />
+                          </div>
+
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Status da Saúde (Meta)</label>
+                            <select 
+                              className="form-select"
+                              value={conn.qualityRating || 'GREEN'}
+                              onChange={async (e) => {
+                                const val = e.target.value;
+                                await fetch('/api/connections', {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ id: conn.id, qualityRating: val })
+                                });
+                                fetchConnections();
+                              }}
+                            >
+                              <option value="GREEN">Alta (Verde)</option>
+                              <option value="YELLOW">Média (Amarela)</option>
+                              <option value="RED">Baixa (Vermelha)</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}

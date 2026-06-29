@@ -112,7 +112,12 @@ export async function GET(request) {
       }
     });
 
-    const msg = `Limpeza concluída. Mídias excluídas: ${deletedUploadsCount}, Logs antigos limpos: ${deletedLogs.count}, Mensagens >30 dias limpas: ${deletedMessages.count}`;
+    // 7. Reset daily lead counts for WhatsApp connections
+    await prisma.whatsAppConnection.updateMany({
+      data: { currentDayLeads: 0 }
+    });
+
+    const msg = `Limpeza concluída. Mídias excluídas: ${deletedUploadsCount}, Logs antigos limpos: ${deletedLogs.count}, Mensagens >30 dias limpas: ${deletedMessages.count}, Contadores de Leads resetados.`;
     await logToDb('INFO', 'SYSTEM', msg);
 
     return NextResponse.json({

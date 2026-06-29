@@ -95,6 +95,15 @@ model WhatsAppConnection {
   agents              Agent[]
   flows               Flow[]
   users               User[]
+
+  // Lead Distribution & Load Balancing
+  isDistributionEnabled Boolean  @default(false)
+  distributionWeight    Int      @default(1)
+  dailyLeadLimit        Int      @default(1000)
+  currentDayLeads       Int      @default(0)
+  qualityRating         String   @default("GREEN")
+  messagingTier         String   @default("TIER_1K")
+  statusMeta            String   @default("CONNECTED")
 }
 
 model Message {
