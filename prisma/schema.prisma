@@ -319,3 +319,29 @@ model Pixel {
   createdAt DateTime @default(now())
 }
 
+model Broadcast {
+  id          String   @id @default(uuid())
+  name        String
+  status      String   @default("PENDING") // PENDING, RUNNING, PAUSED, COMPLETED, CANCELLED
+  message     String   // Texto da mensagem (com suporte a Spintax)
+  flowId      String?  // Opcional: disparar um fluxo/chatbot após a mensagem
+  senderIds   String   // IDs das conexões usadas no disparo (separados por vírgula)
+  totalLeads  Int      @default(0)
+  sentLeads   Int      @default(0)
+  failedLeads Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  logs        BroadcastLog[]
+}
+
+model BroadcastLog {
+  id          String   @id @default(uuid())
+  broadcastId String
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  contactId   String
+  status      String   // SENT, FAILED
+  error       String   @default("")
+  timestamp   DateTime @default(now())
+}
+
+
