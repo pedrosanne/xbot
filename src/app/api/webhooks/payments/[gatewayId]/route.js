@@ -462,6 +462,31 @@ export async function POST(request, { params }) {
           await logToDb('ERROR', 'FLOW', `Erro ao auto-avançar fluxo do contato ${contact.id} após pagamento: ${flowError.message}`);
         }
       }
+
+      // g. Trigger post-payment flows (Upsell)
+      try {
+        const postPaymentFlows = await prisma.flow.findMany({
+          where: {
+            isActive: true,
+            trigger: 'payment_confirmed',
+            OR: [
+              { productId: productId || undefined },
+              { productId: null }
+            ]
+          }
+        });
+
+        if (postPaymentFlows.length > 0) {
+          const bestFlow = postPaymentFlows.find(f => f.productId === productId) || postPaymentFlows[0];
+          await logToDb('INFO', 'FLOW', `Disparando fluxo pós-pagamento '${bestFlow.name}' (Upsell) para o contato ${contact.id}`);
+          
+          const { startFlowForContact } = await import('@/lib/queue');
+          await startFlowForContact(contact, bestFlow, null);
+        }
+      } catch (upsellError) {
+        console.error('Error triggering post-payment flow:', upsellError);
+        await logToDb('ERROR', 'FLOW', `Erro ao disparar fluxo pós-pagamento para o contato ${contact.id}: ${upsellError.message}`);
+      }
     }
 
     return NextResponse.json({ success: true, paymentId: paymentRecord.id });

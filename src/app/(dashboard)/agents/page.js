@@ -1231,6 +1231,7 @@ export default function AgentsPage() {
             >
               <option value="keyword">Palavra-chave</option>
               <option value="welcome">Welcome Flow</option>
+              <option value="payment_confirmed">Pós-Pagamento (Upsell)</option>
             </select>
           </div>
 
@@ -1246,6 +1247,24 @@ export default function AgentsPage() {
                 value={flowKeywords} 
                 onChange={(e) => setFlowKeywords(e.target.value)} 
               />
+            </div>
+          )}
+
+          {/* Product selection (only if post-payment activation is selected) */}
+          {flowTrigger === 'payment_confirmed' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 220px', minWidth: 0 }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Produto:</span>
+              <select 
+                className="form-select" 
+                style={{ padding: '6px 10px', fontSize: '0.82rem', height: '32px', margin: 0 }} 
+                value={flowProductId || ''} 
+                onChange={(e) => setFlowProductId(e.target.value || '')}
+              >
+                <option value="">Qualquer Produto</option>
+                {productsList.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -2841,8 +2860,12 @@ export default function AgentsPage() {
                           <div>
                             <h3 style={{ fontWeight: 600, fontSize: '1rem' }}>{flow.name}</h3>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px', fontSize: '0.72rem' }}>
-                              <span className={`badge ${flow.trigger === 'welcome' ? 'badge-success' : 'badge-warning'}`}>
-                                {flow.trigger === 'welcome' ? 'Entrada Principal' : 'Por Palavra-chave'}
+                              <span className={`badge ${
+                                flow.trigger === 'welcome' ? 'badge-success' : 
+                                flow.trigger === 'payment_confirmed' ? 'badge-info' : 'badge-warning'
+                              }`}>
+                                {flow.trigger === 'welcome' ? 'Entrada Principal' : 
+                                 flow.trigger === 'payment_confirmed' ? 'Pós-Pagamento (Upsell)' : 'Por Palavra-chave'}
                               </span>
                               <span className="badge" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
                                 {parsedSteps.length} etapas

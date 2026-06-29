@@ -705,7 +705,7 @@ async function processSingleMessage(contact, messageData) {
   }
 }
 
-async function startFlowForContact(contact, flow, incomingMessageId = null) {
+export async function startFlowForContact(contact, flow, incomingMessageId = null) {
   const steps = JSON.parse(flow.steps || '[]');
   if (steps.length === 0) return;
 
