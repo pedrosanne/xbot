@@ -475,8 +475,18 @@ async function processSingleMessage(contact, messageData) {
               }
             }
 
-            // Entrada livre de texto no fluxo (sem nextStepId). Fallback para IA se o fluxo tiver um agente de IA designado.
+            // Entrada livre de texto no fluxo (sem nextStepId). Fallback para IA se o fluxo tiver um agente de IA designado e ativo.
+            let isAgentActive = false;
             if (freshContact.designatedAgentId) {
+              const agent = await prisma.agent.findUnique({
+                where: { id: freshContact.designatedAgentId }
+              });
+              if (agent && agent.isActive) {
+                isAgentActive = true;
+              }
+            }
+
+            if (isAgentActive) {
               await logToDb('INFO', 'AI', `Entrada de texto livre no fluxo. Acionando fallback híbrido com Gemini AI usando agente designado.`);
               if (messageData.id) {
                 await markWhatsAppMessageAsRead(messageData.id, freshContact.connection);
@@ -522,9 +532,35 @@ async function processSingleMessage(contact, messageData) {
               await sendStepResponse(contactId, currentStep, steps, messageData.id, freshContact.connection, true);
               return;
             } else {
-              await logToDb('WARN', 'FLOW', `Entrada inválida. Nenhuma opção selecionada e nenhum Agente IA designado para este fluxo. Repetindo etapa.`);
-              await sendText(contactId, "Desculpe, não entendi. Por favor, escolha uma das opções abaixo:", messageData.id, freshContact.connection);
-              await sendStepResponse(contactId, currentStep, steps, messageData.id, freshContact.connection, true);
+              await logToDb('WARN', 'FLOW', `Entrada inválida. Nenhuma opção selecionada e nenhum Agente IA ativo designado para este fluxo. Ignorando e notificando colaboradores.`);
+              
+              try {
+                let targetUserIds = null;
+                if (freshContact.connectionId) {
+                  const connWithUsers = await prisma.whatsAppConnection.findUnique({
+                    where: { id: freshContact.connectionId },
+                    include: { users: { select: { id: true } } }
+                  });
+                  if (connWithUsers && connWithUsers.users.length > 0) {
+                    targetUserIds = connWithUsers.users.map(u => u.id);
+                  }
+                }
+
+                const contactName = freshContact.name || freshContact.profileName || contactId;
+                const messageSnippet = text 
+                  ? (text.length > 60 ? text.substring(0, 60) + '...' : text) 
+                  : 'Mensagem fora de contexto';
+
+                await sendPushNotification(
+                  `Mensagem fora de contexto: ${contactName} ⚠️`,
+                  `Mensagem: "${messageSnippet}" (Aguardando ação do colaborador)`,
+                  `/chat?contactId=${contactId}`,
+                  targetUserIds
+                );
+              } catch (pushErr) {
+                console.error('Error sending invalid input push notification:', pushErr);
+              }
+
               return;
             }
           }
