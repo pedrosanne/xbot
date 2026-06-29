@@ -244,6 +244,13 @@ export default function ChatPage() {
   const [connections, setConnections] = useState([]);
   const [selectedConnectionId, setSelectedConnectionId] = useState('all');
 
+  // Manual Payment states
+  const [products, setProducts] = useState([]);
+  const [showManualPayModal, setShowManualPayModal] = useState(false);
+  const [manualProductId, setManualProductId] = useState('');
+  const [manualAmount, setManualAmount] = useState('');
+  const [registeringManualPay, setRegisteringManualPay] = useState(false);
+
   async function fetchCollaborators() {
     try {
       const res = await fetch('/api/collaborators');
@@ -252,6 +259,51 @@ export default function ChatPage() {
       }
     } catch (err) {
       console.error('Error fetching collaborators:', err);
+    }
+  };
+
+  async function fetchProducts() {
+    try {
+      const res = await fetch('/api/products');
+      if (res.ok) {
+        setProducts(await res.json());
+      }
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    }
+  }
+
+  const handleRegisterManualPayment = async (e) => {
+    e.preventDefault();
+    if (!selectedContact || !manualAmount) return;
+
+    setRegisteringManualPay(true);
+    try {
+      const res = await fetch('/api/payments/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedContact.id,
+          productId: manualProductId || null,
+          amount: manualAmount
+        })
+      });
+
+      if (res.ok) {
+        alert('Venda manual registrada com sucesso!');
+        setShowManualPayModal(false);
+        setManualProductId('');
+        setManualAmount('');
+        fetchMessages(selectedContact.id);
+      } else {
+        const data = await res.json();
+        alert(`Erro: ${data.error || 'Falha ao registrar'}`);
+      }
+    } catch (err) {
+      console.error('Error registering manual payment:', err);
+      alert('Erro ao conectar com o servidor.');
+    } finally {
+      setRegisteringManualPay(false);
     }
   };
 
@@ -321,6 +373,7 @@ export default function ChatPage() {
       fetchConnections();
       fetchCollaborators();
       fetchLoggedUser();
+      fetchProducts();
     });
   }, []);
 
@@ -2221,6 +2274,18 @@ export default function ChatPage() {
                   </div>
 
                   <button 
+                    onClick={() => {
+                      setManualAmount('');
+                      setManualProductId('');
+                      setShowManualPayModal(true);
+                    }}
+                    className="btn" 
+                    style={{ justifyContent: 'center', marginTop: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(74,222,128,0.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)' }}
+                  >
+                    💰 Confirmar Pix / Venda Manual
+                  </button>
+
+                  <button 
                     onClick={() => setEditProfileMode(true)}
                     className="btn btn-secondary" 
                     style={{ justifyContent: 'center', marginTop: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -2477,6 +2542,90 @@ export default function ChatPage() {
           </div>
         )}
       </div>
+
+      {/* Manual Payment Modal */}
+      {showManualPayModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999
+        }}>
+          <div className="glass-panel animate-fade-in" style={{ padding: '28px', maxWidth: '420px', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>💰 Registrar Venda / Pix Manual</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '4px 0 0 0', lineHeight: '1.4' }}>
+                Registre uma transação manual recebida via Pix direto no seu CNPJ. 
+                Isso irá disparar a conversão de compra no Meta Pixel (CAPI) e iniciar fluxos de upsell se configurado.
+              </p>
+            </div>
+
+            <form onSubmit={handleRegisterManualPayment} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Produto Associado</label>
+                <select 
+                  className="form-select"
+                  value={manualProductId}
+                  onChange={(e) => {
+                    const prodId = e.target.value;
+                    setManualProductId(prodId);
+                    const prod = products.find(p => p.id === prodId);
+                    if (prod) {
+                      setManualAmount(prod.price);
+                    }
+                  }}
+                >
+                  <option value="">Sem Produto Específico</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} (R$ {p.price})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Valor do Pix (R$) *</label>
+                <input 
+                  type="number" 
+                  className="form-input" 
+                  step="0.01"
+                  min="0.01"
+                  placeholder="Ex: 97.00"
+                  value={manualAmount}
+                  onChange={(e) => setManualAmount(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowManualPayModal(false)}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  disabled={registeringManualPay}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  style={{ flex: 1, justifyContent: 'center', background: '#22c55e', color: 'white', border: 'none' }}
+                  disabled={registeringManualPay}
+                >
+                  {registeringManualPay ? 'Registrando...' : 'Confirmar Venda'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
