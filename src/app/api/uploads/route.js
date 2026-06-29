@@ -67,7 +67,7 @@ export async function POST(request) {
     const sanitizedBase = baseName
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9 ._-]/g, '')
+      .replace(/[^a-zA-Z0-9_.-]/g, '_')
       .trim() || 'manual_upload';
     const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const filename = `${sanitizedBase}___${uniqueId}${extension}`;
