@@ -23,6 +23,11 @@ model Setting {
   vapiAssistantId     String   @default("")
   publicBaseUrl       String   @default("")
   updatedAt           DateTime @updatedAt
+
+  // Global Meta Pixel & CAPI Settings
+  globalPixelId       String   @default("")
+  globalPixelToken    String   @default("")
+  globalPixelTestCode String   @default("")
 }
 
 model Agent {
@@ -73,6 +78,15 @@ model Contact {
   typingState       String              @default("IDLE")
   assignedUserId    String?
   assignedUser      User?               @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  // Tracking (UTM & Ads Cookies)
+  utmSource    String   @default("")
+  utmMedium    String   @default("")
+  utmCampaign  String   @default("")
+  utmContent   String   @default("")
+  utmTerm      String   @default("")
+  fbp          String   @default("")
+  fbc          String   @default("")
 
   @@index([connectionId])
   @@index([assignedUserId])
@@ -342,6 +356,18 @@ model BroadcastLog {
   status      String   // SENT, FAILED
   error       String   @default("")
   timestamp   DateTime @default(now())
+}
+
+model UtmTracker {
+  id           String   @id // Código de referência único (Ex: "A5X9B")
+  utmSource    String   @default("")
+  utmMedium    String   @default("")
+  utmCampaign  String   @default("")
+  utmContent   String   @default("")
+  utmTerm      String   @default("")
+  fbp          String   @default("")
+  fbc          String   @default("")
+  createdAt    DateTime @default(now())
 }
 
 

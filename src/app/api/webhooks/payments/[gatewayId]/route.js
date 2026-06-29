@@ -434,6 +434,14 @@ export async function POST(request, { params }) {
       // e. Log event
       await logToDb('INFO', 'WEBHOOK', `Pagamento de R$ ${amount} confirmado no gateway ${gateway.name} para o contato ${contact.id}.`);
 
+      // e.2. Send Meta Conversions API Event
+      try {
+        const { sendMetaCapiPurchase } = await import('@/lib/capi');
+        await sendMetaCapiPurchase({ contact, payment: paymentRecord });
+      } catch (capiError) {
+        console.error('Error triggering Meta CAPI:', capiError);
+      }
+
       // f. Continue Chatbot Flow if waiting on a Pix node
       if (contact.activeFlowId && contact.currentStepId) {
         try {

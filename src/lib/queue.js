@@ -285,6 +285,38 @@ async function processSingleMessage(contact, messageData) {
       else if (messageData.type === 'document') mimeType = 'application/pdf';
     }
 
+    // Extract Ref Code from message
+    const refCodeRegex = /Ref:\s*([A-Z0-9]{5})/i;
+    const refMatch = text.match(refCodeRegex);
+    if (refMatch) {
+      const refCode = refMatch[1].toUpperCase();
+      try {
+        const tracker = await prisma.utmTracker.findUnique({
+          where: { id: refCode }
+        });
+        if (tracker) {
+          await prisma.contact.update({
+            where: { id: contactId },
+            data: {
+              utmSource: tracker.utmSource,
+              utmMedium: tracker.utmMedium,
+              utmCampaign: tracker.utmCampaign,
+              utmContent: tracker.utmContent,
+              utmTerm: tracker.utmTerm,
+              fbp: tracker.fbp,
+              fbc: tracker.fbc
+            }
+          });
+          await logToDb('INFO', 'FLOW', `Rastreamento UTM atribuído ao contato ${contactId} usando o Ref Code ${refCode}`, {
+            utmSource: tracker.utmSource,
+            utmCampaign: tracker.utmCampaign
+          });
+        }
+      } catch (err) {
+        console.error('Error matching Ref Code in queue:', err);
+      }
+    }
+
     await logToDb('INFO', 'FLOW', `Entrada consolidada - Texto: "${text}", Botão ID: "${clickedButtonId}"`);
 
     const normalizedInput = text.trim().toLowerCase();

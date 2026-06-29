@@ -62,8 +62,34 @@ export async function GET(request) {
       });
     }
 
+    // 4. Generate unique short reference code
+    const refCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+
+    // Capture Facebook click ID & cookies
+    const fbclid = searchParams.get('fbclid') || '';
+    let fbc = searchParams.get('fbc') || '';
+    if (fbclid && !fbc) {
+      fbc = `fb.1.${Date.now()}.${fbclid}`;
+    }
+    const fbp = searchParams.get('fbp') || '';
+
+    // Save tracking parameters
+    await prisma.utmTracker.create({
+      data: {
+        id: refCode,
+        utmSource: searchParams.get('utm_source') || '',
+        utmMedium: searchParams.get('utm_medium') || '',
+        utmCampaign: searchParams.get('utm_campaign') || '',
+        utmContent: searchParams.get('utm_content') || '',
+        utmTerm: searchParams.get('utm_term') || '',
+        fbp,
+        fbc
+      }
+    });
+
     const cleanPhone = chosenConnection.phoneNumber.replace(/\D/g, '');
-    const waUrl = `https://wa.me/${cleanPhone}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+    const finalMsg = `${text}\n\nRef: ${refCode}`.trim();
+    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(finalMsg)}`;
 
     await logToDb('INFO', 'FLOW', `Lead redirecionado para o número ${chosenConnection.name} (${cleanPhone}). Total hoje: ${chosenConnection.currentDayLeads + 1}/${chosenConnection.dailyLeadLimit}`);
 

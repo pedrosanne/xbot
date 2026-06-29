@@ -32,7 +32,10 @@ export async function POST(request) {
         vapiApiKey: data.vapiApiKey !== undefined ? data.vapiApiKey : undefined,
         vapiPhoneNumberId: data.vapiPhoneNumberId !== undefined ? data.vapiPhoneNumberId : undefined,
         vapiAssistantId: data.vapiAssistantId !== undefined ? data.vapiAssistantId : undefined,
-        publicBaseUrl: data.publicBaseUrl !== undefined ? data.publicBaseUrl : undefined
+        publicBaseUrl: data.publicBaseUrl !== undefined ? data.publicBaseUrl : undefined,
+        globalPixelId: data.globalPixelId !== undefined ? data.globalPixelId : undefined,
+        globalPixelToken: data.globalPixelToken !== undefined ? data.globalPixelToken : undefined,
+        globalPixelTestCode: data.globalPixelTestCode !== undefined ? data.globalPixelTestCode : undefined
       }
     });
 
