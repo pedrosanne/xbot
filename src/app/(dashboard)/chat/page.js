@@ -191,6 +191,32 @@ const getTagStyle = (tag) => {
   return { bg: 'rgba(255, 255, 255, 0.03)', text: '#d4d4d8', border: 'rgba(255, 255, 255, 0.06)' };
 };
 
+// Helper to check if a contact has paid tags
+const isContactPaid = (contact) => {
+  if (!contact || !contact.tags) return false;
+  const tags = contact.tags.toLowerCase();
+  return tags.includes('status: aprovado') || tags.includes('pago') || tags.includes('aprovado');
+};
+
+// Official Meta-style Blue Verified Badge SVG component
+const VerifiedBadge = () => (
+  <svg 
+    viewBox="0 0 24 24" 
+    style={{ 
+      width: '14px', 
+      height: '14px', 
+      fill: '#0095f6', 
+      marginLeft: '4px', 
+      flexShrink: 0,
+      display: 'inline-block',
+      verticalAlign: 'middle'
+    }}
+    title="Cliente Confirmado (Pago)"
+  >
+    <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.94.1-1.348.27C14.825 2.515 13.512 1.5 12 1.5s-2.825 1.015-3.422 2.28c-.406-.17-.866-.27-1.348-.27-2.108 0-3.818 1.78-3.818 3.99 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .94-.1 1.348-.27.597 1.265 1.91 2.28 3.422 2.28s2.825-1.015 3.422-2.28c.406.17.866.27 1.348.27 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6zm-12.72 4.14l-3.3-3.3 1.414-1.414 1.886 1.886 5.316-5.316 1.414 1.414-6.73 6.73z" />
+  </svg>
+);
+
 export default function ChatPage() {
   const [contacts, setContacts] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
@@ -1599,8 +1625,9 @@ export default function ChatPage() {
                   <div className="contact-info">
                     <div className="contact-name-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', maxWidth: '80%' }}>
-                        <span className="contact-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span className="contact-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}>
                           {contact.name || 'Sem Nome'}
+                          {isContactPaid(contact) && <VerifiedBadge />}
                         </span>
                         {contact.isPinned && <span title="Conversa Fixada">📌</span>}
                         {contact.isBlocked && <span title="Contato Bloqueado">🚫</span>}
@@ -1719,7 +1746,10 @@ export default function ChatPage() {
                     </div>
                   )}
                   <div className="chat-header-text">
-                    <span className="chat-header-title">{selectedContact.name}</span>
+                    <span className="chat-header-title" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      {selectedContact.name}
+                      {isContactPaid(selectedContact) && <VerifiedBadge />}
+                    </span>
                     <span className="chat-header-sub clickable-sub">toque para dados do contato</span>
                   </div>
                 </div>
@@ -2456,8 +2486,9 @@ export default function ChatPage() {
                       {getInitials(selectedContact.name)}
                     </div>
                   )}
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, textAlign: 'center' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                     {selectedContact.name || 'Sem Nome'}
+                    {isContactPaid(selectedContact) && <VerifiedBadge />}
                   </h3>
                   <span className={`badge ${selectedContact.status === 'MANUAL' ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     {selectedContact.status === 'MANUAL' ? (
