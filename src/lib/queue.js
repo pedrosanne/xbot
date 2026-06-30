@@ -319,6 +319,94 @@ async function processSingleMessage(contact, messageData) {
 
     await logToDb('INFO', 'FLOW', `Entrada consolidada - Texto: "${text}", Botão ID: "${clickedButtonId}"`);
 
+    // Intercept image attachments to check for Pix Receipts
+    if (messageData.type === 'image' && mediaUrl) {
+      try {
+        await logToDb('INFO', 'FLOW', `Imagem recebida. Iniciando análise de comprovante Pix via IA...`);
+        const { analyzePixReceipt, processPixReceiptPayment } = await import('./receipt');
+        const receiptData = await analyzePixReceipt(mediaUrl, mimeType || 'image/jpeg');
+        
+        if (receiptData && receiptData.isPixReceipt) {
+          if (receiptData.isScheduled) {
+            // It's just a schedule, not a payment
+            const warningMsg = `Identifiquei que este é um AGENDAMENTO de Pix de R$ ${receiptData.amount.toFixed(2).replace('.', ',')}, e não o pagamento final. Por favor, envie o comprovante de pagamento definitivo para que eu possa liberar seu acesso! ⚠️`;
+            await sendText(contactId, warningMsg, null, freshContact.connection);
+            
+            // Log to message history
+            await prisma.message.create({
+              data: {
+                id: `bot_scheduled_pix_warn_${Date.now()}`,
+                contactId,
+                direction: 'OUTGOING',
+                senderType: 'BOT',
+                type: 'text',
+                content: warningMsg,
+                status: 'sent'
+              }
+            });
+            
+            return; // Terminate queue task
+          }
+
+          // Process the receipt payment
+          const result = await processPixReceiptPayment(freshContact, receiptData);
+          
+          if (result.success) {
+            const successMsg = `Perfeito! Identifiquei seu Pix de R$ ${receiptData.amount.toFixed(2).replace('.', ',')} em nosso sistema e seu acesso já está liberado. Obrigado! 🎉`;
+            await sendText(contactId, successMsg, null, freshContact.connection);
+            
+            await prisma.message.create({
+              data: {
+                id: `bot_pix_success_${Date.now()}`,
+                contactId,
+                direction: 'OUTGOING',
+                senderType: 'BOT',
+                type: 'text',
+                content: successMsg,
+                status: 'sent'
+              }
+            });
+          } else {
+            // No match found or already used
+            let failMsg = `Recebi seu comprovante de Pix de R$ ${receiptData.amount.toFixed(2).replace('.', ',')}, mas ainda não localizei o pagamento em nossa conta do Mercado Pago. Vou encaminhar agora mesmo para nossa equipe validar e liberar manualmente para você! ⏳`;
+            if (result.reason === 'already_used') {
+              failMsg = `Este comprovante de Pix já foi utilizado anteriormente no sistema. Vou transferir você para o atendimento humano verificar o ocorrido. ⏳`;
+            }
+            
+            await sendText(contactId, failMsg, null, freshContact.connection);
+            
+            await prisma.message.create({
+              data: {
+                id: `bot_pix_fail_${Date.now()}`,
+                contactId,
+                direction: 'OUTGOING',
+                senderType: 'BOT',
+                type: 'text',
+                content: failMsg,
+                status: 'sent'
+              }
+            });
+
+            // Set contact to MANUAL so human takes over
+            await prisma.contact.update({
+              where: { id: contactId },
+              data: { status: 'MANUAL' }
+            });
+            
+            // Notify collaborators
+            const contactName = freshContact.name || freshContact.profileName || contactId;
+            const title = `Comprovante Pix não localizado! ⚠️`;
+            const body = `O lead ${contactName} enviou comprovante de R$ ${receiptData.amount.toFixed(2).replace('.', ',')} mas não foi localizado no Mercado Pago.`;
+            await sendPushNotification(title, body, `/chat?contactId=${contactId}`);
+          }
+          
+          return; // Terminate queue task, don't let bot send generic reply
+        }
+      } catch (receiptErr) {
+        console.error('Error handling Pix receipt in queue:', receiptErr);
+      }
+    }
+
     const normalizedInput = text.trim().toLowerCase();
 
     // INTERCEPT RECURRING CLIENT WHO ALREADY COMPLETED A FLOW
