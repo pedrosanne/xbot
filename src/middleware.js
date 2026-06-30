@@ -15,7 +15,8 @@ export async function middleware(req) {
     pathname.startsWith('/api/auth/register') ||
     pathname.startsWith('/api/auth/logout') ||
     pathname.startsWith('/api/uploads') ||
-    pathname.startsWith('/api/cron')
+    pathname.startsWith('/api/cron') ||
+    pathname.startsWith('/api/redirect')
   ) {
     return NextResponse.next();
   }
