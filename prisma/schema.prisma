@@ -331,6 +331,7 @@ model Pixel {
   platform  String   // "facebook", "google", "tiktok"
   pixelId   String
   token     String   @default("") // Token de Conversão da API (opcional)
+  testCode  String   @default("") // Código de teste de eventos (opcional)
   createdAt DateTime @default(now())
 }
 

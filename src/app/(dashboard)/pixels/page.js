@@ -4,9 +4,6 @@ import { useState, useEffect } from 'react';
 
 export default function PixelsPage() {
   // Config States
-  const [globalPixelId, setGlobalPixelId] = useState('');
-  const [globalPixelToken, setGlobalPixelToken] = useState('');
-  const [globalPixelTestCode, setGlobalPixelTestCode] = useState('');
   const [publicBaseUrl, setPublicBaseUrl] = useState('');
   
   const [savingConfig, setSavingConfig] = useState(false);
@@ -27,9 +24,6 @@ export default function PixelsPage() {
       const res = await fetch('/api/settings');
       if (res.ok) {
         const data = await res.json();
-        setGlobalPixelId(data.globalPixelId || '');
-        setGlobalPixelToken(data.globalPixelToken || '');
-        setGlobalPixelTestCode(data.globalPixelTestCode || '');
         setPublicBaseUrl(data.publicBaseUrl || '');
       }
     } catch (err) {
@@ -63,9 +57,6 @@ export default function PixelsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          globalPixelId,
-          globalPixelToken,
-          globalPixelTestCode,
           publicBaseUrl
         })
       });
@@ -74,7 +65,7 @@ export default function PixelsPage() {
         setConfigSuccess(true);
         setTimeout(() => setConfigSuccess(false), 3000);
       } else {
-        setConfigError('Erro ao salvar as configurações de rastreamento.');
+        setConfigError('Erro ao salvar as configurações do sistema.');
       }
     } catch (err) {
       setConfigError('Erro de conexão ao salvar.');
@@ -92,7 +83,7 @@ export default function PixelsPage() {
   return (
     <div className="page-container">
       <header className="page-header">
-        <h1 className="page-title">Pixels &amp; UTMs Rastreamento</h1>
+        <h1 className="page-title">Métricas de UTM &amp; Rastreamento</h1>
       </header>
 
       <div className="page-body animate-fade-in" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -130,10 +121,10 @@ export default function PixelsPage() {
           
           {/* Left: Pixel Configuration */}
           <div className="glass-panel" style={{ padding: '24px' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '12px' }}>⚙️ Configuração Meta Pixel &amp; CAPI</h2>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '12px' }}>⚙️ Configuração Geral de Rastreamento</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '20px', lineHeight: '1.5' }}>
-              Insira as credenciais do seu Pixel do Facebook para que o sistema envie automaticamente o evento de <strong>Purchase (Compra)</strong> 
-              via API de Conversões (CAPI) toda vez que um pagamento PIX/Cartão for detectado.
+              Defina as configurações globais de domínio do seu painel. Note que os <strong>pixels de rastreamento</strong> 
+              devem ser configurados individualmente dentro de cada <strong>Produto</strong> (na aba Pixels).
             </p>
 
             {configSuccess && (
@@ -150,52 +141,17 @@ export default function PixelsPage() {
 
             <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">ID do Meta Pixel</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="Ex: 123456789012345" 
-                  value={globalPixelId} 
-                  onChange={(e) => setGlobalPixelId(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Token de Acesso da API de Conversões (CAPI)</label>
-                <input 
-                  type="password" 
-                  className="form-input" 
-                  placeholder="EAABw..." 
-                  value={globalPixelToken} 
-                  onChange={(e) => setGlobalPixelToken(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Código de Teste de Eventos (Opcional)</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="Ex: TEST12345" 
-                  value={globalPixelTestCode} 
-                  onChange={(e) => setGlobalPixelTestCode(e.target.value)}
-                />
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Use para testar o recebimento dos eventos em tempo real no Gerenciador de Eventos da Meta. Remova em produção.
-                </div>
-              </div>
-
-              <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">URL Base Pública do Sistema</label>
                 <input 
                   type="url" 
+                  required
                   className="form-input" 
                   placeholder="https://seu-painel.vercel.app" 
                   value={publicBaseUrl} 
                   onChange={(e) => setPublicBaseUrl(e.target.value)}
                 />
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Necessário para o envio correto do parâmetro <code>event_source_url</code> da CAPI.
+                  Necessário para o envio correto do parâmetro <code>event_source_url</code> da API de Conversões (CAPI) e links de redirecionamento.
                 </div>
               </div>
 
@@ -205,7 +161,7 @@ export default function PixelsPage() {
                 style={{ justifyContent: 'center', padding: '12px', fontWeight: 600, fontSize: '0.9rem', marginTop: '8px' }}
                 disabled={savingConfig}
               >
-                {savingConfig ? 'Salvando...' : 'Salvar Configurações de Rastreamento'}
+                {savingConfig ? 'Salvando...' : 'Salvar Configuração'}
               </button>
             </form>
           </div>

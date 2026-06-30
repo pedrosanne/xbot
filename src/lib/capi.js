@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { logToDb } from './log';
 import { getSystemSettings } from './settings';
+import { prisma } from './prisma';
 
 // Helper: Hash using SHA-256 (required by Meta CAPI)
 function hash(val) {
@@ -16,18 +17,28 @@ function getFirstName(fullName) {
 }
 
 /**
- * Send a Conversions API (CAPI) Purchase event to Meta
+ * Send a Conversions API (CAPI) Purchase event to Meta for each product-configured pixel
  */
 export async function sendMetaCapiPurchase({ contact, payment }) {
   try {
     const settings = await getSystemSettings();
-    const pixelId = settings.globalPixelId;
-    const accessToken = settings.globalPixelToken;
-    const testCode = settings.globalPixelTestCode;
+    
+    if (!payment.productId) {
+      await logToDb('INFO', 'API', `Nenhum produto associado ao pagamento ${payment.id}. Pulando Meta CAPI.`);
+      return { success: false, message: 'Sem produto associado.' };
+    }
 
-    if (!pixelId || !accessToken) {
-      // Quiet return if CAPI is not configured
-      return { success: false, message: 'Meta CAPI não configurado.' };
+    // Fetch Facebook pixels for this product
+    const pixels = await prisma.pixel.findMany({
+      where: {
+        productId: payment.productId,
+        platform: 'facebook'
+      }
+    });
+
+    if (pixels.length === 0) {
+      await logToDb('INFO', 'API', `Nenhum Meta Pixel configurado para o produto '${payment.productId}'. Pulando CAPI.`);
+      return { success: false, message: 'Sem pixels para este produto.' };
     }
 
     const cleanPhone = contact.clientPhone || contact.id.split(':').pop();
@@ -52,7 +63,7 @@ export async function sendMetaCapiPurchase({ contact, payment }) {
       content_type: 'product',
       contents: [
         {
-          id: payment.productId || 'default',
+          id: payment.productId,
           quantity: 1,
           item_price: payment.amount
         }
@@ -69,30 +80,50 @@ export async function sendMetaCapiPurchase({ contact, payment }) {
       custom_data: customData
     };
 
-    const body = {
-      data: [eventPayload],
-      ...(testCode && { test_event_code: testCode })
-    };
+    let successCount = 0;
+    
+    for (const pixel of pixels) {
+      const pixelId = pixel.pixelId;
+      const accessToken = pixel.token;
+      const testCode = pixel.testCode;
 
-    await logToDb('INFO', 'API', `Enviando evento de compra (Purchase) para o Meta CAPI. Event ID: ${eventId}. Test Code: ${testCode || 'Nenhum'}`);
+      if (!pixelId || !accessToken) {
+        await logToDb('WARN', 'API', `Pixel ${pixel.id} associado ao produto ${payment.productId} está sem Pixel ID ou Access Token.`);
+        continue;
+      }
 
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+      const body = {
+        data: [eventPayload],
+        ...(testCode && { test_event_code: testCode })
+      };
 
-    const data = await res.json();
+      try {
+        await logToDb('INFO', 'API', `Enviando evento Purchase para o Pixel ID: ${pixelId}. Test Code: ${testCode || 'Nenhum'}`);
 
-    if (!res.ok) {
-      throw new Error(data.error?.message || `Erro HTTP ${res.status}`);
+        const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error?.message || `Erro HTTP ${res.status}`);
+        }
+
+        successCount++;
+        await logToDb('INFO', 'API', `Evento Purchase enviado com sucesso ao Pixel ${pixelId}. Eventos recebidos: ${data.events_received}`);
+      } catch (pixelErr) {
+        console.error(`Error sending CAPI to pixel ${pixelId}:`, pixelErr);
+        await logToDb('ERROR', 'API', `Falha ao enviar evento ao Pixel ${pixelId}: ${pixelErr.message}`);
+      }
     }
 
-    await logToDb('INFO', 'API', `Evento Purchase enviado com sucesso ao Meta CAPI. Eventos recebidos: ${data.events_received}`);
-    return { success: true, data };
+    return { success: successCount > 0, sentCount: successCount };
   } catch (err) {
     console.error('Error sending Meta CAPI event:', err);
-    await logToDb('ERROR', 'API', `Falha ao enviar evento ao Meta CAPI: ${err.message}`, {
+    await logToDb('ERROR', 'API', `Falha crítica ao enviar evento ao Meta CAPI: ${err.message}`, {
       error: err.message
     });
     return { success: false, error: err.message };

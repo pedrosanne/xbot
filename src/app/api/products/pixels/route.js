@@ -16,7 +16,7 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const { productId, platform, pixelId, token } = await request.json();
+    const { productId, platform, pixelId, token, testCode } = await request.json();
 
     if (!productId || !platform || !pixelId) {
       return NextResponse.json({ error: 'Produto, Plataforma e ID do Pixel são obrigatórios.' }, { status: 400 });
@@ -27,7 +27,8 @@ export async function POST(request) {
         productId,
         platform,
         pixelId,
-        token: token || ''
+        token: token || '',
+        testCode: testCode || ''
       },
       include: { product: true }
     });

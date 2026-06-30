@@ -52,6 +52,7 @@ export default function ProductsPage() {
   const [pixPlatform, setPixPlatform] = useState('facebook');
   const [pixPixelId, setPixPixelId] = useState('');
   const [pixToken, setPixToken] = useState('');
+  const [pixTestCode, setPixTestCode] = useState('');
 
   // Initial Data Load
   useEffect(() => {
@@ -413,7 +414,8 @@ export default function ProductsPage() {
           productId: pixProductId,
           platform: pixPlatform,
           pixelId: pixPixelId,
-          token: pixToken
+          token: pixToken,
+          testCode: pixTestCode
         })
       });
 
@@ -421,6 +423,7 @@ export default function ProductsPage() {
         triggerStatus('success', `Pixel adicionado com sucesso!`);
         setPixPixelId('');
         setPixToken('');
+        setPixTestCode('');
         // Reload
         const data = await fetch('/api/products/pixels').then(r => r.json());
         setPixels(data);
@@ -1237,6 +1240,11 @@ export default function ProductsPage() {
                                 Token API: {pix.token.substring(0, 15)}...
                               </span>
                             )}
+                            {pix.testCode && (
+                              <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                Cód. Teste CAPI: {pix.testCode}
+                              </span>
+                            )}
                           </div>
                           <button onClick={() => handlePixelDelete(pix.id)} className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '0.72rem' }}>
                             Remover
@@ -1291,12 +1299,22 @@ export default function ProductsPage() {
                       />
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label">Token de API de Conversões (Opcional)</label>
+                      <label className="form-label">Token de API de Conversões (Opcional - Facebook)</label>
                       <input
                         type="password"
                         value={pixToken}
                         onChange={(e) => setPixToken(e.target.value)}
                         placeholder="Ex: Token do Meta CAPI"
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Código de Teste de Eventos (Opcional - Facebook)</label>
+                      <input
+                        type="text"
+                        value={pixTestCode}
+                        onChange={(e) => setPixTestCode(e.target.value)}
+                        placeholder="Ex: TEST12345"
                         className="form-input"
                       />
                     </div>
