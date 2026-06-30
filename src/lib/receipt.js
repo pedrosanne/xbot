@@ -49,7 +49,7 @@ export async function analyzePixReceipt(mediaUrl, mimeType) {
       return null;
     }
 
-    const prompt = `Analise a imagem em anexo. Ela é um comprovante de transferência, pagamento ou agendamento de Pix?
+    const prompt = `Analise o documento ou imagem em anexo. Ele é um comprovante de transferência, pagamento ou agendamento de Pix?
 Retorne um objeto JSON com o seguinte formato:
 {
   "isPixReceipt": true ou false,

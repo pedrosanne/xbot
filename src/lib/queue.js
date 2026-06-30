@@ -356,12 +356,12 @@ async function processSingleMessage(contact, messageData) {
 
     await logToDb('INFO', 'FLOW', `Entrada consolidada - Texto: "${text}", Botão ID: "${clickedButtonId}"`);
 
-    // Intercept image attachments to check for Pix Receipts
-    if (messageData.type === 'image' && mediaUrl) {
+    // Intercept image or PDF document attachments to check for Pix Receipts
+    if ((messageData.type === 'image' || messageData.type === 'document') && mediaUrl) {
       try {
-        await logToDb('INFO', 'FLOW', `Imagem recebida. Iniciando análise de comprovante Pix via IA...`);
+        await logToDb('INFO', 'FLOW', `${messageData.type === 'image' ? 'Imagem' : 'Documento'} recebido. Iniciando análise de comprovante Pix via IA...`);
         const { analyzePixReceipt, processPixReceiptPayment } = await import('./receipt');
-        const receiptData = await analyzePixReceipt(mediaUrl, mimeType || 'image/jpeg');
+        const receiptData = await analyzePixReceipt(mediaUrl, mimeType || (messageData.type === 'image' ? 'image/jpeg' : 'application/pdf'));
         
         if (receiptData && receiptData.isPixReceipt) {
           if (receiptData.isScheduled) {
