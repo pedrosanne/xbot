@@ -155,7 +155,19 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
           where: { filename }
         });
         if (upload) {
-          fileBuffer = Buffer.from(upload.data);
+          const supabaseUrl = process.env.SUPABASE_URL;
+          const bucket = process.env.SUPABASE_BUCKET || 'media';
+          
+          const decodedFilename = decodeURIComponent(filename);
+          const encodedFilename = encodeURIComponent(decodedFilename).replace(/%2F/g, '/');
+          const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${encodedFilename}`;
+          
+          const res = await fetch(publicUrl);
+          if (res.ok) {
+            fileBuffer = Buffer.from(await res.arrayBuffer());
+          } else {
+            console.error(`Failed to fetch file from Supabase storage for Gemini attachment: ${publicUrl}`);
+          }
         } else {
           console.warn(`Attachment not found in database: ${filename}`);
         }

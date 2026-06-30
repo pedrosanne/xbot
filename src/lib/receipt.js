@@ -36,11 +36,18 @@ export async function analyzePixReceipt(mediaUrl, mimeType) {
     let fileBuffer = null;
     if (mediaUrl.startsWith('/api/uploads/')) {
       const filename = mediaUrl.replace('/api/uploads/', '');
-      const upload = await prisma.upload.findUnique({
-        where: { filename }
-      });
-      if (upload) {
-        fileBuffer = Buffer.from(upload.data);
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const bucket = process.env.SUPABASE_BUCKET || 'media';
+      
+      const decodedFilename = decodeURIComponent(filename);
+      const encodedFilename = encodeURIComponent(decodedFilename).replace(/%2F/g, '/');
+      const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${encodedFilename}`;
+      
+      const res = await fetch(publicUrl);
+      if (res.ok) {
+        fileBuffer = Buffer.from(await res.arrayBuffer());
+      } else {
+        console.error(`Failed to fetch file from Supabase storage for receipt analysis: ${publicUrl}`);
       }
     }
 
@@ -75,6 +82,14 @@ Retorne um objeto JSON com o seguinte formato:
     return data;
   } catch (err) {
     console.error('Error analyzing Pix receipt with Gemini:', err);
+    try {
+      await logToDb('ERROR', 'AI', `Erro ao analisar comprovante Pix com Gemini: ${err.message}`, {
+        error: err.message,
+        stack: err.stack
+      });
+    } catch (logErr) {
+      console.error('Failed to log receipt analysis error to DB:', logErr);
+    }
     return null;
   }
 }
