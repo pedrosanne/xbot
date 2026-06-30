@@ -369,6 +369,7 @@ model UtmTracker {
   utmTerm      String   @default("")
   fbp          String   @default("")
   fbc          String   @default("")
+  flowId       String   @default("")
   createdAt    DateTime @default(now())
 }
 

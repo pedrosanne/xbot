@@ -74,6 +74,8 @@ export async function GET(request) {
     const fbp = searchParams.get('fbp') || '';
 
     // Save tracking parameters
+    const flowId = searchParams.get('flowId') || '';
+
     await prisma.utmTracker.create({
       data: {
         id: refCode,
@@ -83,7 +85,8 @@ export async function GET(request) {
         utmContent: searchParams.get('utm_content') || '',
         utmTerm: searchParams.get('utm_term') || '',
         fbp,
-        fbc
+        fbc,
+        flowId
       }
     });
 

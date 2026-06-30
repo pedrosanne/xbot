@@ -14,9 +14,15 @@ export default function PixelsPage() {
   const [stats, setStats] = useState([]);
   const [loadingStats, setLoadingStats] = useState(false);
 
+  // Link Generator States
+  const [flows, setFlows] = useState([]);
+  const [selectedFlowId, setSelectedFlowId] = useState('');
+  const [customPreFilledText, setCustomPreFilledText] = useState('');
+
   useEffect(() => {
     fetchSettings();
     fetchStats();
+    fetchFlows();
   }, []);
 
   async function fetchSettings() {
@@ -43,6 +49,17 @@ export default function PixelsPage() {
       console.error('Error fetching stats:', err);
     } finally {
       setLoadingStats(false);
+    }
+  }
+
+  async function fetchFlows() {
+    try {
+      const res = await fetch('/api/flows');
+      if (res.ok) {
+        setFlows(await res.json());
+      }
+    } catch (err) {
+      console.error('Error fetching flows:', err);
     }
   }
 
@@ -229,6 +246,95 @@ export default function PixelsPage() {
                 {savingConfig ? 'Salvando...' : 'Salvar Configuração'}
               </button>
             </form>
+          </div>
+
+          {/* Left - Row 2: Redirect Link Generator */}
+          <div className="glass-panel" style={{ padding: '24px', gridColumn: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>🔗 Gerador de Links de Rotação / Fluxos</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '6px', marginBottom: 0, lineHeight: '1.5' }}>
+                Gere o link distribuidor inteligente para colocar nos botões de CTA da sua página de vendas ou anúncios diretos, vinculando um chatbot específico.
+              </p>
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Fluxo do Chatbot a ser Iniciado</label>
+              <select
+                value={selectedFlowId}
+                onChange={(e) => setSelectedFlowId(e.target.value)}
+                className="form-input"
+              >
+                <option value="">Nenhum (usa fluxo padrão / agente IA)</option>
+                {flows.map(f => (
+                  <option key={f.id} value={f.id}>{f.name} {f.productId ? `(Prod: ${f.productId.substring(0,6)})` : ''}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Mensagem Inicial do Cliente (Opcional)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Ex: Olá! Vim da página de vendas e quero saber mais."
+                value={customPreFilledText}
+                onChange={(e) => setCustomPreFilledText(e.target.value)}
+              />
+            </div>
+
+            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', borderRadius: '8px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                Link de Destino do Botão do seu Site (CTA):
+              </span>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  readOnly
+                  className="form-input"
+                  style={{ fontSize: '0.78rem', fontFamily: 'monospace', background: 'rgba(0,0,0,0.1)' }}
+                  value={`${cleanUrl}/api/redirect/whatsapp${selectedFlowId || customPreFilledText ? '?' : ''}${selectedFlowId ? `flowId=${selectedFlowId}` : ''}${selectedFlowId && customPreFilledText ? '&' : ''}${customPreFilledText ? `text=${encodeURIComponent(customPreFilledText)}` : ''}`}
+                />
+                <button
+                  onClick={() => {
+                    const generatedLink = `${cleanUrl}/api/redirect/whatsapp${selectedFlowId || customPreFilledText ? '?' : ''}${selectedFlowId ? `flowId=${selectedFlowId}` : ''}${selectedFlowId && customPreFilledText ? '&' : ''}${customPreFilledText ? `text=${encodeURIComponent(customPreFilledText)}` : ''}`;
+                    navigator.clipboard.writeText(generatedLink);
+                    alert('Link copiado com sucesso!');
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                >
+                  📋
+                </button>
+              </div>
+            </div>
+
+            <div style={{ padding: '12px', background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: '8px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#60a5fa', display: 'block', marginBottom: '4px' }}>
+                ⚙️ Parâmetros de URL do Facebook Ads Manager:
+              </span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', lineHeight: '1.4' }}>
+                Copie o texto abaixo e cole no campo <strong>Parâmetros de URL</strong> no final do formulário de criação de anúncios do seu Gerenciador de Anúncios:
+              </span>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  readOnly
+                  className="form-input"
+                  style={{ fontSize: '0.75rem', fontFamily: 'monospace', background: 'rgba(0,0,0,0.2)', color: '#93c5fd' }}
+                  value="utm_source=facebook&utm_medium=cpc&utm_campaign={{campaign.name}}&utm_content={{ad.name}}&utm_term={{adset.name}}"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText("utm_source=facebook&utm_medium=cpc&utm_campaign={{campaign.name}}&utm_content={{ad.name}}&utm_term={{adset.name}}");
+                    alert('Parâmetros copiados!');
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 12px', fontSize: '0.8rem', borderColor: 'rgba(96,165,250,0.3)', color: '#93c5fd' }}
+                >
+                  📋
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Right: UTM Analytics Table */}

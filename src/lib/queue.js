@@ -311,6 +311,17 @@ async function processSingleMessage(contact, messageData) {
             utmSource: tracker.utmSource,
             utmCampaign: tracker.utmCampaign
           });
+
+          if (tracker.flowId) {
+            const flowToTrigger = await prisma.flow.findUnique({
+              where: { id: tracker.flowId }
+            });
+            if (flowToTrigger && flowToTrigger.isActive) {
+              await logToDb('INFO', 'FLOW', `Acionando fluxo vinculado ao link: '${flowToTrigger.name}' para o contato ${contactId}`);
+              await startFlowForContact(freshContact, flowToTrigger, null);
+              return; // Terminate queue task since the flow has taken over
+            }
+          }
         }
       } catch (err) {
         console.error('Error matching Ref Code in queue:', err);
