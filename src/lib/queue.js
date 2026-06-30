@@ -314,9 +314,33 @@ async function processSingleMessage(contact, messageData) {
 
           if (tracker.flowId) {
             const flowToTrigger = await prisma.flow.findUnique({
-              where: { id: tracker.flowId }
+              where: { id: tracker.flowId },
+              include: { product: true }
             });
             if (flowToTrigger && flowToTrigger.isActive) {
+              // Add tags for flow and product
+              let contactTags = freshContact.tags || '';
+              const tagsList = contactTags.split(',').map(t => t.trim()).filter(Boolean);
+              
+              const flowTagName = `fluxo:${flowToTrigger.name}`;
+              if (!tagsList.includes(flowTagName)) {
+                tagsList.push(flowTagName);
+              }
+              
+              if (flowToTrigger.product) {
+                const productTagName = `produto:${flowToTrigger.product.name}`;
+                if (!tagsList.includes(productTagName)) {
+                  tagsList.push(productTagName);
+                }
+              }
+              
+              contactTags = tagsList.join(', ');
+              
+              await prisma.contact.update({
+                where: { id: contactId },
+                data: { tags: contactTags }
+              });
+
               await logToDb('INFO', 'FLOW', `Acionando fluxo vinculado ao link: '${flowToTrigger.name}' para o contato ${contactId}`);
               await startFlowForContact(freshContact, flowToTrigger, null);
               return; // Terminate queue task since the flow has taken over

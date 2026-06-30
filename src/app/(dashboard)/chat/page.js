@@ -253,6 +253,16 @@ export default function ChatPage() {
   const [manualSilent, setManualSilent] = useState(false);
   const [registeringManualPay, setRegisteringManualPay] = useState(false);
 
+  // Contact Context Menu & CRM states
+  const [contactContextMenu, setContactContextMenu] = useState(null);
+  const [selectedContactForModal, setSelectedContactForModal] = useState(null);
+  const [showTagsModal, setShowTagsModal] = useState(false);
+  const [tagsInput, setTagsInput] = useState('');
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [notesInput, setNotesInput] = useState('');
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [reminderInput, setReminderInput] = useState('');
+
   async function fetchCollaborators() {
     try {
       const res = await fetch('/api/collaborators');
@@ -391,6 +401,14 @@ export default function ChatPage() {
       fetchProducts();
       fetchFlows();
     });
+  }, []);
+
+  useEffect(() => {
+    const handleWindowClick = () => {
+      setContactContextMenu(null);
+    };
+    window.addEventListener('click', handleWindowClick);
+    return () => window.removeEventListener('click', handleWindowClick);
   }, []);
 
   useEffect(() => {
@@ -1198,6 +1216,156 @@ export default function ChatPage() {
     }
   };
 
+  // ==========================================
+  // CONTACT CRM CONTEXT MENU ACTIONS
+  // ==========================================
+  const handleContactContextMenu = (e, contact) => {
+    e.preventDefault();
+    setContactContextMenu({
+      x: Math.min(e.clientX, window.innerWidth - 220),
+      y: Math.min(e.clientY, window.innerHeight - 320),
+      contact
+    });
+  };
+
+  const handleTogglePin = async (contact) => {
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: contact.id,
+          isPinned: !contact.isPinned
+        })
+      });
+      if (res.ok) {
+        fetchContacts(selectedConnectionId);
+        if (selectedContact && selectedContact.id === contact.id) {
+          setSelectedContact(prev => ({ ...prev, isPinned: !contact.isPinned }));
+        }
+      }
+    } catch (err) {
+      console.error('Error pinning contact:', err);
+    }
+  };
+
+  const handleToggleBlock = async (contact) => {
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: contact.id,
+          isBlocked: !contact.isBlocked
+        })
+      });
+      if (res.ok) {
+        fetchContacts(selectedConnectionId);
+        if (selectedContact && selectedContact.id === contact.id) {
+          setSelectedContact(prev => ({ ...prev, isBlocked: !contact.isBlocked }));
+        }
+      }
+    } catch (err) {
+      console.error('Error blocking contact:', err);
+    }
+  };
+
+  const handleDeleteContactOrConversations = async (contactId, action) => {
+    const confirmMsg = action === 'clear' 
+      ? 'Deseja realmente apagar todo o histórico de mensagens deste contato?' 
+      : 'Deseja realmente excluir este contato e todos os seus dados permanentemente do sistema?';
+    
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`/api/chat?contactId=${encodeURIComponent(contactId)}&action=${action}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        alert(action === 'clear' ? 'Conversa limpa com sucesso!' : 'Contato excluído com sucesso!');
+        if (selectedContact && selectedContact.id === contactId) {
+          setSelectedContact(null);
+        }
+        fetchContacts(selectedConnectionId);
+      } else {
+        const data = await res.json();
+        alert(`Erro: ${data.error || 'Falha ao processar'}`);
+      }
+    } catch (err) {
+      console.error('Error deleting contact/conversation:', err);
+      alert('Erro na conexão com o servidor.');
+    }
+  };
+
+  const handleSaveTags = async () => {
+    if (!selectedContactForModal) return;
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedContactForModal.id,
+          tags: tagsInput
+        })
+      });
+      if (res.ok) {
+        fetchContacts(selectedConnectionId);
+        if (selectedContact && selectedContact.id === selectedContactForModal.id) {
+          setSelectedContact(prev => ({ ...prev, tags: tagsInput }));
+        }
+        setShowTagsModal(false);
+      }
+    } catch (err) {
+      console.error('Error saving tags:', err);
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!selectedContactForModal) return;
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedContactForModal.id,
+          notes: notesInput
+        })
+      });
+      if (res.ok) {
+        fetchContacts(selectedConnectionId);
+        if (selectedContact && selectedContact.id === selectedContactForModal.id) {
+          setSelectedContact(prev => ({ ...prev, notes: notesInput }));
+        }
+        setShowNotesModal(false);
+      }
+    } catch (err) {
+      console.error('Error saving notes:', err);
+    }
+  };
+
+  const handleSaveReminder = async () => {
+    if (!selectedContactForModal) return;
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedContactForModal.id,
+          reminderDate: reminderInput || null
+        })
+      });
+      if (res.ok) {
+        fetchContacts(selectedConnectionId);
+        if (selectedContact && selectedContact.id === selectedContactForModal.id) {
+          setSelectedContact(prev => ({ ...prev, reminderDate: reminderInput || null }));
+        }
+        setShowReminderModal(false);
+      }
+    } catch (err) {
+      console.error('Error saving reminder:', err);
+    }
+  };
+
   const filteredContacts = contacts.filter((contact) => {
     const matchesSearch = 
       contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -1214,6 +1382,12 @@ export default function ChatPage() {
     }
 
     return matchesSearch && matchesFilter && matchesAssignee;
+  });
+
+  const sortedContacts = [...filteredContacts].sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return new Date(b.lastInteraction).getTime() - new Date(a.lastInteraction).getTime();
   });
 
   const getInitials = (name) => {
@@ -1350,12 +1524,12 @@ export default function ChatPage() {
 
         {/* Contact list body */}
         <div className="contacts-list">
-          {filteredContacts.length === 0 ? (
+          {sortedContacts.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 8px', fontSize: '0.85rem' }}>
               Nenhum contato encontrado.
             </div>
           ) : (
-            filteredContacts.map((contact) => {
+            sortedContacts.map((contact) => {
               const isSelected = selectedContact?.id === contact.id;
               const isManual = contact.status === 'MANUAL';
               const initials = getInitials(contact.name || contact.profileName || contact.id);
@@ -1363,7 +1537,14 @@ export default function ChatPage() {
                 <div
                   key={contact.id}
                   onClick={() => handleSelectContact(contact)}
+                  onContextMenu={(e) => handleContactContextMenu(e, contact)}
                   className={`contact-item ${isSelected ? 'selected' : ''}`}
+                  style={{
+                    position: 'relative',
+                    opacity: contact.isBlocked ? 0.5 : 1,
+                    background: contact.isPinned ? 'rgba(255,255,255,0.02)' : '',
+                    borderLeft: contact.isPinned ? '3px solid var(--neon-green)' : ''
+                  }}
                 >
                   {contact.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -1378,10 +1559,29 @@ export default function ChatPage() {
                     </div>
                   )}
                   <div className="contact-info">
-                    <div className="contact-name-row">
-                      <span className="contact-name">{contact.name || 'Sem Nome'}</span>
+                    <div className="contact-name-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', maxWidth: '80%' }}>
+                        <span className="contact-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {contact.name || 'Sem Nome'}
+                        </span>
+                        {contact.isPinned && <span title="Conversa Fixada">📌</span>}
+                        {contact.isBlocked && <span title="Contato Bloqueado">🚫</span>}
+                        {contact.reminderDate && <span title="Lembrete Ativo">⏰</span>}
+                      </div>
                       <span className={`status-indicator ${isManual ? 'manual' : 'auto'}`} />
                     </div>
+                    
+                    {/* Render Tags */}
+                    {contact.tags && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' }}>
+                        {contact.tags.split(',').map(t => t.trim()).filter(Boolean).map((tag, idx) => (
+                          <span key={idx} style={{ fontSize: '0.6rem', padding: '1px 4px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', borderRadius: '3px' }}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     {contact.assignedUser && (
                       <div style={{ fontSize: '0.7rem', color: 'var(--color-primary-hover)', display: 'flex', alignItems: 'center', gap: '3px', margin: '2px 0' }}>
                         <svg style={{ width: '10px', height: '10px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2667,6 +2867,167 @@ export default function ChatPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Contact Context Menu */}
+      {contactContextMenu && (
+        <div 
+          className="glass-panel animate-fade-in"
+          style={{
+            position: 'fixed',
+            left: `${contactContextMenu.x}px`,
+            top: `${contactContextMenu.y}px`,
+            zIndex: 1000,
+            padding: '6px 0',
+            width: '200px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+            border: '1px solid var(--border-glass)',
+            background: 'rgba(23, 23, 23, 0.95)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px'
+          }}
+        >
+          <button 
+            onClick={() => handleTogglePin(contactContextMenu.contact)}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', border: 'none', background: 'none', color: '#fff', fontSize: '0.82rem', width: '100%', textAlign: 'left', cursor: 'pointer', transition: 'background 0.2s' }}
+          >
+            📌 {contactContextMenu.contact.isPinned ? 'Desafixar Conversa' : 'Fixar Conversa'}
+          </button>
+          <button 
+            onClick={() => {
+              setSelectedContactForModal(contactContextMenu.contact);
+              setTagsInput(contactContextMenu.contact.tags || '');
+              setShowTagsModal(true);
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', border: 'none', background: 'none', color: '#fff', fontSize: '0.82rem', width: '100%', textAlign: 'left', cursor: 'pointer', transition: 'background 0.2s' }}
+          >
+            🏷️ Gerenciar Tags
+          </button>
+          <button 
+            onClick={() => {
+              setSelectedContactForModal(contactContextMenu.contact);
+              setNotesInput(contactContextMenu.contact.notes || '');
+              setShowNotesModal(true);
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', border: 'none', background: 'none', color: '#fff', fontSize: '0.82rem', width: '100%', textAlign: 'left', cursor: 'pointer', transition: 'background 0.2s' }}
+          >
+            📝 Adicionar Observações
+          </button>
+          <button 
+            onClick={() => {
+              setSelectedContactForModal(contactContextMenu.contact);
+              setReminderInput(contactContextMenu.contact.reminderDate ? new Date(contactContextMenu.contact.reminderDate).toISOString().substring(0, 16) : '');
+              setShowReminderModal(true);
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', border: 'none', background: 'none', color: '#fff', fontSize: '0.82rem', width: '100%', textAlign: 'left', cursor: 'pointer', transition: 'background 0.2s' }}
+          >
+            ⏰ Definir Lembrete
+          </button>
+          <button 
+            onClick={() => handleToggleBlock(contactContextMenu.contact)}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', border: 'none', background: 'none', color: '#fff', fontSize: '0.82rem', width: '100%', textAlign: 'left', cursor: 'pointer', transition: 'background 0.2s' }}
+          >
+            🚫 {contactContextMenu.contact.isBlocked ? 'Desbloquear Contato' : 'Bloquear Contato'}
+          </button>
+          <div style={{ height: '1px', background: 'var(--border-glass)', margin: '4px 0' }} />
+          <button 
+            onClick={() => handleDeleteContactOrConversations(contactContextMenu.contact.id, 'clear')}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', border: 'none', background: 'none', color: '#f87171', fontSize: '0.82rem', width: '100%', textAlign: 'left', cursor: 'pointer', transition: 'background 0.2s' }}
+          >
+            🧹 Apagar Conversa
+          </button>
+          <button 
+            onClick={() => handleDeleteContactOrConversations(contactContextMenu.contact.id, 'delete')}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.15)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', border: 'none', background: 'none', color: '#ef4444', fontSize: '0.82rem', width: '100%', textAlign: 'left', cursor: 'pointer', transition: 'background 0.2s' }}
+          >
+            ❌ Excluir Contato
+          </button>
+        </div>
+      )}
+
+      {/* Tags Modal */}
+      {showTagsModal && selectedContactForModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(5px)' }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>🏷️ Gerenciar Tags</h3>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Tags (separadas por vírgula)</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={tagsInput} 
+                onChange={(e) => setTagsInput(e.target.value)}
+                placeholder="Ex: pago, lead, quente" 
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'end', marginTop: '8px' }}>
+              <button onClick={() => setShowTagsModal(false)} className="btn btn-secondary" style={{ padding: '8px 16px' }}>Cancelar</button>
+              <button onClick={handleSaveTags} className="btn btn-primary" style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none' }}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notes Modal */}
+      {showNotesModal && selectedContactForModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(5px)' }}>
+          <div className="glass-panel" style={{ width: '450px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>📝 Observações do Lead</h3>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Anotações internas</label>
+              <textarea 
+                className="form-input" 
+                style={{ minHeight: '120px', resize: 'vertical' }}
+                value={notesInput} 
+                onChange={(e) => setNotesInput(e.target.value)}
+                placeholder="Insira detalhes sobre a negociação, preferências do cliente, etc." 
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'end', marginTop: '8px' }}>
+              <button onClick={() => setShowNotesModal(false)} className="btn btn-secondary" style={{ padding: '8px 16px' }}>Cancelar</button>
+              <button onClick={handleSaveNotes} className="btn btn-primary" style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none' }}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reminder Modal */}
+      {showReminderModal && selectedContactForModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(5px)' }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>⏰ Definir Lembrete de Retorno</h3>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Data e Hora do Lembrete</label>
+              <input 
+                type="datetime-local" 
+                className="form-input" 
+                value={reminderInput} 
+                onChange={(e) => setReminderInput(e.target.value)}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'end', marginTop: '8px' }}>
+              <button onClick={() => setShowReminderModal(false)} className="btn btn-secondary" style={{ padding: '8px 16px' }}>Cancelar</button>
+              <button onClick={handleSaveReminder} className="btn btn-primary" style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none' }}>Salvar</button>
+            </div>
           </div>
         </div>
       )}

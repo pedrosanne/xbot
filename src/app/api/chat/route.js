@@ -346,10 +346,23 @@ export async function POST(request) {
   }
 }
 
-// PUT: Update contact details (status, name, email, notes, tags, avatarUrl, typingState)
+// PUT: Update contact details (status, name, email, notes, tags, avatarUrl, typingState, isPinned, isBlocked, reminderDate)
 export async function PUT(request) {
   try {
-    const { contactId, status, name, email, notes, tags, avatarUrl, typingState, assignedUserId } = await request.json();
+    const { 
+      contactId, 
+      status, 
+      name, 
+      email, 
+      notes, 
+      tags, 
+      avatarUrl, 
+      typingState, 
+      assignedUserId,
+      isPinned,
+      isBlocked,
+      reminderDate
+    } = await request.json();
 
     if (!contactId) {
       return NextResponse.json({ error: 'Missing contactId' }, { status: 400 });
@@ -364,6 +377,9 @@ export async function PUT(request) {
     if (avatarUrl !== undefined) dataToUpdate.avatarUrl = avatarUrl;
     if (typingState !== undefined) dataToUpdate.typingState = typingState;
     if (assignedUserId !== undefined) dataToUpdate.assignedUserId = assignedUserId;
+    if (isPinned !== undefined) dataToUpdate.isPinned = isPinned;
+    if (isBlocked !== undefined) dataToUpdate.isBlocked = isBlocked;
+    if (reminderDate !== undefined) dataToUpdate.reminderDate = reminderDate ? new Date(reminderDate) : null;
 
     const existing = await prisma.contact.findUnique({
       where: { id: contactId }
@@ -381,7 +397,10 @@ export async function PUT(request) {
             status: status || 'AUTO',
             phoneNumberId: phoneId || '',
             clientPhone: clientPhone || contactId,
-            typingState: typingState || 'IDLE'
+            typingState: typingState || 'IDLE',
+            isPinned: isPinned || false,
+            isBlocked: isBlocked || false,
+            reminderDate: reminderDate ? new Date(reminderDate) : null
           }
         });
         return NextResponse.json(newContact);
@@ -407,5 +426,38 @@ export async function PUT(request) {
   } catch (error) {
     console.error('Error updating contact:', error);
     return NextResponse.json({ error: 'Failed to update contact' }, { status: 500 });
+  }
+}
+
+// DELETE: Delete contact or clear conversation
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const contactId = searchParams.get('contactId');
+    const action = searchParams.get('action'); // "clear" or "delete"
+
+    if (!contactId) {
+      return NextResponse.json({ error: 'Missing contactId' }, { status: 400 });
+    }
+
+    if (action === 'clear') {
+      // Clear conversation (delete all messages for this contact)
+      await prisma.message.deleteMany({
+        where: { contactId }
+      });
+      return NextResponse.json({ success: true, message: 'Conversa limpa com sucesso.' });
+    } else {
+      // Exclude contact (cascade delete messages, payments, calls)
+      await prisma.message.deleteMany({ where: { contactId } });
+      await prisma.payment.deleteMany({ where: { contactId } });
+      await prisma.call.deleteMany({ where: { contactId } });
+      await prisma.contact.delete({
+        where: { id: contactId }
+      });
+      return NextResponse.json({ success: true, message: 'Contato excluído com sucesso.' });
+    }
+  } catch (error) {
+    console.error('Error in DELETE contact:', error);
+    return NextResponse.json({ error: error.message || 'Failed to delete contact/conversation' }, { status: 500 });
   }
 }

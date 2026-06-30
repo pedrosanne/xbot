@@ -68,6 +68,9 @@ model Contact {
   payments        Payment[]
   createdAt       DateTime  @default(now())
   passedFlows     String    @default("")
+  isPinned        Boolean   @default(false)
+  isBlocked       Boolean   @default(false)
+  reminderDate    DateTime?
   
   // Scoping fields for multi-number support
   phoneNumberId   String    @default("")
