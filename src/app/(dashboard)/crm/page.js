@@ -115,10 +115,10 @@ export default function CRMPage() {
   async function fetchContacts() {
     setLoadingContacts(true);
     try {
-      const res = await fetch('/api/chat/messages'); // Fetches contacts list
+      const res = await fetch('/api/chat'); // Fetches contacts list
       if (res.ok) {
         const data = await res.json();
-        setContacts(data.contacts || []);
+        setContacts(data || []);
       }
     } catch (err) {
       console.error('Error fetching contacts:', err);
