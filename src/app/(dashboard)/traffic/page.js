@@ -54,6 +54,7 @@ export default function TrafficRoiDashboard() {
   
   // Connection states
   const [tokenInput, setTokenInput] = useState('');
+  const [appIdInput, setAppIdInput] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -81,7 +82,52 @@ export default function TrafficRoiDashboard() {
 
   useEffect(() => {
     fetchConfig();
+    
+    // Check if redirect has a Facebook access token in the hash
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      if (accessToken) {
+        saveToken(accessToken);
+        // Clean URL hash
+        window.history.replaceState(null, null, window.location.pathname);
+      }
+    }
   }, []);
+
+  const saveToken = async (token) => {
+    setConnecting(true);
+    setConnectError('');
+    try {
+      const res = await fetch('/api/facebook/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: token })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Fetch ad accounts
+        setLoadingAccounts(true);
+        const accountsRes = await fetch('/api/facebook/accounts');
+        if (accountsRes.ok) {
+          const accountsData = await accountsRes.json();
+          setAdAccounts(accountsData);
+          setConfig({ hasConfig: true, id: data.id, adAccountId: '' });
+        } else {
+          const accountsErr = await accountsRes.json();
+          setConnectError(accountsErr.error || 'Falha ao buscar contas de anúncios.');
+        }
+        setLoadingAccounts(false);
+      } else {
+        setConnectError(data.error || 'Falha ao conectar com o Facebook.');
+      }
+    } catch (err) {
+      console.error('Error saving Facebook token:', err);
+      setConnectError('Erro ao salvar token de acesso.');
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   const fetchConfig = async () => {
     setLoadingConfig(true);
@@ -360,37 +406,88 @@ export default function TrafficRoiDashboard() {
           </div>
 
           <p className="text-zinc-400 text-sm leading-relaxed">
-            Para importar os gastos de anúncios e gerenciar as campanhas, conecte um <strong>Token de Acesso do Usuário</strong> (User Access Token ou System User Token). Você pode gerar este token acessando o portal de desenvolvedores do Facebook ou nas configurações da sua BM.
+            Importe os gastos de anúncios e gerencie orçamentos e campanhas integrando sua conta. Escolha um dos métodos abaixo:
           </p>
 
-          <form onSubmit={handleConnectFacebook} className="space-y-4">
-            {connectError && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl flex items-start gap-2">
-                <ShieldAlertIcon />
-                <span>{connectError}</span>
-              </div>
-            )}
+          {connectError && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl flex items-start gap-2 animate-pulse">
+              <ShieldAlertIcon />
+              <span>{connectError}</span>
+            </div>
+          )}
 
+          {/* Option 1: Facebook Login button */}
+          <div className="bg-zinc-950/40 border border-zinc-850/80 rounded-xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-300">Método A: Entrar com o Facebook (Recomendado)</span>
+            </div>
+            
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-400">Token de Acesso (Access Token)</label>
-              <textarea
-                required
-                placeholder="EAAQ..."
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                rows={4}
-                className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-zinc-700 text-zinc-100 font-mono resize-none"
+              <label className="text-xs font-semibold text-zinc-400">ID do Aplicativo do Facebook (App ID)</label>
+              <input
+                type="text"
+                placeholder="Insira o App ID do seu aplicativo do Facebook"
+                value={appIdInput}
+                onChange={(e) => setAppIdInput(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-zinc-700 text-zinc-100"
               />
+              <p className="text-[10px] text-zinc-500 leading-normal">
+                Para usar este método, você deve criar um aplicativo do tipo "Empresa" ou "Outro" em <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">developers.facebook.com</a> e configurar a URL de redirecionamento de Login como: <code className="bg-zinc-900 px-1 py-0.5 rounded text-zinc-300">{typeof window !== 'undefined' ? `${window.location.origin}/traffic` : ''}</code>
+              </p>
             </div>
 
             <button
-              type="submit"
-              disabled={connecting}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-semibold transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+              type="button"
+              onClick={() => {
+                if (!appIdInput) {
+                  alert('Por favor, insira o ID do seu aplicativo do Facebook primeiro.');
+                  return;
+                }
+                const redirectUri = encodeURIComponent(`${window.location.origin}/traffic`);
+                const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appIdInput}&redirect_uri=${redirectUri}&scope=ads_read,ads_management,business_management&response_type=token`;
+                window.location.href = oauthUrl;
+              }}
+              className="w-full bg-[#1877f2] hover:bg-[#166fe5] text-white py-3 rounded-xl font-bold transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 text-xs"
             >
-              {connecting ? <LoaderIcon /> : 'Testar e Conectar'}
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+              </svg>
+              Entrar com o Facebook
             </button>
-          </form>
+          </div>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-zinc-850"></div>
+            <span className="flex-shrink mx-4 text-zinc-600 text-[10px] font-black tracking-wider">OU</span>
+            <div className="flex-grow border-t border-zinc-850"></div>
+          </div>
+
+          {/* Option 2: Manual token form */}
+          <div className="bg-zinc-950/20 border border-zinc-850/60 rounded-xl p-5 space-y-4">
+            <span className="text-xs font-bold text-zinc-400">Método B: Conectar via Token de Acesso Manual</span>
+            
+            <form onSubmit={handleConnectFacebook} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-500">Token de Acesso do Usuário (Access Token)</label>
+                <textarea
+                  required
+                  placeholder="Cole seu token de acesso manual (EAAQ...)"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
+                  rows={3}
+                  className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-zinc-700 text-zinc-100 font-mono resize-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={connecting}
+                className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2.5 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {connecting ? <LoaderIcon /> : 'Conectar via Token'}
+              </button>
+            </form>
+          </div>
         </div>
       ) : !config.adAccountId ? (
         /* Ad Account Selection Screen */
