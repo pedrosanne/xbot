@@ -97,9 +97,25 @@ export async function processPixReceiptPayment(contact, receiptData) {
       return { success: false, reason: 'no_gateway' };
     }
 
+    // 2. Identify Product from the Contact's active chatbot flow
+    let productId = null;
+    if (contact.activeFlowId) {
+      try {
+        const activeFlow = await prisma.flow.findUnique({
+          where: { id: contact.activeFlowId }
+        });
+        if (activeFlow && activeFlow.productId) {
+          productId = activeFlow.productId;
+          await logToDb('INFO', 'FLOW', `Identificado produto '${productId}' através do fluxo ativo '${activeFlow.name}' do contato ${contact.id}`);
+        }
+      } catch (flowErr) {
+        console.error('Error fetching active flow for product identification:', flowErr);
+      }
+    }
+
     await logToDb('INFO', 'FLOW', `Buscando transação de R$ ${amount} no Mercado Pago para o contato ${contact.id}...`);
 
-    // 2. Search recent payments in Mercado Pago (last 50 payments)
+    // 3. Search recent payments in Mercado Pago (last 50 payments)
     const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=50`, {
       headers: {
         'Authorization': `Bearer ${gateway.apiKey}`
@@ -113,13 +129,13 @@ export async function processPixReceiptPayment(contact, receiptData) {
     const mpData = await mpRes.json();
     const mpPayments = mpData.results || [];
 
-    // 3. Look for a matching approved payment
+    // 4. Look for a matching approved payment (matching the real amount from the receipt)
     let matchedMpPayment = null;
 
     for (const mpPay of mpPayments) {
       if (mpPay.status !== 'approved') continue;
       
-      // Compare amount (tolerance of 0.01)
+      // Compare amount (tolerance of 0.02 to allow small rounding)
       const amountDiff = Math.abs(mpPay.transaction_amount - amount);
       if (amountDiff > 0.02) continue;
 
@@ -162,7 +178,7 @@ export async function processPixReceiptPayment(contact, receiptData) {
 
     const externalId = String(matchedMpPayment.id);
 
-    // 4. Check if this payment ID has already been registered in our database
+    // 5. Check if this payment ID has already been registered in our database
     const existingPayment = await prisma.payment.findUnique({
       where: { externalId }
     });
@@ -172,7 +188,7 @@ export async function processPixReceiptPayment(contact, receiptData) {
       return { success: false, reason: 'already_used' };
     }
 
-    // 5. Create Payment record in DB
+    // 6. Create Payment record in DB (using the REAL amount from Mercado Pago)
     const payment = await prisma.payment.create({
       data: {
         gatewayId: gateway.id,
@@ -181,7 +197,8 @@ export async function processPixReceiptPayment(contact, receiptData) {
         amount: matchedMpPayment.transaction_amount,
         status: 'PAID',
         paymentMethod: 'pix',
-        description: `Pix Direto CNPJ Detectado via IA - Ref: ${transactionId || 'N/A'}`
+        description: `Pix Direto CNPJ Detectado via IA - Ref: ${transactionId || 'N/A'}`,
+        productId: productId
       }
     });
 
@@ -226,20 +243,45 @@ export async function processPixReceiptPayment(contact, receiptData) {
       console.error('Error sending push for IA Pix:', pushError);
     }
 
-    // d. Trigger post-payment flows (Upsell)
+    // d. Trigger post-payment flows (Product Post-Sale Flow or Upsell)
     let triggeredFlow = null;
     try {
-      const postPaymentFlows = await prisma.flow.findMany({
-        where: {
-          isActive: true,
-          trigger: 'payment_confirmed',
-          productId: null // Global payment confirmed triggers
+      // 1. Check if the product has a specific post-sale flow set
+      if (productId) {
+        const product = await prisma.product.findUnique({
+          where: { id: productId }
+        });
+        if (product && product.postSaleFlowId) {
+          const flow = await prisma.flow.findUnique({
+            where: { id: product.postSaleFlowId }
+          });
+          if (flow && flow.isActive) {
+            triggeredFlow = flow;
+            await logToDb('INFO', 'FLOW', `Disparando fluxo pós-venda direto do produto '${flow.name}' para o contato ${contact.id}`);
+          }
         }
-      });
+      }
 
-      if (postPaymentFlows.length > 0) {
-        triggeredFlow = postPaymentFlows[0];
-        await logToDb('INFO', 'FLOW', `Disparando fluxo pós-pagamento '${triggeredFlow.name}' (Upsell) para o contato ${contact.id} após validação por IA`);
+      // 2. Fallback: Find flows matching trigger 'payment_confirmed'
+      if (!triggeredFlow) {
+        const postPaymentFlows = await prisma.flow.findMany({
+          where: {
+            isActive: true,
+            trigger: 'payment_confirmed',
+            OR: [
+              { productId: productId || undefined },
+              { productId: null }
+            ]
+          }
+        });
+
+        if (postPaymentFlows.length > 0) {
+          triggeredFlow = postPaymentFlows.find(f => f.productId === productId) || postPaymentFlows[0];
+          await logToDb('INFO', 'FLOW', `Disparando fluxo pós-pagamento '${triggeredFlow.name}' (Upsell) para o contato ${contact.id} após validação por IA`);
+        }
+      }
+
+      if (triggeredFlow) {
         await startFlowForContact(contact, triggeredFlow, null);
       }
     } catch (upsellError) {
