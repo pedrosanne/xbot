@@ -8,7 +8,7 @@ import { startFlowForContact } from '@/lib/queue';
 
 export async function POST(request) {
   try {
-    const { contactId, productId, amount } = await request.json();
+    const { contactId, productId, amount, silent } = await request.json();
 
     if (!contactId || !amount) {
       return NextResponse.json({ error: 'Contato e valor são obrigatórios.' }, { status: 400 });
@@ -66,7 +66,7 @@ export async function POST(request) {
       }
     });
 
-    await logToDb('INFO', 'API', `Venda manual/Pix direto de R$ ${amount} registrada para o contato ${contact.id}.`);
+    await logToDb('INFO', 'API', `Venda manual/Pix direto de R$ ${amount} registrada para o contato ${contact.id}. Silencioso: ${!!silent}`);
 
     // =========================================================================
     // AUTOMATIONS (Same as Webhook)
@@ -90,9 +90,9 @@ export async function POST(request) {
       });
     }
 
-    // c. Send confirmation WhatsApp message
+    // c. Send confirmation WhatsApp message (only if NOT silent)
     const connectionToUse = contact.connection;
-    if (connectionToUse) {
+    if (!silent && connectionToUse) {
       try {
         const messageText = `Confirmamos seu pagamento de R$ ${parseFloat(amount).toFixed(2).replace('.', ',')} com sucesso! Obrigado! 🎉`;
         await sendText(contact.id, messageText, null, connectionToUse);
@@ -133,45 +133,47 @@ export async function POST(request) {
       console.error('Error sending Meta CAPI for manual payment:', capiError);
     }
 
-    // f. Trigger post-payment flows (Upsell / Chatbot Flow)
-    try {
-      let triggeredFlow = null;
+    // f. Trigger post-payment flows (Upsell / Chatbot Flow) (only if NOT silent)
+    if (!silent) {
+      try {
+        let triggeredFlow = null;
 
-      // 1. Check if the product has a specific post-sale flow set
-      if (product && product.postSaleFlowId) {
-        const flow = await prisma.flow.findUnique({
-          where: { id: product.postSaleFlowId }
-        });
-        if (flow && flow.isActive) {
-          triggeredFlow = flow;
-          await logToDb('INFO', 'FLOW', `Disparando fluxo pós-venda direto do produto '${flow.name}' para o contato ${contact.id}`);
-        }
-      }
-
-      // 2. Fallback: Find flows matching trigger 'payment_confirmed'
-      if (!triggeredFlow) {
-        const postPaymentFlows = await prisma.flow.findMany({
-          where: {
-            isActive: true,
-            trigger: 'payment_confirmed',
-            OR: [
-              { productId: productId || undefined },
-              { productId: null }
-            ]
+        // 1. Check if the product has a specific post-sale flow set
+        if (product && product.postSaleFlowId) {
+          const flow = await prisma.flow.findUnique({
+            where: { id: product.postSaleFlowId }
+          });
+          if (flow && flow.isActive) {
+            triggeredFlow = flow;
+            await logToDb('INFO', 'FLOW', `Disparando fluxo pós-venda direto do produto '${flow.name}' para o contato ${contact.id}`);
           }
-        });
-
-        if (postPaymentFlows.length > 0) {
-          triggeredFlow = postPaymentFlows.find(f => f.productId === productId) || postPaymentFlows[0];
-          await logToDb('INFO', 'FLOW', `Disparando fluxo pós-pagamento '${triggeredFlow.name}' (Upsell) para o contato ${contact.id} após venda manual`);
         }
-      }
 
-      if (triggeredFlow) {
-        await startFlowForContact(contact, triggeredFlow, null);
+        // 2. Fallback: Find flows matching trigger 'payment_confirmed'
+        if (!triggeredFlow) {
+          const postPaymentFlows = await prisma.flow.findMany({
+            where: {
+              isActive: true,
+              trigger: 'payment_confirmed',
+              OR: [
+                { productId: productId || undefined },
+                { productId: null }
+              ]
+            }
+          });
+
+          if (postPaymentFlows.length > 0) {
+            triggeredFlow = postPaymentFlows.find(f => f.productId === productId) || postPaymentFlows[0];
+            await logToDb('INFO', 'FLOW', `Disparando fluxo pós-pagamento '${triggeredFlow.name}' (Upsell) para o contato ${contact.id} após venda manual`);
+          }
+        }
+
+        if (triggeredFlow) {
+          await startFlowForContact(contact, triggeredFlow, null);
+        }
+      } catch (upsellError) {
+        console.error('Error triggering post-payment flow for manual sale:', upsellError);
       }
-    } catch (upsellError) {
-      console.error('Error triggering post-payment flow for manual sale:', upsellError);
     }
 
     return NextResponse.json({ success: true, paymentId: payment.id });

@@ -179,7 +179,7 @@ export async function processPixReceiptPayment(contact, receiptData) {
     const externalId = String(matchedMpPayment.id);
 
     // 5. Check if this payment ID has already been registered in our database
-    const existingPayment = await prisma.payment.findUnique({
+    const existingPayment = await prisma.payment.findFirst({
       where: { externalId }
     });
 

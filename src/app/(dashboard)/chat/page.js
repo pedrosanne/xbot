@@ -249,6 +249,7 @@ export default function ChatPage() {
   const [showManualPayModal, setShowManualPayModal] = useState(false);
   const [manualProductId, setManualProductId] = useState('');
   const [manualAmount, setManualAmount] = useState('');
+  const [manualSilent, setManualSilent] = useState(false);
   const [registeringManualPay, setRegisteringManualPay] = useState(false);
 
   async function fetchCollaborators() {
@@ -285,7 +286,8 @@ export default function ChatPage() {
         body: JSON.stringify({
           contactId: selectedContact.id,
           productId: manualProductId || null,
-          amount: manualAmount
+          amount: manualAmount,
+          silent: manualSilent
         })
       });
 
@@ -294,6 +296,7 @@ export default function ChatPage() {
         setShowManualPayModal(false);
         setManualProductId('');
         setManualAmount('');
+        setManualSilent(false);
         fetchMessages(selectedContact.id);
       } else {
         const data = await res.json();
@@ -2277,6 +2280,7 @@ export default function ChatPage() {
                     onClick={() => {
                       setManualAmount('');
                       setManualProductId('');
+                      setManualSilent(false);
                       setShowManualPayModal(true);
                     }}
                     className="btn" 
@@ -2601,6 +2605,19 @@ export default function ChatPage() {
                   onChange={(e) => setManualAmount(e.target.value)}
                   required
                 />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', marginBottom: '8px' }}>
+                <input 
+                  type="checkbox" 
+                  id="manualSilent" 
+                  checked={manualSilent} 
+                  onChange={(e) => setManualSilent(e.target.checked)} 
+                  style={{ cursor: 'pointer' }}
+                />
+                <label htmlFor="manualSilent" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+                  Apenas registrar venda (silencioso - não envia mensagens ou fluxos)
+                </label>
               </div>
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
