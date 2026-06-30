@@ -80,6 +80,71 @@ export default function PixelsPage() {
   const totalRevenue = stats.reduce((sum, s) => sum + s.revenue, 0);
   const globalConvRate = totalLeads > 0 ? ((totalSales / totalLeads) * 100).toFixed(2) : '0.00';
 
+  const cleanUrl = publicBaseUrl ? publicBaseUrl.replace(/\/$/, '') : 'https://seu-painel.com';
+
+  const trackingScriptCode = `<!-- XBot UTM & CAPI Tracking Script -->
+<script>
+(function() {
+  // 1. Captura parâmetros UTM da URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const utms = {};
+  ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(function(param) {
+    if (urlParams.has(param)) utms[param] = urlParams.get(param);
+  });
+
+  // 2. Captura cookies do Facebook para atribuição CAPI
+  const getCookie = function(name) {
+    const value = "; " + document.cookie;
+    const parts = value.split("; " + name + "=");
+    if (parts.length === 2) return parts.pop().split(";").shift();
+    return null;
+  };
+  const fbp = getCookie('_fbp');
+  const fbc = getCookie('_fbc') || urlParams.get('fbclid');
+
+  // 3. Modifica todos os links de WhatsApp para passarem pelo rastreamento
+  window.addEventListener('DOMContentLoaded', function() {
+    const redirectorBase = "${cleanUrl}/api/redirect/whatsapp";
+    const links = document.querySelectorAll('a[href*="wa.me"], a[href*="api.whatsapp.com"]');
+    
+    links.forEach(function(link) {
+      try {
+        const newUrl = new URL(redirectorBase);
+        
+        // Copia UTMs
+        Object.keys(utms).forEach(function(key) {
+          newUrl.searchParams.set(key, utms[key]);
+        });
+        
+        // Copia cookies de clique
+        if (fbp) newUrl.searchParams.set('fbp', fbp);
+        if (fbc) {
+          const cleanFbc = fbc.startsWith('fb.1.') ? fbc : "fb.1." + Date.now() + "." + fbc;
+          newUrl.searchParams.set('fbc', cleanFbc);
+        }
+        
+        // Mantém a mensagem original do botão (se houver)
+        let text = "";
+        try {
+          const oldUrl = new URL(link.href);
+          text = oldUrl.searchParams.get('text') || "";
+        } catch(urlErr) {
+          // Fallback if href is not a full URL
+          const match = link.href.match(/[?&]text=([^&#]*)/);
+          if (match) text = decodeURIComponent(match[1]);
+        }
+        
+        if (text) newUrl.searchParams.set('text', text);
+
+        link.href = newUrl.toString();
+      } catch(e) {
+        console.error("Erro ao rastrear link do WhatsApp:", e);
+      }
+    });
+  });
+})();
+</script>`;
+
   return (
     <div className="page-container">
       <header className="page-header">
@@ -221,6 +286,54 @@ export default function PixelsPage() {
             )}
           </div>
 
+        </div>
+
+        {/* External Site Integration */}
+        <div className="glass-panel" style={{ padding: '24px', marginTop: '12px' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            🔌 Integração com Páginas de Venda Externas (WordPress, Elementor, etc.)
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: '1.6', marginBottom: '20px' }}>
+            Como você utiliza páginas de vendas externas, as UTMs e os cookies do Facebook (<code style={{ color: 'var(--neon-green)' }}>_fbp</code> e <code style={{ color: 'var(--neon-green)' }}>_fbc</code>) ficam salvos no navegador do cliente enquanto ele navega no seu site. 
+            Para passar esses dados para o WhatsApp do atendente de forma automática, copie e cole o script abaixo dentro da tag <code style={{ color: 'var(--neon-green)' }}>&lt;head&gt;</code> do seu site:
+          </p>
+
+          <div style={{ position: 'relative', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-glass)', borderRadius: '8px', padding: '16px', overflow: 'hidden' }}>
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(trackingScriptCode);
+                alert('Script de rastreamento copiado para a área de transferência!');
+              }} 
+              className="btn btn-secondary" 
+              style={{ position: 'absolute', top: '12px', right: '12px', padding: '6px 12px', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)' }}
+            >
+              📋 Copiar Script
+            </button>
+            <pre style={{ margin: 0, fontSize: '0.75rem', fontFamily: 'monospace', color: '#a7f3d0', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '280px' }}>
+              {trackingScriptCode}
+            </pre>
+          </div>
+
+          <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '8px', color: '#60a5fa' }}>💡 O que este script faz automaticamente:</h4>
+              <ul style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <li>Captura todas as UTMs do anúncio da barra de endereço do seu site.</li>
+                <li>Lê os cookies do Facebook do navegador do lead.</li>
+                <li>Intercepta todos os botões de WhatsApp do seu site (links que apontam para <code>wa.me</code> ou <code>whatsapp.com</code>) e os redireciona através do nosso distribuidor inteligente de leads.</li>
+                <li>Garante 100% de precisão no rastreamento e atribuição CAPI.</li>
+              </ul>
+            </div>
+            <div>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '8px', color: '#60a5fa' }}>🛠️ Como instalar no WordPress / Elementor:</h4>
+              <ol style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <li>No painel do WordPress, vá em <strong>Elementor &gt; Custom Code</strong> (ou use um plugin de Header/Footer).</li>
+                <li>Clique em <strong>Add New Code</strong>.</li>
+                <li>Cole o script acima, defina a localização como <strong>&lt;head&gt;</strong> e salve em todo o site.</li>
+                <li>Pronto! Todos os seus botões de WhatsApp externos agora estão rastreados pelo XBot.</li>
+              </ol>
+            </div>
+          </div>
         </div>
 
       </div>
