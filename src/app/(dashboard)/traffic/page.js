@@ -59,6 +59,10 @@ export default function TrafficRoiDashboard() {
   const [connectError, setConnectError] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [updatingAccount, setUpdatingAccount] = useState(false);
+  
+  // Tutorial Modal States
+  const [showTutorialA, setShowTutorialA] = useState(false);
+  const [showTutorialB, setShowTutorialB] = useState(false);
 
   // Dashboard states
   const [level, setLevel] = useState('campaign'); // 'campaign' | 'adset' | 'ad'
@@ -419,7 +423,14 @@ export default function TrafficRoiDashboard() {
           {/* Option 1: Facebook Login button */}
           <div className="bg-zinc-950/40 border border-zinc-850/80 rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-zinc-300">Método A: Entrar com o Facebook (Recomendado)</span>
+              <span className="text-xs font-bold text-zinc-300 font-sans">Método A: Entrar com o Facebook (Recomendado)</span>
+              <button 
+                type="button" 
+                onClick={() => setShowTutorialA(true)} 
+                className="text-[11px] text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1 transition-all"
+              >
+                ❓ Como configurar?
+              </button>
             </div>
             
             <div className="space-y-1.5">
@@ -464,7 +475,16 @@ export default function TrafficRoiDashboard() {
 
           {/* Option 2: Manual token form */}
           <div className="bg-zinc-950/20 border border-zinc-850/60 rounded-xl p-5 space-y-4">
-            <span className="text-xs font-bold text-zinc-400">Método B: Conectar via Token de Acesso Manual</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-400">Método B: Conectar via Token de Acesso Manual</span>
+              <button 
+                type="button" 
+                onClick={() => setShowTutorialB(true)} 
+                className="text-[11px] text-zinc-500 hover:text-zinc-400 hover:underline flex items-center gap-1 transition-all"
+              >
+                ❓ Como gerar o token?
+              </button>
+            </div>
             
             <form onSubmit={handleConnectFacebook} className="space-y-4">
               <div className="space-y-1.5">
@@ -791,6 +811,101 @@ export default function TrafficRoiDashboard() {
               </div>
             </div>
           )}
+        </div>
+      )}
+      {/* Tutorial Modal A */}
+      {showTutorialA && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
+          <div className="bg-zinc-950 border border-zinc-800 w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-zinc-900 flex justify-between items-center bg-zinc-900/10">
+              <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                <span>📘</span> Tutorial: Criar Aplicativo & Entrar com Facebook
+              </h3>
+              <button onClick={() => setShowTutorialA(false)} className="text-zinc-400 hover:text-white text-lg font-bold">✕</button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-5 text-[11px] text-zinc-300 leading-relaxed">
+              <div>
+                <h4 className="font-bold text-zinc-100 text-xs mb-1">Passo 1: Acessar o Portal de Desenvolvedores</h4>
+                <p>Acesse <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-bold">developers.facebook.com</a>, faça login com seu Facebook e clique em <strong>Meus aplicativos</strong> no canto superior direito.</p>
+              </div>
+              
+              <div>
+                <h4 className="font-bold text-zinc-100 text-xs mb-1">Passo 2: Criar o Aplicativo</h4>
+                <p>Clique em <strong>Criar aplicativo</strong>, selecione <strong>Outro</strong> e clique em Avançar. Escolha o tipo <strong>Empresa (Business)</strong>, preencha o nome do aplicativo (ex: <code>XBot Painel</code>) e selecione seu gerenciador de negócios (BM).</p>
+              </div>
+              
+              <div>
+                <h4 className="font-bold text-zinc-100 text-xs mb-1">Passo 3: Adicionar o Login do Facebook</h4>
+                <p>No painel do aplicativo, procure por <strong>Login do Facebook</strong> e clique em <strong>Configurar</strong>. Escolha <strong>Web (WWW)</strong> e informe o link <code>https://xbot-sigma.vercel.app</code>.</p>
+                <p className="mt-1">Depois, no menu esquerdo do Login, vá em <strong>Configurações</strong> e em <strong>URIs de redirecionamento do OAuth válidos</strong> adicione:</p>
+                <code className="block bg-zinc-900 p-2 rounded text-zinc-200 font-mono mt-1 select-all text-[10px]">https://xbot-sigma.vercel.app/traffic</code>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-zinc-100 text-xs mb-1">Passo 4: Adicionar a API de Marketing</h4>
+                <p>Volte ao painel do aplicativo (ou clique em Adicionar Produto) e clique em <strong>Configurar</strong> sob o produto <strong>API de Marketing (Marketing API)</strong>.</p>
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-blue-400">
+                <strong>Pronto!</strong> Agora copie o <strong>ID do aplicativo (App ID)</strong> exibido no topo do portal do Facebook, cole no XBot e clique em <strong>Entrar com o Facebook</strong>.
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-zinc-900 flex justify-end bg-zinc-900/10">
+              <button onClick={() => setShowTutorialA(false)} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-xl text-xs font-bold transition-all">
+                Fechar Tutorial
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tutorial Modal B */}
+      {showTutorialB && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in">
+          <div className="bg-zinc-950 border border-zinc-800 w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-zinc-900 flex justify-between items-center bg-zinc-900/10">
+              <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                <span>🔑</span> Tutorial: Como Gerar o Token de Acesso Manual
+              </h3>
+              <button onClick={() => setShowTutorialB(false)} className="text-zinc-400 hover:text-white text-lg font-bold">✕</button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-5 text-[11px] text-zinc-300 leading-relaxed">
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-emerald-400">
+                <strong>Recomendação:</strong> O método definitivo (Opção A) gera um token permanente que <strong>nunca expira</strong>, ideal para deixar integrado de forma definitiva.
+              </div>
+
+              <div>
+                <h4 className="font-bold text-zinc-100 text-xs mb-1">Opção A: Token Permanente via BM (Recomendado)</h4>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Acesse as <strong>Configurações do Negócio</strong> da sua BM: <a href="https://business.facebook.com/settings" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-bold">business.facebook.com/settings</a>.</li>
+                  <li>No menu esquerdo, clique em <strong>Usuários do sistema</strong> (sob a aba Usuários).</li>
+                  <li>Clique em <strong>Adicionar</strong> se ainda não tiver um (função Administrador).</li>
+                  <li>Selecione o usuário, clique em <strong>Atribuir ativos</strong>, escolha sua <strong>Conta de anúncios</strong> e dê permissão de <strong>Gerenciar Conta de Anúncios</strong> (Controle Total).</li>
+                  <li>Clique em <strong>Gerar novo token</strong>, selecione o seu aplicativo e marque as permissões: <code>ads_read</code> e <code>ads_management</code>.</li>
+                  <li>Gere e copie o token permanente.</li>
+                </ol>
+              </div>
+              
+              <div className="border-t border-zinc-900 pt-4">
+                <h4 className="font-bold text-zinc-100 text-xs mb-1">Opção B: Token Rápido (Expira em 2 Horas)</h4>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Acesse o <strong>Graph API Explorer</strong>: <a href="https://developers.facebook.com/tools/explorer" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-bold">developers.facebook.com/tools/explorer</a>.</li>
+                  <li>No canto direito, selecione o seu aplicativo no campo <strong>Meta App</strong> e escolha <strong>User Token</strong>.</li>
+                  <li>No campo de permissões, clique em *Add a Permission* e adicione: <code>ads_read</code>, <code>ads_management</code> e <code>business_management</code>.</li>
+                  <li>Clique em <strong>Generate Access Token</strong>, autorize a janela do Facebook e copie o token gerado.</li>
+                </ol>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-zinc-900 flex justify-end bg-zinc-900/10">
+              <button onClick={() => setShowTutorialB(false)} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-xl text-xs font-bold transition-all">
+                Fechar Tutorial
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
