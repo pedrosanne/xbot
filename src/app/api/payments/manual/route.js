@@ -133,23 +133,42 @@ export async function POST(request) {
       console.error('Error sending Meta CAPI for manual payment:', capiError);
     }
 
-    // f. Trigger post-payment flows (Upsell)
+    // f. Trigger post-payment flows (Upsell / Chatbot Flow)
     try {
-      const postPaymentFlows = await prisma.flow.findMany({
-        where: {
-          isActive: true,
-          trigger: 'payment_confirmed',
-          OR: [
-            { productId: productId || undefined },
-            { productId: null }
-          ]
-        }
-      });
+      let triggeredFlow = null;
 
-      if (postPaymentFlows.length > 0) {
-        const bestFlow = postPaymentFlows.find(f => f.productId === productId) || postPaymentFlows[0];
-        await logToDb('INFO', 'FLOW', `Disparando fluxo pós-pagamento '${bestFlow.name}' (Upsell) para o contato ${contact.id} após venda manual`);
-        await startFlowForContact(contact, bestFlow, null);
+      // 1. Check if the product has a specific post-sale flow set
+      if (product && product.postSaleFlowId) {
+        const flow = await prisma.flow.findUnique({
+          where: { id: product.postSaleFlowId }
+        });
+        if (flow && flow.isActive) {
+          triggeredFlow = flow;
+          await logToDb('INFO', 'FLOW', `Disparando fluxo pós-venda direto do produto '${flow.name}' para o contato ${contact.id}`);
+        }
+      }
+
+      // 2. Fallback: Find flows matching trigger 'payment_confirmed'
+      if (!triggeredFlow) {
+        const postPaymentFlows = await prisma.flow.findMany({
+          where: {
+            isActive: true,
+            trigger: 'payment_confirmed',
+            OR: [
+              { productId: productId || undefined },
+              { productId: null }
+            ]
+          }
+        });
+
+        if (postPaymentFlows.length > 0) {
+          triggeredFlow = postPaymentFlows.find(f => f.productId === productId) || postPaymentFlows[0];
+          await logToDb('INFO', 'FLOW', `Disparando fluxo pós-pagamento '${triggeredFlow.name}' (Upsell) para o contato ${contact.id} após venda manual`);
+        }
+      }
+
+      if (triggeredFlow) {
+        await startFlowForContact(contact, triggeredFlow, null);
       }
     } catch (upsellError) {
       console.error('Error triggering post-payment flow for manual sale:', upsellError);

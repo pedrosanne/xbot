@@ -285,6 +285,7 @@ model Product {
   agents      Agent[]
   flows       Flow[]
   payments    Payment[]
+  postSaleFlowId String?
 }
 
 model Offer {

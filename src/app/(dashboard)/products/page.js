@@ -21,7 +21,9 @@ export default function ProductsPage() {
   const [prodType, setProdType] = useState('DIGITAL');
   const [prodPrice, setProdPrice] = useState('0.00');
   const [prodImage, setProdImage] = useState('');
+  const [prodPostSaleFlowId, setProdPostSaleFlowId] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
+  const [flows, setFlows] = useState([]);
 
   // 2. Offer Form States
   const [offProductId, setOffProductId] = useState('');
@@ -59,12 +61,13 @@ export default function ProductsPage() {
   async function fetchData() {
     setFetching(true);
     try {
-      const [resProd, resOff, resBump, resUp, resPix] = await Promise.all([
+      const [resProd, resOff, resBump, resUp, resPix, resFlows] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/products/offers'),
         fetch('/api/products/bumps'),
         fetch('/api/products/upsells'),
-        fetch('/api/products/pixels')
+        fetch('/api/products/pixels'),
+        fetch('/api/flows')
       ]);
 
       if (resProd.ok) setProducts(await resProd.json());
@@ -72,6 +75,7 @@ export default function ProductsPage() {
       if (resBump.ok) setBumps(await resBump.json());
       if (resUp.ok) setUpsells(await resUp.json());
       if (resPix.ok) setPixels(await resPix.json());
+      if (resFlows.ok) setFlows(await resFlows.json());
     } catch (err) {
       console.error('Error loading data:', err);
       setStatusMsg({ type: 'error', text: 'Falha ao conectar com o banco de dados.' });
@@ -101,7 +105,8 @@ export default function ProductsPage() {
           description: prodDesc,
           type: prodType,
           price: parseFloat(prodPrice) || 0.0,
-          imageUrl: prodImage
+          imageUrl: prodImage,
+          postSaleFlowId: prodPostSaleFlowId || null
         })
       });
 
@@ -112,6 +117,7 @@ export default function ProductsPage() {
         setProdType('DIGITAL');
         setProdPrice('0.00');
         setProdImage('');
+        setProdPostSaleFlowId('');
         // Reload
         const prodData = await fetch('/api/products').then(r => r.json());
         setProducts(prodData);
@@ -140,7 +146,8 @@ export default function ProductsPage() {
           description: editingProduct.description,
           type: editingProduct.type,
           price: parseFloat(editingProduct.price) || 0.0,
-          imageUrl: editingProduct.imageUrl
+          imageUrl: editingProduct.imageUrl,
+          postSaleFlowId: editingProduct.postSaleFlowId || null
         })
       });
 
@@ -545,7 +552,7 @@ export default function ProductsPage() {
                       <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label">URL da Imagem (Opcional)</label>
                         <input
-                          type="text"
+          type="text"
                           value={editingProduct.imageUrl}
                           onChange={(e) => setEditingProduct({ ...editingProduct, imageUrl: e.target.value })}
                           placeholder="https://exemplo.com/imagem.png"
@@ -561,6 +568,19 @@ export default function ProductsPage() {
                           className="form-input"
                           style={{ resize: 'vertical' }}
                         />
+                      </div>
+                      <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
+                        <label className="form-label">Fluxo de Pós-Venda (Chatbot)</label>
+                        <select
+                          value={editingProduct.postSaleFlowId || ''}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, postSaleFlowId: e.target.value || null })}
+                          className="form-input"
+                        >
+                          <option value="">Nenhum (Disparar fluxos genéricos de pagamento confirmado)</option>
+                          {flows.map(f => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        </select>
                       </div>
                       <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '8px' }}>
                         <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }} disabled={loading}>
@@ -689,6 +709,19 @@ export default function ProductsPage() {
                           className="form-input"
                           style={{ resize: 'vertical' }}
                         />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Fluxo de Pós-Venda (Chatbot)</label>
+                        <select
+                          value={prodPostSaleFlowId}
+                          onChange={(e) => setProdPostSaleFlowId(e.target.value)}
+                          className="form-input"
+                        >
+                          <option value="">Nenhum (Disparar fluxos genéricos de pagamento confirmado)</option>
+                          {flows.map(f => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        </select>
                       </div>
                       <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '10px', fontSize: '0.85rem' }} disabled={loading}>
                         {loading ? 'Criando...' : 'Adicionar Produto'}

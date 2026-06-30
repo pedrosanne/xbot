@@ -15,7 +15,7 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const { name, description, type, price, imageUrl } = await request.json();
+    const { name, description, type, price, imageUrl, postSaleFlowId } = await request.json();
 
     if (!name) {
       return NextResponse.json({ error: 'Nome do produto é obrigatório.' }, { status: 400 });
@@ -27,7 +27,8 @@ export async function POST(request) {
         description: description || '',
         type: type || 'DIGITAL',
         price: parseFloat(price) || 0.0,
-        imageUrl: imageUrl || ''
+        imageUrl: imageUrl || '',
+        postSaleFlowId: postSaleFlowId || null
       }
     });
 
@@ -40,7 +41,7 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
-    const { id, name, description, type, price, imageUrl } = await request.json();
+    const { id, name, description, type, price, imageUrl, postSaleFlowId } = await request.json();
 
     if (!id || !name) {
       return NextResponse.json({ error: 'ID e Nome são obrigatórios.' }, { status: 400 });
@@ -53,7 +54,8 @@ export async function PUT(request) {
         description: description ?? '',
         type: type || 'DIGITAL',
         price: parseFloat(price) ?? 0.0,
-        imageUrl: imageUrl ?? ''
+        imageUrl: imageUrl ?? '',
+        postSaleFlowId: postSaleFlowId !== undefined ? postSaleFlowId : undefined
       }
     });
 
