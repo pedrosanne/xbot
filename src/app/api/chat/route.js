@@ -368,12 +368,14 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Missing contactId' }, { status: 400 });
     }
 
+    const existing = await prisma.contact.findUnique({
+      where: { id: contactId }
+    });
+
     const dataToUpdate = {};
-    if (status !== undefined) dataToUpdate.status = status;
     if (name !== undefined) dataToUpdate.name = name;
     if (email !== undefined) dataToUpdate.email = email;
     if (notes !== undefined) dataToUpdate.notes = notes;
-    if (tags !== undefined) dataToUpdate.tags = tags;
     if (avatarUrl !== undefined) dataToUpdate.avatarUrl = avatarUrl;
     if (typingState !== undefined) dataToUpdate.typingState = typingState;
     if (assignedUserId !== undefined) dataToUpdate.assignedUserId = assignedUserId;
@@ -381,9 +383,21 @@ export async function PUT(request) {
     if (isBlocked !== undefined) dataToUpdate.isBlocked = isBlocked;
     if (reminderDate !== undefined) dataToUpdate.reminderDate = reminderDate ? new Date(reminderDate) : null;
 
-    const existing = await prisma.contact.findUnique({
-      where: { id: contactId }
-    });
+    if (status !== undefined) {
+      dataToUpdate.status = status;
+      
+      const currentTagsStr = tags !== undefined ? tags : (existing?.tags || '');
+      let currentTags = currentTagsStr ? currentTagsStr.split(',').map(t => t.trim()).filter(Boolean) : [];
+      
+      // Update or add the status tag
+      const statusTag = `Status: ${status === 'MANUAL' ? 'Manual' : 'Robô'}`;
+      currentTags = currentTags.filter(t => !t.startsWith('Status:'));
+      currentTags.push(statusTag);
+      
+      dataToUpdate.tags = currentTags.join(', ');
+    } else if (tags !== undefined) {
+      dataToUpdate.tags = tags;
+    }
 
     if (!existing) {
       if (typingState !== undefined || status !== undefined || name !== undefined) {

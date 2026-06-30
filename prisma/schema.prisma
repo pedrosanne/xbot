@@ -376,4 +376,26 @@ model UtmTracker {
   createdAt    DateTime @default(now())
 }
 
+model Page {
+  id                 String   @id @default(uuid())
+  title              String
+  slug               String   @unique
+  description        String   @default("")
+  status             String   @default("DRAFT") // DRAFT, PUBLISHED
+  content            Json     // Estrutura de blocos da página (JSON Array)
+  facebookPixelId    String   @default("") // Pixel específico da página
+  facebookPixelToken String   @default("") // Token de Conversão Meta específico
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model FacebookConfig {
+  id            String   @id @default(uuid())
+  accessToken   String   // Token de acesso do usuário do Facebook
+  adAccountId   String   @default("") // Conta de anúncio selecionada (ex: "act_123456")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 

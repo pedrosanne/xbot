@@ -2489,6 +2489,74 @@ export default function ChatPage() {
                     </div>
                   </div>
 
+                  {/* Manual Flow Trigger Section */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px', padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', borderRadius: '10px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>🤖 Iniciar Fluxo Manualmente</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <select
+                        id="manualFlowSelect"
+                        className="form-select"
+                        style={{ 
+                          flex: 1, 
+                          padding: '6px 10px', 
+                          fontSize: '0.8rem', 
+                          background: 'var(--bg-glass)', 
+                          border: '1px solid var(--border-glass)',
+                          color: 'var(--text-primary)',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        <option value="">Selecione...</option>
+                        {flows.filter(f => f.isActive).map(f => (
+                          <option key={f.id} value={f.id}>{f.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={async () => {
+                          const selectEl = document.getElementById('manualFlowSelect');
+                          const flowId = selectEl?.value;
+                          if (!flowId) {
+                            alert('Selecione um fluxo para disparar.');
+                            return;
+                          }
+                          const flow = flows.find(f => f.id === flowId);
+                          if (!confirm(`Deseja realmente iniciar o fluxo "${flow?.name}" para ${selectedContact.name}?`)) return;
+                          
+                          try {
+                            setLoading(true);
+                            const res = await fetch('/api/flows/trigger', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                contactId: selectedContact.id,
+                                flowId
+                              })
+                            });
+                            if (res.ok) {
+                              alert('Fluxo iniciado com sucesso!');
+                              if (selectEl) selectEl.value = '';
+                              fetchMessages(selectedContact.id);
+                              fetchContacts();
+                            } else {
+                              const errData = await res.json();
+                              alert(`Erro: ${errData.error || 'Falha ao disparar'}`);
+                            }
+                          } catch (err) {
+                            console.error('Error triggering flow:', err);
+                            alert('Erro ao conectar com o servidor.');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        className="btn btn-primary"
+                        style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'var(--color-primary)', border: 'none' }}
+                        disabled={loading}
+                      >
+                        Disparar
+                      </button>
+                    </div>
+                  </div>
+
                   <button 
                     onClick={() => {
                       let defaultProductId = '';

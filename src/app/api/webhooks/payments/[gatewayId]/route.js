@@ -442,6 +442,14 @@ export async function POST(request, { params }) {
         console.error('Error triggering Meta CAPI:', capiError);
       }
 
+      // e.3. Tag contact as Aprovado and add product tag
+      try {
+        const { tagContactForPayment } = await import('@/lib/queue');
+        await tagContactForPayment(contact.id, productId);
+      } catch (tagError) {
+        console.error('Error auto-tagging contact on webhook payment:', tagError);
+      }
+
       // f. Continue Chatbot Flow if waiting on a Pix node
       if (contact.activeFlowId && contact.currentStepId) {
         try {

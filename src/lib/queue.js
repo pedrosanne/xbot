@@ -290,6 +290,8 @@ async function processSingleMessage(contact, messageData) {
     const refMatch = text.match(refCodeRegex);
     if (refMatch) {
       const refCode = refMatch[1].toUpperCase();
+      // Clean the Ref suffix from the text so keyword matching works
+      text = text.replace(/[\s,\.-]*Ref:\s*[A-Z0-9]{5}/i, '').trim();
       try {
         const tracker = await prisma.utmTracker.findUnique({
           where: { id: refCode }
@@ -402,6 +404,10 @@ async function processSingleMessage(contact, messageData) {
               }
             });
 
+            // Tag contact as Aprovado and add product tag
+            if (result.payment) {
+              await tagContactForPayment(contactId, result.payment.productId);
+            }
             if (result.triggeredFlow) {
               await startFlowForContact(freshContact, result.triggeredFlow, null);
             }
@@ -900,6 +906,43 @@ async function processSingleMessage(contact, messageData) {
   }
 }
 
+export async function tagContactForPayment(contactId, productId) {
+  try {
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId }
+    });
+    if (!contact) return;
+
+    let currentTags = contact.tags ? contact.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+    // 1. Update Status Tag to 'Aprovado'
+    currentTags = currentTags.filter(t => !t.startsWith('Status:'));
+    currentTags.push('Status: Aprovado');
+
+    // 2. Add Product Tag if productId is provided
+    if (productId) {
+      const prod = await prisma.product.findUnique({ where: { id: productId } });
+      if (prod) {
+        const productTag = `Produto: ${prod.name}`;
+        if (!currentTags.includes(productTag)) {
+          currentTags.push(productTag);
+        }
+      }
+    }
+
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        tags: currentTags.join(', ')
+      }
+    });
+
+    await logToDb('INFO', 'FLOW', `Contato ${contactId} marcado com a tag 'Status: Aprovado' e produto associado.`);
+  } catch (err) {
+    console.error('Error tagging contact for payment:', err);
+  }
+}
+
 export async function startFlowForContact(contact, flow, incomingMessageId = null) {
   const steps = JSON.parse(flow.steps || '[]');
   if (steps.length === 0) return;
@@ -913,6 +956,43 @@ export async function startFlowForContact(contact, flow, incomingMessageId = nul
     updatedPassedFlows = updatedPassedFlows ? `${updatedPassedFlows},${flowIdentifier}` : flowIdentifier;
   }
 
+  // Auto-generate CRM Tags for the contact
+  const freshContact = await prisma.contact.findUnique({
+    where: { id: contact.id }
+  });
+
+  let currentTags = freshContact?.tags ? freshContact.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  // A. Status Tag (don't overwrite Aprovado)
+  const hasApproved = currentTags.includes('Status: Aprovado');
+  const statusTag = hasApproved ? 'Status: Aprovado' : `Status: ${freshContact?.status === 'MANUAL' ? 'Manual' : 'Robô'}`;
+  currentTags = currentTags.filter(t => !t.startsWith('Status:'));
+  currentTags.push(statusTag);
+
+  // B. Flow Tag
+  const flowTag = `Fluxo: ${flow.name}`;
+  if (!currentTags.includes(flowTag)) {
+    currentTags.push(flowTag);
+  }
+
+  // C. Product Tag
+  if (flow.productId) {
+    const prod = await prisma.product.findUnique({ where: { id: flow.productId } });
+    if (prod) {
+      const productTag = `Produto: ${prod.name}`;
+      if (!currentTags.includes(productTag)) {
+        currentTags.push(productTag);
+      }
+    }
+  }
+
+  // D. UTM Source Tag
+  if (freshContact?.utmSource) {
+    const sourceTag = `Origem: ${freshContact.utmSource}`;
+    currentTags = currentTags.filter(t => !t.startsWith('Origem:'));
+    currentTags.push(sourceTag);
+  }
+
   await prisma.contact.update({
     where: { id: contact.id },
     data: {
@@ -920,7 +1000,8 @@ export async function startFlowForContact(contact, flow, incomingMessageId = nul
       activeFlowId: flow.id,
       currentStepId: startStep.id,
       designatedAgentId: flow.agentId || null,
-      passedFlows: updatedPassedFlows
+      passedFlows: updatedPassedFlows,
+      tags: currentTags.join(', ')
     }
   });
 

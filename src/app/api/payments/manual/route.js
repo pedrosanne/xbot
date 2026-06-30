@@ -4,7 +4,7 @@ import { logToDb } from '@/lib/log';
 import { sendText } from '@/lib/whatsapp';
 import { sendPushNotification } from '@/lib/push';
 import { sendMetaCapiPurchase } from '@/lib/capi';
-import { startFlowForContact } from '@/lib/queue';
+import { startFlowForContact, tagContactForPayment } from '@/lib/queue';
 
 export async function POST(request) {
   try {
@@ -131,6 +131,13 @@ export async function POST(request) {
       await sendMetaCapiPurchase({ contact, payment });
     } catch (capiError) {
       console.error('Error sending Meta CAPI for manual payment:', capiError);
+    }
+
+    // e.2. Tag contact as Aprovado and add product tag
+    try {
+      await tagContactForPayment(contact.id, productId);
+    } catch (tagError) {
+      console.error('Error auto-tagging contact on manual payment:', tagError);
     }
 
     // f. Trigger post-payment flows (Upsell / Chatbot Flow) (only if NOT silent)

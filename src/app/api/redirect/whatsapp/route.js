@@ -49,17 +49,25 @@ export async function GET(request) {
       chosenConnection = fallbackConnection;
     }
 
-    if (!chosenConnection || !chosenConnection.phoneNumber) {
-      await logToDb('ERROR', 'FLOW', 'Tentativa de redirecionamento de lead sem número de WhatsApp ativo configurado no sistema.');
-      return new Response('Nenhum número de WhatsApp ativo configurado no sistema.', { status: 404 });
-    }
+    const customPhone = searchParams.get('phone') || '';
+    let cleanPhone = '';
 
-    // 3. Increment daily count for the chosen number
-    if (chosenConnection.isDistributionEnabled) {
-      await prisma.whatsAppConnection.update({
-        where: { id: chosenConnection.id },
-        data: { currentDayLeads: { increment: 1 } }
-      });
+    if (customPhone) {
+      cleanPhone = customPhone.replace(/\D/g, '');
+    } else {
+      if (!chosenConnection || !chosenConnection.phoneNumber) {
+        await logToDb('ERROR', 'FLOW', 'Tentativa de redirecionamento de lead sem número de WhatsApp ativo configurado no sistema.');
+        return new Response('Nenhum número de WhatsApp ativo configurado no sistema.', { status: 404 });
+      }
+
+      // 3. Increment daily count for the chosen number
+      if (chosenConnection.isDistributionEnabled) {
+        await prisma.whatsAppConnection.update({
+          where: { id: chosenConnection.id },
+          data: { currentDayLeads: { increment: 1 } }
+        });
+      }
+      cleanPhone = chosenConnection.phoneNumber.replace(/\D/g, '');
     }
 
     // 4. Generate unique short reference code
@@ -90,11 +98,10 @@ export async function GET(request) {
       }
     });
 
-    const cleanPhone = chosenConnection.phoneNumber.replace(/\D/g, '');
     const finalMsg = `${text}\n\nRef: ${refCode}`.trim();
     const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(finalMsg)}`;
 
-    await logToDb('INFO', 'FLOW', `Lead redirecionado para o número ${chosenConnection.name} (${cleanPhone}). Total hoje: ${chosenConnection.currentDayLeads + 1}/${chosenConnection.dailyLeadLimit}`);
+    await logToDb('INFO', 'FLOW', `Lead redirecionado para o número ${chosenConnection ? chosenConnection.name : 'Fixo'} (${cleanPhone}).`);
 
     return NextResponse.redirect(waUrl);
   } catch (error) {
