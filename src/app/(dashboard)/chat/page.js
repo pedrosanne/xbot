@@ -246,6 +246,7 @@ export default function ChatPage() {
 
   // Manual Payment states
   const [products, setProducts] = useState([]);
+  const [flows, setFlows] = useState([]);
   const [showManualPayModal, setShowManualPayModal] = useState(false);
   const [manualProductId, setManualProductId] = useState('');
   const [manualAmount, setManualAmount] = useState('');
@@ -271,6 +272,17 @@ export default function ChatPage() {
       }
     } catch (err) {
       console.error('Error fetching products:', err);
+    }
+  }
+
+  async function fetchFlows() {
+    try {
+      const res = await fetch('/api/flows');
+      if (res.ok) {
+        setFlows(await res.json());
+      }
+    } catch (err) {
+      console.error('Error fetching flows:', err);
     }
   }
 
@@ -377,6 +389,7 @@ export default function ChatPage() {
       fetchCollaborators();
       fetchLoggedUser();
       fetchProducts();
+      fetchFlows();
     });
   }, []);
 
@@ -2278,8 +2291,22 @@ export default function ChatPage() {
 
                   <button 
                     onClick={() => {
-                      setManualAmount('');
-                      setManualProductId('');
+                      let defaultProductId = '';
+                      let defaultAmount = '';
+                      
+                      if (selectedContact && selectedContact.activeFlowId) {
+                        const activeFlow = flows.find(f => f.id === selectedContact.activeFlowId);
+                        if (activeFlow && activeFlow.productId) {
+                          defaultProductId = activeFlow.productId;
+                          const relatedProduct = products.find(p => p.id === activeFlow.productId);
+                          if (relatedProduct) {
+                            defaultAmount = String(relatedProduct.price);
+                          }
+                        }
+                      }
+
+                      setManualProductId(defaultProductId);
+                      setManualAmount(defaultAmount);
                       setManualSilent(false);
                       setShowManualPayModal(true);
                     }}
