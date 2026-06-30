@@ -94,6 +94,14 @@ export async function processSingleMessageWrapper(contactId, messageData) {
         },
         include: { connection: true }
       });
+
+      // Trigger Group Automations for lead_created
+      try {
+        const { triggerGroupAutomations } = await import('./groupAuto');
+        await triggerGroupAutomations('lead_created', { contact, productId: null });
+      } catch (groupAutoErr) {
+        console.error('Error triggering group automations for lead_created:', groupAutoErr);
+      }
     } else if (messageData.profileName && contact.profileName !== messageData.profileName) {
       await logToDb('INFO', 'DATABASE', `Atualizando nome de perfil do contato ${contactId}: ${messageData.profileName}`);
       contact = await prisma.contact.update({

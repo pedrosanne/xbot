@@ -203,6 +203,14 @@ export async function processPixReceiptPayment(contact, receiptData) {
 
     await logToDb('INFO', 'FLOW', `Pagamento Pix direto de R$ ${payment.amount} atribuído com sucesso ao contato ${contact.id} via IA.`);
 
+    // Trigger Group Automations for payment_approved
+    try {
+      const { triggerGroupAutomations } = await import('./groupAuto');
+      await triggerGroupAutomations('payment_approved', { contact, payment, productId });
+    } catch (groupAutoErr) {
+      console.error('Error triggering group automations in receipt.js:', groupAutoErr);
+    }
+
     // =========================================================================
     // AUTOMATIONS
     // =========================================================================

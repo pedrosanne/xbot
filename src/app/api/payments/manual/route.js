@@ -140,6 +140,14 @@ export async function POST(request) {
       console.error('Error auto-tagging contact on manual payment:', tagError);
     }
 
+    // e.3. Trigger Group Automations for payment_approved
+    try {
+      const { triggerGroupAutomations } = await import('@/lib/groupAuto');
+      await triggerGroupAutomations('payment_approved', { contact, payment, productId });
+    } catch (groupAutoErr) {
+      console.error('Error triggering group automations for manual payment:', groupAutoErr);
+    }
+
     // f. Trigger post-payment flows (Upsell / Chatbot Flow) (only if NOT silent)
     if (!silent) {
       try {

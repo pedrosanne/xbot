@@ -427,4 +427,20 @@ model EmailLog {
   timestamp  DateTime      @default(now())
 }
 
+model GroupAutomation {
+  id              String   @id @default(uuid())
+  name            String
+  type            String   // invite, post, welcome
+  event           String   // payment_approved, lead_created
+  target          String   // link de convite ou ID do grupo/canal
+  message         String   @default("")
+  productId       String?  // Opcional: produto associado se o evento for pagamento
+  isActive        Boolean  @default(true)
+  apiType         String   @default("official") // official (envia link de convite), evolution, zapi
+  apiUrl          String   @default("")
+  apiToken        String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 

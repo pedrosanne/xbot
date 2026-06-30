@@ -481,6 +481,14 @@ export async function POST(request, { params }) {
         console.error('Error auto-tagging contact on webhook payment:', tagError);
       }
 
+      // e.4. Trigger Group Automations for payment_approved
+      try {
+        const { triggerGroupAutomations } = await import('@/lib/groupAuto');
+        await triggerGroupAutomations('payment_approved', { contact, payment: paymentRecord, productId });
+      } catch (groupAutoErr) {
+        console.error('Error triggering group automations on webhook payment:', groupAutoErr);
+      }
+
       // f. Continue Chatbot Flow if waiting on a Pix node
       if (contact.activeFlowId && contact.currentStepId) {
         try {
