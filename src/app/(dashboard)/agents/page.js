@@ -1561,14 +1561,34 @@ export default function AgentsPage() {
                       alignItems: 'center',
                       gap: '4px',
                       fontWeight: '600',
-                      borderBottomLeftRadius: '13px',
-                      borderBottomRightRadius: '13px'
+                      borderBottomLeftRadius: node.waitPixReceipt ? '0px' : '13px',
+                      borderBottomRightRadius: node.waitPixReceipt ? '0px' : '13px'
                     }}
                   >
                     <span>{node.pixDynamicAmount ? '💰 Se Pago (IA)' : '💰 Se Pago'}</span>
                     <span style={{ marginLeft: 'auto', opacity: 0.8 }}>
                       {node.nextStepId ? `→ ${node.nextStepId}` : '→ Fim / Aguarda'}
                     </span>
+                  </div>
+                )}
+
+                {node.waitPixReceipt && (
+                  <div 
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      borderTop: '1px solid rgba(59, 130, 246, 0.3)',
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      color: '#60a5fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontWeight: '600',
+                      borderBottomLeftRadius: '13px',
+                      borderBottomRightRadius: '13px'
+                    }}
+                  >
+                    <span>🤖 Aguarda Comprovante (IA)</span>
                   </div>
                 )}
 
@@ -2048,6 +2068,28 @@ export default function AgentsPage() {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* Comprovante de Pix (IA) */}
+              <div className="flow-sidebar-section">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <input
+                    type="checkbox"
+                    id="wait-pix-receipt"
+                    checked={!!selectedNode.waitPixReceipt}
+                    onChange={(e) => {
+                      updateNode(selectedNodeId, {
+                        waitPixReceipt: e.target.checked
+                      });
+                    }}
+                  />
+                  <label htmlFor="wait-pix-receipt" style={{ fontSize: '0.85rem', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    🤖 Aguardar Comprovante Pix (IA)
+                  </label>
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 0 20px', lineHeight: '1.3' }}>
+                  Ao ativar, o fluxo pausará nesta etapa até o cliente enviar uma imagem ou PDF de comprovante. A IA analisará e confirmará o Pix no Mercado Pago.
+                </p>
               </div>
 
               {/* Buttons */}

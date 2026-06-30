@@ -585,6 +585,79 @@ async function processSingleMessage(contact, messageData) {
         if (currentStep) {
           await logToDb('INFO', 'FLOW', `Contato está no fluxo '${currentFlow.name}', etapa atual: '${currentStep.id}'`);
           
+          // Check if this step is waiting for a Pix receipt (IA)
+          if (currentStep.waitPixReceipt) {
+            await logToDb('INFO', 'FLOW', `Contato ${contactId} na etapa de aguardar comprovante Pix '${currentStep.id}'.`);
+            
+            const isMedia = messageData.type === 'image' || messageData.type === 'document';
+            if (isMedia && messageData.mediaUrl) {
+              const mimeType = messageData.type === 'image' ? 'image/png' : 'application/pdf';
+              
+              // 1. Analyze the receipt with Gemini
+              const { analyzePixReceipt, processPixReceiptPayment } = await import('./receipt');
+              const receiptData = await analyzePixReceipt(messageData.mediaUrl, mimeType);
+              
+              if (receiptData && receiptData.isPixReceipt) {
+                // 2. Verify in Mercado Pago and approve payment
+                const result = await processPixReceiptPayment(freshContact, receiptData);
+                if (result.success) {
+                  // Payment approved! Trigger post-sale flow
+                  let nextFlow = result.triggeredFlow;
+                  if (nextFlow) {
+                    const nextSteps = JSON.parse(nextFlow.steps || '[]');
+                    const firstStep = nextSteps[0];
+                    if (firstStep) {
+                      await prisma.contact.update({
+                        where: { id: contactId },
+                        data: {
+                          botMode: 'FLOW',
+                          activeFlowId: nextFlow.id,
+                          currentStepId: firstStep.id
+                        }
+                      });
+                      await sendStepResponse(contactId, firstStep, nextSteps, messageData.id, freshContact.connection);
+                      return;
+                    }
+                  }
+                  
+                  // Fallback if no post-sale flow is set
+                  await prisma.contact.update({
+                    where: { id: contactId },
+                    data: {
+                      activeFlowId: '',
+                      currentStepId: ''
+                    }
+                  });
+                  const successMsg = "Seu pagamento foi confirmado com sucesso! Obrigado pela compra. 🎉";
+                  await sendText(contactId, successMsg, messageData.id, freshContact.connection);
+                  await saveOutgoingMessage(`bot_${Date.now()}_pix_success`, contactId, 'text', '', successMsg);
+                  return;
+                } else {
+                  // Receipt analyzed but payment not confirmed or already used
+                  let failMsg = "Não conseguimos localizar esse pagamento no nosso sistema. Por favor, verifique se o Pix foi concluído e envie o comprovante novamente.";
+                  if (result.reason === 'already_used') {
+                    failMsg = "Este comprovante já foi utilizado em outra compra. Por favor, envie um comprovante válido.";
+                  }
+                  await sendText(contactId, failMsg, messageData.id, freshContact.connection);
+                  await saveOutgoingMessage(`bot_${Date.now()}_pix_failed`, contactId, 'text', '', failMsg);
+                  return;
+                }
+              } else {
+                // Sent media but it's not a Pix receipt
+                const notReceiptMsg = "O arquivo enviado não parece ser um comprovante de Pix válido. Por favor, envie a imagem ou PDF do comprovante de transferência do Pix.";
+                await sendText(contactId, notReceiptMsg, messageData.id, freshContact.connection);
+                await saveOutgoingMessage(`bot_${Date.now()}_not_receipt`, contactId, 'text', '', notReceiptMsg);
+                return;
+              }
+            } else {
+              // User sent text instead of media
+              const promptMsg = "Por favor, envie o comprovante do Pix em formato de Imagem ou PDF para que possamos confirmar seu pagamento automaticamente.";
+              await sendText(contactId, promptMsg, messageData.id, freshContact.connection);
+              await saveOutgoingMessage(`bot_${Date.now()}_pix_prompt`, contactId, 'text', '', promptMsg);
+              return;
+            }
+          }
+
           // Check if this is a dynamic Pix amount collection step (IA)
           if (currentStep.pixEnabled && currentStep.pixDynamicAmount) {
             await logToDb('INFO', 'FLOW', `Contato ${contactId} na etapa de Pix Dinâmico '${currentStep.id}'. Tentando extrair valor do texto: "${text}"`);
