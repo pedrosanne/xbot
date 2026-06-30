@@ -5,7 +5,6 @@ import { logToDb } from './log';
 import { sendText } from './whatsapp';
 import { sendPushNotification } from './push';
 import { sendMetaCapiPurchase } from './capi';
-import { startFlowForContact } from './queue';
 
 /**
  * Extracts Pix receipt data from an image using Gemini Vision
@@ -281,9 +280,6 @@ export async function processPixReceiptPayment(contact, receiptData) {
         }
       }
 
-      if (triggeredFlow) {
-        await startFlowForContact(contact, triggeredFlow, null);
-      }
     } catch (upsellError) {
       console.error('Error triggering post-payment flow for IA Pix:', upsellError);
     }

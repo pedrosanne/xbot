@@ -401,6 +401,10 @@ async function processSingleMessage(contact, messageData) {
                 status: 'sent'
               }
             });
+
+            if (result.triggeredFlow) {
+              await startFlowForContact(freshContact, result.triggeredFlow, null);
+            }
           } else {
             // No match found or already used
             let failMsg = `Recebi seu comprovante de Pix de R$ ${receiptData.amount.toFixed(2).replace('.', ',')}, mas ainda não localizei o pagamento em nossa conta do Mercado Pago. Vou encaminhar agora mesmo para nossa equipe validar e liberar manualmente para você! ⏳`;
