@@ -121,7 +121,7 @@ export async function POST(request) {
       const url = `/chat?contactId=${contact.id}`;
       const targetUserIds = contact.assignedUserId ? [contact.assignedUserId] : null;
       
-      await sendPushNotification(title, body, url, targetUserIds);
+      await sendPushNotification(title, body, url, targetUserIds, 'sale');
     } catch (pushError) {
       console.error('Error sending manual payment push notification:', pushError);
     }

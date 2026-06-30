@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { playSynthesizedSound } from '@/lib/audioSynth';
 
 export default function PWARegistration() {
   useEffect(() => {
@@ -19,8 +20,21 @@ export default function PWARegistration() {
         registerSW();
       } else {
         window.addEventListener('load', registerSW);
-        return () => window.removeEventListener('load', registerSW);
       }
+
+      // Listen for messages from the Service Worker to play notification sounds
+      const handleMessage = (event) => {
+        if (event.data && event.data.type === 'PLAY_SOUND') {
+          playSynthesizedSound(event.data.soundType);
+        }
+      };
+
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+
+      return () => {
+        window.removeEventListener('load', registerSW);
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      };
     }
   }, []);
 

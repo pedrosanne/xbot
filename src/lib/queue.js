@@ -180,7 +180,8 @@ export async function processSingleMessageWrapper(contactId, messageData) {
           `Atendimento Manual: ${contactName} 💬`,
           messageSnippet,
           `/chat?contactId=${contactId}`,
-          targetUserIds
+          targetUserIds,
+          'message'
         );
         return;
       }
@@ -442,7 +443,7 @@ async function processSingleMessage(contact, messageData) {
             const contactName = freshContact.name || freshContact.profileName || contactId;
             const title = `Comprovante Pix não localizado! ⚠️`;
             const body = `O lead ${contactName} enviou comprovante de R$ ${receiptData.amount.toFixed(2).replace('.', ',')} mas não foi localizado no Mercado Pago.`;
-            await sendPushNotification(title, body, `/chat?contactId=${contactId}`);
+            await sendPushNotification(title, body, `/chat?contactId=${contactId}`, null, 'message');
           }
           
           return; // Terminate queue task, don't let bot send generic reply
@@ -539,7 +540,8 @@ async function processSingleMessage(contact, messageData) {
         `Cliente Recorrente: ${contactName} 👤`,
         `Já passou por: ${flowNames} e retornou contato.`,
         `/chat?contactId=${contactId}`,
-        targetUserIds
+        targetUserIds,
+        'message'
       );
 
       return;
@@ -720,7 +722,8 @@ async function processSingleMessage(contact, messageData) {
                   `Mensagem fora de contexto: ${contactName} ⚠️`,
                   `Mensagem: "${messageSnippet}" (Aguardando ação do colaborador)`,
                   `/chat?contactId=${contactId}`,
-                  targetUserIds
+                  targetUserIds,
+                  'message'
                 );
               } catch (pushErr) {
                 console.error('Error sending invalid input push notification:', pushErr);
@@ -895,7 +898,8 @@ async function processSingleMessage(contact, messageData) {
       `Novo Atendimento: ${contactName} 👤`,
       messageSnippet,
       `/chat?contactId=${contactId}`,
-      targetUserIds
+      targetUserIds,
+      'message'
     );
 
   } catch (error) {
@@ -1526,7 +1530,9 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
     await sendPushNotification(
       `Solicitação de Atendimento: ${contactName} 👤`,
       `Cliente solicitou atendimento humano no fluxo.`,
-      `/chat?contactId=${contact.id}`
+      `/chat?contactId=${contact.id}`,
+      null,
+      'message'
     );
   } else if (option.action === 'end_flow') {
     await logToDb('INFO', 'SYSTEM', `Finalizando fluxo para o contato ${contact.id}`);

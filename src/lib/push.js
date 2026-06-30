@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 import { getSystemSettings } from './settings';
 import { logToDb } from './log';
 
-export async function sendPushNotification(title, body, url = '/chat', targetUserIds = null) {
+export async function sendPushNotification(title, body, url = '/chat', targetUserIds = null, soundType = 'default') {
   try {
     const settings = await getSystemSettings();
     
@@ -36,7 +36,11 @@ export async function sendPushNotification(title, body, url = '/chat', targetUse
       body,
       icon: '/icons/icon.svg',
       badge: '/icons/icon.svg',
-      url
+      url,
+      data: {
+        url,
+        soundType
+      }
     });
 
     const results = await Promise.all(

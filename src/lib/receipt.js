@@ -236,8 +236,7 @@ export async function processPixReceiptPayment(contact, receiptData) {
       const contactName = contact.name || contact.profileName || contact.id;
       const title = `Pix Automático via IA! 🤖💰`;
       const body = `O lead ${contactName} enviou o comprovante e a IA identificou o Pix de R$ ${payment.amount.toFixed(2).replace('.', ',')} no Mercado Pago.`;
-      const url = `/chat?contactId=${contact.id}`;
-      await sendPushNotification(title, body, url);
+      await sendPushNotification(title, body, url, null, 'sale');
     } catch (pushError) {
       console.error('Error sending push for IA Pix:', pushError);
     }
