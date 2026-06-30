@@ -627,11 +627,22 @@ async function processSingleMessage(contact, messageData) {
             };
 
             if (isMedia && messageData.mediaUrl) {
-              const mimeType = messageData.type === 'image' ? 'image/png' : 'application/pdf';
-              
-              // 1. Analyze the receipt with Gemini
-              const { analyzePixReceipt, processPixReceiptPayment } = await import('./receipt');
-              const receiptData = await analyzePixReceipt(messageData.mediaUrl, mimeType);
+              const { processPixReceiptPayment } = await import('./receipt');
+              let receiptData = null;
+
+              if (behavior === 'approve_on_any_receipt') {
+                // Automatically mock validate and approve any image or PDF without calling Gemini or Mercado Pago
+                receiptData = {
+                  isPixReceipt: true,
+                  amount: currentStep.pixAmount || 0,
+                  transactionId: `auto_${Date.now()}`,
+                  payerName: freshContact.name || freshContact.profileName || 'Cliente'
+                };
+              } else {
+                const mimeType = messageData.type === 'image' ? 'image/png' : 'application/pdf';
+                const { analyzePixReceipt } = await import('./receipt');
+                receiptData = await analyzePixReceipt(messageData.mediaUrl, mimeType);
+              }
               
               if (receiptData && receiptData.isPixReceipt) {
                 // 2. Verify in Mercado Pago and approve payment
