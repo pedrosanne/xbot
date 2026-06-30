@@ -598,6 +598,34 @@ async function processSingleMessage(contact, messageData) {
             await logToDb('INFO', 'FLOW', `Contato ${contactId} na etapa de aguardar comprovante Pix '${currentStep.id}'.`);
             
             const isMedia = messageData.type === 'image' || messageData.type === 'document';
+            const behavior = currentStep.waitPixReceiptBehavior || 'request_receipt';
+
+            // Helper to notify human team in silent mode
+            const notifyHumanTeam = async (alertReason) => {
+              let targetUserIds = null;
+              if (freshContact.connectionId) {
+                try {
+                  const connWithUsers = await prisma.whatsAppConnection.findUnique({
+                    where: { id: freshContact.connectionId },
+                    include: { users: { select: { id: true } } }
+                  });
+                  if (connWithUsers && connWithUsers.users.length > 0) {
+                    targetUserIds = connWithUsers.users.map(u => u.id);
+                  }
+                } catch (err) {
+                  console.error('Error fetching connection users for push:', err);
+                }
+              }
+
+              const contactName = freshContact.name || freshContact.profileName || contactId;
+              const textSnippet = messageData.content || (messageData.type === 'document' ? 'PDF enviado' : 'Mídia enviada');
+              const pushTitle = `Aguardando Comprovante: ${contactName} ⏳`;
+              const pushBody = `[${alertReason}] ${textSnippet.length > 60 ? textSnippet.substring(0, 60) + '...' : textSnippet}`;
+              
+              await logToDb('INFO', 'FLOW', `Silenciando resposta automática para ${contactId} na etapa '${currentStep.id}' e notificando atendentes. Motivo: ${alertReason}`);
+              await sendPushNotification(pushTitle, pushBody, `/chat?contactId=${contactId}`, targetUserIds, 'message');
+            };
+
             if (isMedia && messageData.mediaUrl) {
               const mimeType = messageData.type === 'image' ? 'image/png' : 'application/pdf';
               
@@ -642,6 +670,12 @@ async function processSingleMessage(contact, messageData) {
                   return;
                 } else {
                   // Receipt analyzed but payment not confirmed or already used
+                  if (behavior === 'ignore_and_notify') {
+                    const reason = result.reason === 'already_used' ? 'Comprovante já utilizado' : 'Pix não localizado no MP';
+                    await notifyHumanTeam(reason);
+                    return;
+                  }
+
                   let failMsg = "Não conseguimos localizar esse pagamento no nosso sistema. Por favor, verifique se o Pix foi concluído e envie o comprovante novamente.";
                   if (result.reason === 'already_used') {
                     failMsg = "Este comprovante já foi utilizado em outra compra. Por favor, envie um comprovante válido.";
@@ -652,6 +686,11 @@ async function processSingleMessage(contact, messageData) {
                 }
               } else {
                 // Sent media but it's not a Pix receipt
+                if (behavior === 'ignore_and_notify') {
+                  await notifyHumanTeam('Envio de mídia (não comprovante)');
+                  return;
+                }
+
                 const notReceiptMsg = "O arquivo enviado não parece ser um comprovante de Pix válido. Por favor, envie a imagem ou PDF do comprovante de transferência do Pix.";
                 await sendText(contactId, notReceiptMsg, messageData.id, freshContact.connection);
                 await saveOutgoingMessage(`bot_${Date.now()}_not_receipt`, contactId, 'text', '', notReceiptMsg);
@@ -659,6 +698,11 @@ async function processSingleMessage(contact, messageData) {
               }
             } else {
               // User sent text instead of media
+              if (behavior === 'ignore_and_notify') {
+                await notifyHumanTeam('Mensagem de texto do cliente');
+                return;
+              }
+
               const promptMsg = "Por favor, envie o comprovante do Pix em formato de Imagem ou PDF para que possamos confirmar seu pagamento automaticamente.";
               await sendText(contactId, promptMsg, messageData.id, freshContact.connection);
               await saveOutgoingMessage(`bot_${Date.now()}_pix_prompt`, contactId, 'text', '', promptMsg);

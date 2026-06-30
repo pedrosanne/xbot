@@ -2082,8 +2082,10 @@ export default function AgentsPage() {
                     id="wait-pix-receipt"
                     checked={!!selectedNode.waitPixReceipt}
                     onChange={(e) => {
+                      const isChecked = e.target.checked;
                       updateNode(selectedNodeId, {
-                        waitPixReceipt: e.target.checked
+                        waitPixReceipt: isChecked,
+                        ...(!isChecked && { waitPixReceiptBehavior: null })
                       });
                     }}
                   />
@@ -2094,6 +2096,21 @@ export default function AgentsPage() {
                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 0 20px', lineHeight: '1.3' }}>
                   Ao ativar, o fluxo pausará nesta etapa até o cliente enviar uma imagem ou PDF de comprovante. A IA analisará e confirmará o Pix no Mercado Pago.
                 </p>
+
+                {selectedNode.waitPixReceipt && (
+                  <div style={{ marginTop: '12px', paddingLeft: '20px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Reação a mensagens que não são comprovante:</label>
+                    <select
+                      className="form-select"
+                      style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
+                      value={selectedNode.waitPixReceiptBehavior || 'request_receipt'}
+                      onChange={(e) => updateNode(selectedNodeId, { waitPixReceiptBehavior: e.target.value })}
+                    >
+                      <option value="request_receipt" style={{ background: 'var(--bg-primary)' }}>💬 Responder pedindo comprovante</option>
+                      <option value="ignore_and_notify" style={{ background: 'var(--bg-primary)' }}>🤫 Ignorar bot e notificar atendente</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Buttons */}
