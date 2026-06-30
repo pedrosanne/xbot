@@ -1476,6 +1476,14 @@ export default function AgentsPage() {
                     {idx === 0 ? 'Início' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'IA' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'Humano' : 'Msg'}
                   </span>
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.id}</span>
+                  {node.timeoutEnabled && (
+                    <span 
+                      title={`Timeout: reenviar após ${node.timeoutDuration} ${node.timeoutUnit === 'minutes' ? 'minutos' : node.timeoutUnit === 'hours' ? 'horas' : 'dias'}`} 
+                      style={{ marginRight: '6px', fontSize: '0.85rem', display: 'flex', alignItems: 'center' }}
+                    >
+                      ⏱️
+                    </span>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1733,6 +1741,79 @@ export default function AgentsPage() {
                     </span>
                   )}
                 </div>
+              </div>
+
+              {/* Auto-Follow-up / Timeout */}
+              <div className="flow-sidebar-section" style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '16px', marginTop: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <input
+                    type="checkbox"
+                    id="timeout-enabled"
+                    checked={!!selectedNode.timeoutEnabled}
+                    onChange={(e) => {
+                      const isChecked = e.target.checked;
+                      updateNode(selectedNodeId, {
+                        timeoutEnabled: isChecked,
+                        ...(isChecked && {
+                          timeoutDuration: selectedNode.timeoutDuration || 5,
+                          timeoutUnit: selectedNode.timeoutUnit || 'minutes',
+                          timeoutNextStepId: selectedNode.timeoutNextStepId || ''
+                        })
+                      });
+                    }}
+                  />
+                  <label htmlFor="timeout-enabled" style={{ fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600', color: '#ffb020', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    ⏱️ Timeout / Reenviar sem resposta
+                  </label>
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 10px 20px', lineHeight: '1.3' }}>
+                  Se ativado, o bot avançará automaticamente para outra etapa após o tempo configurado caso o contato não responda à mensagem.
+                </p>
+
+                {selectedNode.timeoutEnabled && (
+                  <div style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tempo</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', margin: 0 }}
+                          min="1"
+                          value={selectedNode.timeoutDuration || 5}
+                          onChange={(e) => updateNode(selectedNodeId, { timeoutDuration: parseInt(e.target.value) || 1 })}
+                        />
+                      </div>
+                      <div style={{ flex: 1.5 }}>
+                        <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Unidade</label>
+                        <select
+                          className="form-select"
+                          style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
+                          value={selectedNode.timeoutUnit || 'minutes'}
+                          onChange={(e) => updateNode(selectedNodeId, { timeoutUnit: e.target.value })}
+                        >
+                          <option value="minutes" style={{ background: 'var(--bg-primary)' }}>Minutos</option>
+                          <option value="hours" style={{ background: 'var(--bg-primary)' }}>Horas</option>
+                          <option value="days" style={{ background: 'var(--bg-primary)' }}>Dias</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Avançar para a Etapa:</label>
+                      <select
+                        className="form-select"
+                        style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
+                        value={selectedNode.timeoutNextStepId || ''}
+                        onChange={(e) => updateNode(selectedNodeId, { timeoutNextStepId: e.target.value || '' })}
+                      >
+                        <option value="" style={{ background: 'var(--bg-primary)' }}>-- Selecione --</option>
+                        {nodes.filter(n => n.id !== selectedNodeId).map(n => (
+                          <option key={n.id} value={n.id} style={{ background: 'var(--bg-primary)' }}>{n.id}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Media */}
