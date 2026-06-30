@@ -52,6 +52,7 @@ export async function POST(request, { params }) {
     let contactId = '';
     let productId = null;
     let sellerId = null;
+    let payerName = '';
 
     // 1. Parse fields based on provider type
     if (gateway.type === 'stripe') {
@@ -151,6 +152,11 @@ export async function POST(request, { params }) {
 
           if (mpPayment.payer?.phone?.area_code && mpPayment.payer?.phone?.number) {
             phone = `${mpPayment.payer.phone.area_code}${mpPayment.payer.phone.number}`;
+          }
+          if (mpPayment.payer?.first_name) {
+            payerName = `${mpPayment.payer.first_name} ${mpPayment.payer.last_name || ''}`.trim();
+          } else if (mpPayment.payer?.name) {
+            payerName = mpPayment.payer.name;
           }
         } catch (mpError) {
           await logToDb('ERROR', 'WEBHOOK', `Falha ao consultar pagamento no Mercado Pago: ${mpError.message}`);
@@ -306,6 +312,31 @@ export async function POST(request, { params }) {
         where: { email: { equals: email, mode: 'insensitive' } },
         include: { connection: true }
       });
+    }
+
+    if (!contact && payerName) {
+      // Find active contacts in the last 2 hours
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const activeContacts = await prisma.contact.findMany({
+        where: {
+          lastInteraction: { gte: twoHoursAgo }
+        },
+        include: { connection: true }
+      });
+      
+      const cleanPayer = payerName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      
+      contact = activeContacts.find(c => {
+        if (!c.name) return false;
+        const cleanContact = c.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        
+        return (cleanPayer.length > 4 && cleanContact.length > 4) && 
+               (cleanPayer.includes(cleanContact) || cleanContact.includes(cleanPayer));
+      });
+      
+      if (contact) {
+        await logToDb('INFO', 'WEBHOOK', `Contato ${contact.id} correspondido automaticamente pelo nome do pagador Pix: "${payerName}"`);
+      }
     }
 
     // Deduce product and seller from contact if not supplied in metadata
