@@ -1421,71 +1421,42 @@ export async function sendStepResponse(contactId, step, steps, incomingMessageId
     quoteMessageId = null;
   }
 
-  // Send Pix billing request if enabled
+  // 1. Send Automatic Pix (Gateway) if enabled
   const isGatewayPix = !skipPix && step.pixEnabled && !step.pixDynamicAmount && step.pixGatewayEnabled && step.pixGatewayId && step.pixAmount > 0;
-  const isStaticPix = !skipPix && step.pixEnabled && !step.pixDynamicAmount && !step.pixGatewayEnabled && step.pixKey && step.pixAmount > 0;
-
-  if (isGatewayPix || isStaticPix) {
+  if (isGatewayPix) {
     try {
       const amount = parseFloat(step.pixAmount);
-      let pixCode = '';
-      let referenceId = `pix_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      let gatewayName = 'Pix';
-
-      if (isGatewayPix) {
-        await logToDb('INFO', 'FLOW', `Gerando cobrança Pix dinâmica via Gateway ID '${step.pixGatewayId}' de R$ ${amount.toFixed(2)} para ${contactId}`);
-        const result = await generateGatewayPixCode({
-          gatewayId: step.pixGatewayId,
-          amount: amount,
-          contact: contact,
-          stepId: step.id,
-          productId: step.pixProductId || null
-        });
-        pixCode = result.pixCode;
-        referenceId = result.externalId;
-        gatewayName = 'Gateway';
-      } else {
-        await logToDb('INFO', 'FLOW', `Gerando cobrança Pix estática de R$ ${amount.toFixed(2)} para ${contactId}`);
-        pixCode = generateStaticPixCode({
-          key: step.pixKey,
-          amount: amount,
-          merchantName: step.pixMerchantName || 'Beneficiario',
-          merchantCity: step.pixMerchantCity || 'SAO PAULO',
-          description: step.pixDescription || 'Pagamento'
-        });
-      }
-
-      const pixMerchantName = step.pixMerchantName || connection?.name || 'Beneficiario';
-      let pixKey = isGatewayPix ? '123e4567-e89b-12d3-a456-426614174000' : (step.pixKey || '');
-      let pixKeyType = (isGatewayPix ? 'EVP' : (step.pixKeyType || 'EVP')).toUpperCase();
-
-      if (pixKeyType === 'CNPJ' || pixKeyType === 'CPF') {
-        pixKey = pixKey.replace(/\D/g, '');
-      } else if (pixKeyType === 'PHONE') {
-        if (!pixKey.startsWith('+')) {
-          pixKey = '+' + pixKey.replace(/\D/g, '');
-        }
-      }
-
+      await logToDb('INFO', 'FLOW', `Gerando cobrança Pix dinâmica via Gateway ID '${step.pixGatewayId}' de R$ ${amount.toFixed(2)} para ${contactId}`);
+      const result = await generateGatewayPixCode({
+        gatewayId: step.pixGatewayId,
+        amount: amount,
+        contact: contact,
+        stepId: step.id,
+        productId: step.pixProductId || null
+      });
+      const pixCode = result.pixCode;
+      const referenceId = result.externalId;
+      const pixMerchantName = connection?.name || 'Beneficiario';
+      
       const amountInCents = Math.round(amount * 100);
-      const bodyText = `${pixMerchantName} solicitou um pagamento.`;
+      const bodyText = `${pixMerchantName} solicitou um pagamento (Pix Copia e Cola).`;
 
       let sentInteractive = false;
       try {
-        await logToDb('INFO', 'API', `Enviando solicitação interativa de Pix para ${contactId}`);
+        await logToDb('INFO', 'API', `Enviando solicitação interativa de Pix Automático para ${contactId}`);
         const response = await sendPixPaymentRequest(
           contactId,
           amountInCents,
           pixCode,
           pixMerchantName,
-          pixKey,
-          pixKeyType,
+          '123e4567-e89b-12d3-a456-426614174000', // Dummy key for gateway Pix
+          'EVP',
           referenceId,
           bodyText,
           connection
         );
         if (response && response.messages && response.messages.length > 0) {
-          await saveOutgoingMessage(`bot_${Date.now()}_pix_req`, contactId, 'interactive', '', `Cobrança Pix R$ ${amount.toFixed(2)} [Código Pix Copia e Cola gerado]`);
+          await saveOutgoingMessage(`bot_${Date.now()}_pix_req`, contactId, 'interactive', '', `Cobrança Pix Automática R$ ${amount.toFixed(2)} [Código Pix Copia e Cola gerado]`);
           sentInteractive = true;
         }
       } catch (err) {
@@ -1498,14 +1469,70 @@ export async function sendStepResponse(contactId, step, steps, incomingMessageId
         await saveOutgoingMessage(`bot_${Date.now()}_pix_code`, contactId, 'text', '', `Copia e Cola: ${pixCode}`);
       }
       quoteMessageId = null;
-
     } catch (pixErr) {
-      await logToDb('ERROR', 'FLOW', `Erro ao gerar/enviar cobrança Pix na etapa '${step.id}': ${pixErr.message}`, {
-        error: pixErr.message,
-        stack: pixErr.stack
+      await logToDb('ERROR', 'FLOW', `Erro ao gerar/enviar cobrança Pix Automática na etapa '${step.id}': ${pixErr.message}`);
+    }
+  }
+
+  // 2. Send Manual Pix (Static Key) if enabled
+  const isStaticPix = !skipPix && step.pixEnabled && !step.pixDynamicAmount && step.pixStaticEnabled && step.pixKey && step.pixAmount > 0;
+  if (isStaticPix) {
+    try {
+      const amount = parseFloat(step.pixAmount);
+      await logToDb('INFO', 'FLOW', `Gerando cobrança Pix estática de R$ ${amount.toFixed(2)} para ${contactId}`);
+      const pixCode = generateStaticPixCode({
+        key: step.pixKey,
+        amount: amount,
+        merchantName: step.pixMerchantName || 'Beneficiario',
+        merchantCity: step.pixMerchantCity || 'SAO PAULO',
+        description: step.pixDescription || 'Pagamento'
       });
-      // Fallback message to notify client about billing failure
-      await sendText(contactId, `Desculpe, ocorreu um erro ao gerar a sua cobrança Pix. Por favor, tente novamente mais tarde.`, quoteMessageId, connection);
+
+      const pixMerchantName = step.pixMerchantName || connection?.name || 'Beneficiario';
+      let pixKey = step.pixKey || '';
+      let pixKeyType = (step.pixKeyType || 'EVP').toUpperCase();
+
+      if (pixKeyType === 'CNPJ' || pixKeyType === 'CPF') {
+        pixKey = pixKey.replace(/\D/g, '');
+      } else if (pixKeyType === 'PHONE') {
+        if (!pixKey.startsWith('+')) {
+          pixKey = '+' + pixKey.replace(/\D/g, '');
+        }
+      }
+
+      const amountInCents = Math.round(amount * 100);
+      const bodyText = `${pixMerchantName} solicitou um pagamento manual.`;
+
+      let sentInteractive = false;
+      try {
+        await logToDb('INFO', 'API', `Enviando solicitação interativa de Pix Manual para ${contactId}`);
+        const response = await sendPixPaymentRequest(
+          contactId,
+          amountInCents,
+          pixCode,
+          pixMerchantName,
+          pixKey,
+          pixKeyType,
+          `static_${Date.now()}`,
+          bodyText,
+          connection
+        );
+        if (response && response.messages && response.messages.length > 0) {
+          await saveOutgoingMessage(`bot_${Date.now()}_pix_static_req`, contactId, 'interactive', '', `Cobrança Pix Manual R$ ${amount.toFixed(2)}`);
+          sentInteractive = true;
+        }
+      } catch (err) {
+        await logToDb('WARN', 'API', `Falha ao enviar a solicitação interativa de pagamento Pix do WhatsApp: ${err.message}. Enviando apenas texto de fallback.`);
+      }
+
+      if (!sentInteractive) {
+        const pixMsgText = `*Pagamento via Pix Manual*:\n\n*Chave Pix (${pixKeyType})*:\n\`${pixKey}\`\n\n*Valor*: R$ ${amount.toFixed(2)}\n\n*Código Pix Copia e Cola*:\n\`\`\`${pixCode}\`\`\``;
+        await sendText(contactId, pixMsgText, quoteMessageId, connection);
+        await saveOutgoingMessage(`bot_${Date.now()}_pix_static_code`, contactId, 'text', '', `Manual Pix: ${pixKey}`);
+      }
+      quoteMessageId = null;
+    } catch (pixErr) {
+      await logToDb('ERROR', 'FLOW', `Erro ao gerar/enviar cobrança Pix Manual na etapa '${step.id}': ${pixErr.message}`);
     }
   }
 

@@ -1565,7 +1565,11 @@ export default function AgentsPage() {
                       borderBottomRightRadius: node.waitPixReceipt ? '0px' : '13px'
                     }}
                   >
-                    <span>{node.pixDynamicAmount ? '💰 Se Pago (IA)' : '💰 Se Pago'}</span>
+                    <span>
+                      {node.pixGatewayEnabled && node.pixStaticEnabled ? '💵 Pix Auto+Manual' :
+                       node.pixGatewayEnabled ? (node.pixDynamicAmount ? '⚡ Pix Auto (IA)' : '⚡ Pix Automático') :
+                       '💵 Pix Manual'}
+                    </span>
                     <span style={{ marginLeft: 'auto', opacity: 0.8 }}>
                       {node.nextStepId ? `→ ${node.nextStepId}` : '→ Fim / Aguarda'}
                     </span>
@@ -1840,234 +1844,234 @@ export default function AgentsPage() {
               </div>
 
               {/* Cobrança Pix */}
-              <div className="flow-sidebar-section">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <input
-                    type="checkbox"
-                    id="enable-pix"
-                    checked={!!selectedNode.pixEnabled}
-                    onChange={(e) => {
-                      const isChecked = e.target.checked;
-                      updateNode(selectedNodeId, {
-                        pixEnabled: isChecked,
-                        ...(isChecked && {
-                          pixKey: selectedNode.pixKey || '',
-                          pixKeyType: selectedNode.pixKeyType || 'EVP',
-                          pixAmount: selectedNode.pixAmount || 0,
-                          pixMerchantName: selectedNode.pixMerchantName || 'Beneficiario',
-                          pixMerchantCity: selectedNode.pixMerchantCity || 'SAO PAULO',
-                          pixDescription: selectedNode.pixDescription || 'Pagamento'
-                        })
-                      });
-                    }}
-                  />
-                  <label htmlFor="enable-pix" style={{ fontSize: '0.85rem', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    💵 Habilitar Cobrança Pix
-                  </label>
-                </div>
+              <div className="flow-sidebar-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                
+                {/* 1. Cobrança Pix Automática (API) */}
+                <div style={{ paddingBottom: '12px', borderBottom: '1px solid var(--border-glass)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <input
+                      type="checkbox"
+                      id="enable-pix-gateway"
+                      checked={!!selectedNode.pixGatewayEnabled}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        updateNode(selectedNodeId, {
+                          pixGatewayEnabled: isChecked,
+                          pixEnabled: isChecked || !!selectedNode.pixStaticEnabled,
+                          ...(isChecked && {
+                            pixGatewayId: selectedNode.pixGatewayId || '',
+                            pixProductId: selectedNode.pixProductId || '',
+                            pixAmount: selectedNode.pixAmount || 0
+                          })
+                        });
+                      }}
+                    />
+                    <label htmlFor="enable-pix-gateway" style={{ fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600', color: '#2ed573', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      ⚡ Pix Automático (API Mercado Pago)
+                    </label>
+                  </div>
 
-                {selectedNode.pixEnabled && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px', padding: '10px', background: 'var(--bg-glass)', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '8px', marginBottom: '4px' }}>
-                      <input
-                        type="checkbox"
-                        id="pix-dynamic-amount"
-                        checked={!!selectedNode.pixDynamicAmount}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          updateNode(selectedNodeId, { 
-                            pixDynamicAmount: isChecked,
-                            ...(isChecked && { pixAmount: 0 })
-                          });
-                        }}
-                      />
-                      <label htmlFor="pix-dynamic-amount" style={{ fontSize: '0.82rem', cursor: 'pointer', fontWeight: '600', color: '#2ed573', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        🧠 Coletar valor digitado pelo cliente (IA)
-                      </label>
-                    </div>
+                  {selectedNode.pixGatewayEnabled && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px', padding: '10px', background: 'var(--bg-glass)', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '8px', marginBottom: '4px' }}>
+                        <input
+                          type="checkbox"
+                          id="pix-dynamic-amount"
+                          checked={!!selectedNode.pixDynamicAmount}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked;
+                            updateNode(selectedNodeId, { 
+                              pixDynamicAmount: isChecked,
+                              ...(isChecked && { pixAmount: 0 })
+                            });
+                          }}
+                        />
+                        <label htmlFor="pix-dynamic-amount" style={{ fontSize: '0.82rem', cursor: 'pointer', fontWeight: '600', color: '#2ed573', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          🧠 Coletar valor digitado pelo cliente (IA)
+                        </label>
+                      </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '8px', marginBottom: '4px' }}>
-                      <input
-                        type="checkbox"
-                        id="pix-gateway-enabled"
-                        checked={!!selectedNode.pixGatewayEnabled}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          updateNode(selectedNodeId, { 
-                            pixGatewayEnabled: isChecked,
-                            ...(isChecked && {
-                              pixGatewayId: selectedNode.pixGatewayId || '',
-                              pixProductId: selectedNode.pixProductId || ''
-                            })
-                          });
-                        }}
-                      />
-                      <label htmlFor="pix-gateway-enabled" style={{ fontSize: '0.82rem', cursor: 'pointer', fontWeight: '600', color: 'var(--text-primary)' }}>
-                        Usar Gateway de Pagamento
-                      </label>
-                    </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Gateway de Pagamento</label>
+                        <select
+                          className="form-select"
+                          style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
+                          value={selectedNode.pixGatewayId || ''}
+                          onChange={(e) => updateNode(selectedNodeId, { pixGatewayId: e.target.value })}
+                        >
+                          <option value="" style={{ background: 'var(--bg-primary)' }}>Selecione um Gateway...</option>
+                          {gatewaysList.filter(g => g.isActive).map(g => (
+                            <option key={g.id} value={g.id} style={{ background: 'var(--bg-primary)' }}>{g.name} ({g.type})</option>
+                          ))}
+                        </select>
+                      </div>
 
-                    {selectedNode.pixGatewayEnabled ? (
-                      /* GATEWAY PIX CONFIG */
-                      <>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Gateway de Pagamento</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Produto Associado</label>
                           <select
                             className="form-select"
                             style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
-                            value={selectedNode.pixGatewayId || ''}
-                            onChange={(e) => updateNode(selectedNodeId, { pixGatewayId: e.target.value })}
+                            value={selectedNode.pixProductId || ''}
+                            onChange={(e) => updateNode(selectedNodeId, { pixProductId: e.target.value })}
                           >
-                            <option value="" style={{ background: 'var(--bg-primary)' }}>Selecione um Gateway...</option>
-                            {gatewaysList.filter(g => g.isActive).map(g => (
-                              <option key={g.id} value={g.id} style={{ background: 'var(--bg-primary)' }}>{g.name} ({g.type})</option>
+                            <option value="" style={{ background: 'var(--bg-primary)' }}>Nenhum</option>
+                            {productsList.map(p => (
+                              <option key={p.id} value={p.id} style={{ background: 'var(--bg-primary)' }}>{p.name}</option>
                             ))}
                           </select>
                         </div>
-
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Produto Associado</label>
-                            <select
-                              className="form-select"
-                              style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
-                              value={selectedNode.pixProductId || ''}
-                              onChange={(e) => updateNode(selectedNodeId, { pixProductId: e.target.value })}
-                            >
-                              <option value="" style={{ background: 'var(--bg-primary)' }}>Nenhum</option>
-                              {productsList.map(p => (
-                                <option key={p.id} value={p.id} style={{ background: 'var(--bg-primary)' }}>{p.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Valor (R$)</label>
-                            {selectedNode.pixDynamicAmount ? (
-                              <div style={{ fontSize: '0.72rem', color: '#2ed573', border: '1px dashed rgba(46, 213, 115, 0.3)', padding: '6px 8px', borderRadius: '6px', background: 'rgba(46, 213, 115, 0.05)', height: '34px', display: 'flex', alignItems: 'center', boxSizing: 'border-box' }}>
-                                🤖 Definido por IA
-                              </div>
-                            ) : (
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                className="form-input"
-                                style={{ padding: '6px 10px', fontSize: '0.82rem', margin: 0, height: '34px' }}
-                                placeholder="0.00"
-                                value={selectedNode.pixAmount || ''}
-                                onChange={(e) => updateNode(selectedNodeId, { pixAmount: parseFloat(e.target.value) || 0 })}
-                              />
-                            )}
-                          </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Valor (R$)</label>
+                          {selectedNode.pixDynamicAmount ? (
+                            <div style={{ fontSize: '0.72rem', color: '#2ed573', border: '1px dashed rgba(46, 213, 115, 0.3)', padding: '6px 8px', borderRadius: '6px', background: 'rgba(46, 213, 115, 0.05)', height: '34px', display: 'flex', alignItems: 'center', boxSizing: 'border-box' }}>
+                              🤖 Definido por IA
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              className="form-input"
+                              style={{ padding: '6px 10px', fontSize: '0.82rem', margin: 0, height: '34px' }}
+                              placeholder="0.00"
+                              value={selectedNode.pixAmount || ''}
+                              onChange={(e) => updateNode(selectedNodeId, { pixAmount: parseFloat(e.target.value) || 0 })}
+                            />
+                          )}
                         </div>
+                      </div>
 
-                        <div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Descrição (opcional)</label>
+                        <input
+                          type="text"
+                          maxLength={25}
+                          className="form-input"
+                          style={{ padding: '6px 10px', fontSize: '0.82rem' }}
+                          placeholder="Ex: Pagamento da Compra"
+                          value={selectedNode.pixDescription || ''}
+                          onChange={(e) => updateNode(selectedNodeId, { pixDescription: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Cobrança Pix Manual (Chave Estática) */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <input
+                      type="checkbox"
+                      id="enable-pix-static"
+                      checked={!!selectedNode.pixStaticEnabled}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        updateNode(selectedNodeId, {
+                          pixStaticEnabled: isChecked,
+                          pixEnabled: isChecked || !!selectedNode.pixGatewayEnabled,
+                          ...(isChecked && {
+                            pixKey: selectedNode.pixKey || '',
+                            pixKeyType: selectedNode.pixKeyType || 'EVP',
+                            pixAmount: selectedNode.pixAmount || 0,
+                            pixMerchantName: selectedNode.pixMerchantName || 'Beneficiario',
+                            pixMerchantCity: selectedNode.pixMerchantCity || 'SAO PAULO',
+                            pixDescription: selectedNode.pixDescription || 'Pagamento'
+                          })
+                        });
+                      }}
+                    />
+                    <label htmlFor="enable-pix-static" style={{ fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      💵 Pix Manual (Chave Pix Estática)
+                    </label>
+                  </div>
+
+                  {selectedNode.pixStaticEnabled && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px', padding: '10px', background: 'var(--bg-glass)', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Chave Pix</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          style={{ padding: '6px 10px', fontSize: '0.82rem' }}
+                          placeholder="Chave Pix (E-mail, CPF, Celular, etc)"
+                          value={selectedNode.pixKey || ''}
+                          onChange={(e) => updateNode(selectedNodeId, { pixKey: e.target.value })}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tipo de Chave</label>
+                          <select
+                            className="form-select"
+                            style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
+                            value={selectedNode.pixKeyType || 'EVP'}
+                            onChange={(e) => updateNode(selectedNodeId, { pixKeyType: e.target.value })}
+                          >
+                            <option value="EVP" style={{ background: 'var(--bg-primary)' }}>Chave Aleatória (EVP)</option>
+                            <option value="CPF" style={{ background: 'var(--bg-primary)' }}>CPF</option>
+                            <option value="CNPJ" style={{ background: 'var(--bg-primary)' }}>CNPJ</option>
+                            <option value="EMAIL" style={{ background: 'var(--bg-primary)' }}>E-mail</option>
+                            <option value="PHONE" style={{ background: 'var(--bg-primary)' }}>Telefone</option>
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Valor (R$)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            className="form-input"
+                            style={{ padding: '6px 10px', fontSize: '0.82rem', margin: 0, height: '34px' }}
+                            placeholder="0.00"
+                            value={selectedNode.pixAmount || ''}
+                            onChange={(e) => updateNode(selectedNodeId, { pixAmount: parseFloat(e.target.value) || 0 })}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Nome do Beneficiário</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          style={{ padding: '6px 10px', fontSize: '0.82rem' }}
+                          placeholder="Ex: Artiz"
+                          value={selectedNode.pixMerchantName || ''}
+                          onChange={(e) => updateNode(selectedNodeId, { pixMerchantName: e.target.value })}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Cidade</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ padding: '6px 10px', fontSize: '0.82rem' }}
+                            placeholder="Ex: SAO PAULO"
+                            value={selectedNode.pixMerchantCity || 'SAO PAULO'}
+                            onChange={(e) => updateNode(selectedNodeId, { pixMerchantCity: e.target.value })}
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
                           <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Descrição (opcional)</label>
                           <input
                             type="text"
                             maxLength={25}
                             className="form-input"
                             style={{ padding: '6px 10px', fontSize: '0.82rem' }}
-                            placeholder="Ex: Pagamento da Compra"
+                            placeholder="Max 25 caracteres"
                             value={selectedNode.pixDescription || ''}
                             onChange={(e) => updateNode(selectedNodeId, { pixDescription: e.target.value })}
                           />
                         </div>
-                      </>
-                    ) : (
-                      /* STATIC PIX CONFIG */
-                      <>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Chave Pix</label>
-                          <input
-                            type="text"
-                            className="form-input"
-                            style={{ padding: '6px 10px', fontSize: '0.82rem' }}
-                            placeholder="Chave Pix (E-mail, CPF, Celular, etc)"
-                            value={selectedNode.pixKey || ''}
-                            onChange={(e) => updateNode(selectedNodeId, { pixKey: e.target.value })}
-                          />
-                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tipo de Chave</label>
-                            <select
-                              className="form-select"
-                              style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
-                              value={selectedNode.pixKeyType || 'EVP'}
-                              onChange={(e) => updateNode(selectedNodeId, { pixKeyType: e.target.value })}
-                            >
-                              <option value="EVP" style={{ background: 'var(--bg-primary)' }}>Chave Aleatória (EVP)</option>
-                              <option value="CPF" style={{ background: 'var(--bg-primary)' }}>CPF</option>
-                              <option value="CNPJ" style={{ background: 'var(--bg-primary)' }}>CNPJ</option>
-                              <option value="EMAIL" style={{ background: 'var(--bg-primary)' }}>E-mail</option>
-                              <option value="PHONE" style={{ background: 'var(--bg-primary)' }}>Telefone</option>
-                            </select>
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Valor (R$)</label>
-                            {selectedNode.pixDynamicAmount ? (
-                              <div style={{ fontSize: '0.72rem', color: '#2ed573', border: '1px dashed rgba(46, 213, 115, 0.3)', padding: '6px 8px', borderRadius: '6px', background: 'rgba(46, 213, 115, 0.05)', height: '34px', display: 'flex', alignItems: 'center', boxSizing: 'border-box' }}>
-                                🤖 Definido por IA
-                              </div>
-                            ) : (
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                className="form-input"
-                                style={{ padding: '6px 10px', fontSize: '0.82rem', margin: 0, height: '34px' }}
-                                placeholder="0.00"
-                                value={selectedNode.pixAmount || ''}
-                                onChange={(e) => updateNode(selectedNodeId, { pixAmount: parseFloat(e.target.value) || 0 })}
-                              />
-                            )}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Nome do Beneficiário</label>
-                          <input
-                            type="text"
-                            className="form-input"
-                            style={{ padding: '6px 10px', fontSize: '0.82rem' }}
-                            placeholder="Ex: Artiz"
-                            value={selectedNode.pixMerchantName || ''}
-                            onChange={(e) => updateNode(selectedNodeId, { pixMerchantName: e.target.value })}
-                          />
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Cidade</label>
-                            <input
-                              type="text"
-                              className="form-input"
-                              style={{ padding: '6px 10px', fontSize: '0.82rem' }}
-                              placeholder="Ex: SAO PAULO"
-                              value={selectedNode.pixMerchantCity || 'SAO PAULO'}
-                              onChange={(e) => updateNode(selectedNodeId, { pixMerchantCity: e.target.value })}
-                            />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Descrição (opcional)</label>
-                            <input
-                              type="text"
-                              maxLength={25}
-                              className="form-input"
-                              style={{ padding: '6px 10px', fontSize: '0.82rem' }}
-                              placeholder="Max 25 caracteres"
-                              value={selectedNode.pixDescription || ''}
-                              onChange={(e) => updateNode(selectedNodeId, { pixDescription: e.target.value })}
-                            />
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Comprovante de Pix (IA) */}
