@@ -635,7 +635,7 @@ async function processSingleMessage(contact, messageData) {
               
               if (receiptData && receiptData.isPixReceipt) {
                 // 2. Verify in Mercado Pago and approve payment
-                const result = await processPixReceiptPayment(freshContact, receiptData);
+                const result = await processPixReceiptPayment(freshContact, receiptData, behavior === 'approve_on_any_receipt');
                 if (result.success) {
                   // Payment approved! Trigger post-sale flow
                   let nextFlow = result.triggeredFlow;

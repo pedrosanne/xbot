@@ -2189,6 +2189,7 @@ export default function AgentsPage() {
                     >
                       <option value="request_receipt" style={{ background: 'var(--bg-primary)' }}>💬 Responder pedindo comprovante</option>
                       <option value="ignore_and_notify" style={{ background: 'var(--bg-primary)' }}>🤫 Ignorar bot e notificar atendente</option>
+                      <option value="approve_on_any_receipt" style={{ background: 'var(--bg-primary)' }}>🤖 Aprovar qualquer comprovante válido (Sem API)</option>
                     </select>
                   </div>
                 )}

@@ -97,18 +97,35 @@ Retorne um objeto JSON com o seguinte formato:
 /**
  * Searches Mercado Pago for a payment matching the receipt data and processes it
  */
-export async function processPixReceiptPayment(contact, receiptData) {
+export async function processPixReceiptPayment(contact, receiptData, mockMode = false) {
   try {
     const { amount, transactionId, payerName } = receiptData;
 
-    // 1. Fetch active Mercado Pago gateway
-    const gateway = await prisma.paymentGateway.findFirst({
-      where: { type: 'mercadopago', isActive: true }
-    });
+    let gateway = null;
+    let finalAmount = parseFloat(amount) || 0.0;
+    let externalId = '';
 
-    if (!gateway || !gateway.apiKey) {
-      await logToDb('WARN', 'FLOW', `Comprovante Pix recebido de ${contact.id}, mas nenhum gateway Mercado Pago ativo com API Key foi encontrado.`);
-      return { success: false, reason: 'no_gateway' };
+    if (mockMode) {
+      // Fetch any active gateway or just any gateway as a placeholder
+      gateway = await prisma.paymentGateway.findFirst({
+        where: { isActive: true }
+      });
+      if (!gateway) {
+        gateway = await prisma.paymentGateway.findFirst();
+      }
+      
+      externalId = transactionId || `mock_${Date.now()}`;
+      await logToDb('INFO', 'FLOW', `Modo Simulação / Sem Mercado Pago ativo. Validando comprovante ID ${externalId} no valor de R$ ${finalAmount}`);
+    } else {
+      // 1. Fetch active Mercado Pago gateway
+      gateway = await prisma.paymentGateway.findFirst({
+        where: { type: 'mercadopago', isActive: true }
+      });
+
+      if (!gateway || !gateway.apiKey) {
+        await logToDb('WARN', 'FLOW', `Comprovante Pix recebido de ${contact.id}, mas nenhum gateway Mercado Pago ativo com API Key foi encontrado.`);
+        return { success: false, reason: 'no_gateway' };
+      }
     }
 
     // 2. Identify Product from the Contact's active chatbot flow
@@ -127,70 +144,73 @@ export async function processPixReceiptPayment(contact, receiptData) {
       }
     }
 
-    await logToDb('INFO', 'FLOW', `Buscando transação de R$ ${amount} no Mercado Pago para o contato ${contact.id}...`);
+    if (!mockMode) {
+      await logToDb('INFO', 'FLOW', `Buscando transação de R$ ${amount} no Mercado Pago para o contato ${contact.id}...`);
 
-    // 3. Search recent payments in Mercado Pago (last 50 payments)
-    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=50`, {
-      headers: {
-        'Authorization': `Bearer ${gateway.apiKey}`
-      }
-    });
-
-    if (!mpRes.ok) {
-      throw new Error(`Erro API Mercado Pago: ${mpRes.statusText}`);
-    }
-
-    const mpData = await mpRes.json();
-    const mpPayments = mpData.results || [];
-
-    // 4. Look for a matching approved payment (matching the real amount from the receipt)
-    let matchedMpPayment = null;
-
-    for (const mpPay of mpPayments) {
-      if (mpPay.status !== 'approved') continue;
-      
-      // Compare amount (tolerance of 0.02 to allow small rounding)
-      const amountDiff = Math.abs(mpPay.transaction_amount - amount);
-      if (amountDiff > 0.02) continue;
-
-      // Compare End-to-End ID if available in both
-      const mpE2eId = mpPay.point_of_interaction?.transaction_data?.transaction_id || 
-                      mpPay.transaction_details?.transaction_id || '';
-      
-      if (transactionId && mpE2eId) {
-        if (mpE2eId.toLowerCase().includes(transactionId.toLowerCase()) || 
-            transactionId.toLowerCase().includes(mpE2eId.toLowerCase())) {
-          matchedMpPayment = mpPay;
-          break;
+      // 3. Search recent payments in Mercado Pago (last 50 payments)
+      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=50`, {
+        headers: {
+          'Authorization': `Bearer ${gateway.apiKey}`
         }
+      });
+
+      if (!mpRes.ok) {
+        throw new Error(`Erro API Mercado Pago: ${mpRes.statusText}`);
       }
 
-      // Fallback: If no E2E ID matches but the amount is identical and the payment was created recently (last 4 hours)
-      const timeDiffHours = (Date.now() - new Date(mpPay.date_created).getTime()) / (1000 * 60 * 60);
-      if (timeDiffHours <= 4 && !transactionId) {
-        // Match by amount + name similarity if available
-        const mpPayerName = mpPay.payer?.first_name || '';
-        if (payerName && mpPayerName) {
-          const firstWordReceipt = payerName.split(' ')[0].toLowerCase();
-          const firstWordMp = mpPayerName.split(' ')[0].toLowerCase();
-          if (firstWordReceipt === firstWordMp) {
+      const mpData = await mpRes.json();
+      const mpPayments = mpData.results || [];
+
+      // 4. Look for a matching approved payment (matching the real amount from the receipt)
+      let matchedMpPayment = null;
+
+      for (const mpPay of mpPayments) {
+        if (mpPay.status !== 'approved') continue;
+        
+        // Compare amount (tolerance of 0.02 to allow small rounding)
+        const amountDiff = Math.abs(mpPay.transaction_amount - amount);
+        if (amountDiff > 0.02) continue;
+
+        // Compare End-to-End ID if available in both
+        const mpE2eId = mpPay.point_of_interaction?.transaction_data?.transaction_id || 
+                        mpPay.transaction_details?.transaction_id || '';
+        
+        if (transactionId && mpE2eId) {
+          if (mpE2eId.toLowerCase().includes(transactionId.toLowerCase()) || 
+              transactionId.toLowerCase().includes(mpE2eId.toLowerCase())) {
             matchedMpPayment = mpPay;
             break;
           }
-        } else {
-          // If no payer name to compare, match by amount alone (since it's within 4 hours)
-          matchedMpPayment = mpPay;
-          break;
+        }
+
+        // Fallback: If no E2E ID matches but the amount is identical and the payment was created recently (last 4 hours)
+        const timeDiffHours = (Date.now() - new Date(mpPay.date_created).getTime()) / (1000 * 60 * 60);
+        if (timeDiffHours <= 4 && !transactionId) {
+          // Match by amount + name similarity if available
+          const mpPayerName = mpPay.payer?.first_name || '';
+          if (payerName && mpPayerName) {
+            const firstWordReceipt = payerName.split(' ')[0].toLowerCase();
+            const firstWordMp = mpPayerName.split(' ')[0].toLowerCase();
+            if (firstWordReceipt === firstWordMp) {
+              matchedMpPayment = mpPay;
+              break;
+            }
+          } else {
+            // If no payer name to compare, match by amount alone (since it's within 4 hours)
+            matchedMpPayment = mpPay;
+            break;
+          }
         }
       }
-    }
 
-    if (!matchedMpPayment) {
-      await logToDb('WARN', 'FLOW', `Nenhum pagamento de R$ ${amount} correspondente ao comprovante do contato ${contact.id} foi encontrado no Mercado Pago.`);
-      return { success: false, reason: 'not_found' };
-    }
+      if (!matchedMpPayment) {
+        await logToDb('WARN', 'FLOW', `Nenhum pagamento de R$ ${amount} correspondente ao comprovante do contato ${contact.id} foi encontrado no Mercado Pago.`);
+        return { success: false, reason: 'not_found' };
+      }
 
-    const externalId = String(matchedMpPayment.id);
+      externalId = String(matchedMpPayment.id);
+      finalAmount = matchedMpPayment.transaction_amount;
+    }
 
     // 5. Check if this payment ID has already been registered in our database
     const existingPayment = await prisma.payment.findFirst({
@@ -198,20 +218,22 @@ export async function processPixReceiptPayment(contact, receiptData) {
     });
 
     if (existingPayment) {
-      await logToDb('WARN', 'FLOW', `Transação Mercado Pago ID ${externalId} já foi utilizada no sistema anteriormente. Abortando atribuição duplicada.`);
+      await logToDb('WARN', 'FLOW', `Transação/Comprovante ID ${externalId} já foi utilizado no sistema anteriormente. Abortando atribuição duplicada.`);
       return { success: false, reason: 'already_used' };
     }
 
-    // 6. Create Payment record in DB (using the REAL amount from Mercado Pago)
+    // 6. Create Payment record in DB
     const payment = await prisma.payment.create({
       data: {
-        gatewayId: gateway.id,
+        gatewayId: gateway ? gateway.id : 'manual',
         contactId: contact.id,
         externalId: externalId,
-        amount: matchedMpPayment.transaction_amount,
+        amount: finalAmount,
         status: 'PAID',
-        paymentMethod: 'pix',
-        description: `Pix Direto CNPJ Detectado via IA - Ref: ${transactionId || 'N/A'}`,
+        paymentMethod: mockMode ? 'pix_simulado' : 'pix',
+        description: mockMode 
+          ? `Pix Direto (IA Sem Verificação MP) - Benef: ${payerName || 'Cliente'} - Ref: ${transactionId || 'N/A'}`
+          : `Pix Direto CNPJ Detectado via IA - Ref: ${transactionId || 'N/A'}`,
         productId: productId
       }
     });
@@ -257,9 +279,12 @@ export async function processPixReceiptPayment(contact, receiptData) {
     // c. Dispatch push notification
     try {
       const contactName = contact.name || contact.profileName || contact.id;
-      const title = `Pix Automático via IA! 🤖💰`;
-      const body = `O lead ${contactName} enviou o comprovante e a IA identificou o Pix de R$ ${payment.amount.toFixed(2).replace('.', ',')} no Mercado Pago.`;
-      await sendPushNotification(title, body, url, null, 'sale');
+      const title = mockMode ? `Pix via IA (Simulado)! 🤖💰` : `Pix Automático via IA! 🤖💰`;
+      const body = mockMode
+        ? `O lead ${contactName} enviou o comprovante e a IA aprovou o Pix de R$ ${payment.amount.toFixed(2).replace('.', ',')} (Sem verificação MP).`
+        : `O lead ${contactName} enviou o comprovante e a IA identificou o Pix de R$ ${payment.amount.toFixed(2).replace('.', ',')} no Mercado Pago.`;
+      const pushUrl = `/chat?contactId=${contact.id}`;
+      await sendPushNotification(title, body, pushUrl, null, 'sale');
     } catch (pushError) {
       console.error('Error sending push for IA Pix:', pushError);
     }
