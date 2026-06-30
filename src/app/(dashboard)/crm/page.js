@@ -4,17 +4,19 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { logToDb } from '@/lib/log';
 
 export default function CRMPage() {
-  const [activeSubTab, setActiveSubTab] = useState('crm'); // 'crm' or 'broadcasts'
+  const [activeSubTab, setActiveSubTab] = useState('crm'); // 'crm', 'broadcasts', or 'emails'
   
   // Data States
   const [contacts, setContacts] = useState([]);
   const [flows, setFlows] = useState([]);
   const [connections, setConnections] = useState([]);
   const [broadcasts, setBroadcasts] = useState([]);
+  const [emailCampaigns, setEmailCampaigns] = useState([]);
   
   // Loading States
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingBroadcasts, setLoadingBroadcasts] = useState(false);
+  const [loadingEmailCampaigns, setLoadingEmailCampaigns] = useState(false);
   
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,11 +39,28 @@ export default function CRMPage() {
   const [runningCampaign, setRunningCampaign] = useState(null); // { id, contactIds, currentIndex }
   const runningCampaignRef = useRef(null);
 
+  // Email Marketing States
+  const [emailConfig, setEmailConfig] = useState(null);
+  const [emailProvider, setEmailProvider] = useState('resend');
+  const [emailApiKey, setEmailApiKey] = useState('');
+  const [emailSender, setEmailSender] = useState('');
+  const [emailCampaignName, setEmailCampaignName] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [emailTargetType, setEmailTargetType] = useState('all'); // 'all', 'selected', 'tag'
+  const [emailTagFilter, setEmailTagFilter] = useState('');
+  const [testEmailRecipient, setTestEmailRecipient] = useState('');
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [runningEmailCampaign, setRunningEmailCampaign] = useState(null); // { id, contactIds, currentIndex }
+  const runningEmailCampaignRef = useRef(null);
+
   useEffect(() => {
     fetchContacts();
     fetchFlows();
     fetchConnections();
     fetchBroadcasts();
+    fetchEmailConfig();
+    fetchEmailCampaigns();
   }, []);
 
   // Sync ref with state for the async loop
@@ -111,6 +130,66 @@ export default function CRMPage() {
     };
   }, [runningCampaign, minDelay, maxDelay]);
 
+  // Sync ref with state for the email async loop
+  useEffect(() => {
+    runningEmailCampaignRef.current = runningEmailCampaign;
+  }, [runningEmailCampaign]);
+
+  // Bulk Email Sender Loop (Client-Side Queue Processor)
+  useEffect(() => {
+    if (!runningEmailCampaign) return;
+
+    let timeoutId;
+    let isAborted = false;
+
+    async function processNextEmail() {
+      const current = runningEmailCampaignRef.current;
+      if (!current || isAborted) return;
+
+      const { id, contactIds, currentIndex } = current;
+
+      if (currentIndex >= contactIds.length) {
+        // Campaign finished!
+        await updateEmailCampaignStatus(id, 'COMPLETED');
+        setRunningEmailCampaign(null);
+        fetchEmailCampaigns();
+        return;
+      }
+
+      const contactId = contactIds[currentIndex];
+
+      try {
+        await fetch('/api/emails/campaigns/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaignId: id, contactId })
+        });
+      } catch (err) {
+        console.error('Error processing email campaign item:', err);
+      }
+
+      // Refresh list to show updated counters
+      fetchEmailCampaigns();
+
+      // Schedule next item with a short delay (e.g. 200ms) since email sending is fast
+      if (!isAborted && runningEmailCampaignRef.current?.id === id) {
+        setRunningEmailCampaign(prev => ({
+          ...prev,
+          currentIndex: prev.currentIndex + 1
+        }));
+        timeoutId = setTimeout(processNextEmail, 200);
+      }
+    }
+
+    // Start the loop
+    timeoutId = setTimeout(processNextEmail, 1000);
+
+    return () => {
+      isAborted = true;
+      clearTimeout(timeoutId);
+    };
+  }, [runningEmailCampaign]);
+
   // Fetch Functions
   async function fetchContacts() {
     setLoadingContacts(true);
@@ -147,6 +226,236 @@ export default function CRMPage() {
       console.error('Error fetching connections:', err);
     }
   }
+
+  async function fetchEmailConfig() {
+    try {
+      const res = await fetch('/api/emails/config');
+      if (res.ok) {
+        const data = await res.json();
+        setEmailConfig(data);
+        if (data.hasConfig) {
+          setEmailProvider(data.provider || 'resend');
+          setEmailSender(data.sender || '');
+          setEmailApiKey(data.apiKey || '');
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching email config:', err);
+    }
+  }
+
+  async function fetchEmailCampaigns() {
+    setLoadingEmailCampaigns(true);
+    try {
+      const res = await fetch('/api/emails/campaigns');
+      if (res.ok) {
+        const data = await res.json();
+        setEmailCampaigns(data || []);
+
+        // Resume running email campaign if found in DB
+        const activeDbCampaign = data.find(c => c.status === 'RUNNING');
+        if (activeDbCampaign && !runningEmailCampaignRef.current) {
+          // Fetch full campaign details with logs to find remaining
+          const detailRes = await fetch(`/api/emails/campaigns?campaignId=${activeDbCampaign.id}`);
+          if (detailRes.ok) {
+            const detailData = await detailRes.json();
+            const processedContactIds = new Set(detailData.logs.map(l => l.contactId));
+            
+            // Re-evaluate target list (contacts with emails)
+            const allTargetIds = contacts.filter(c => c.email).map(c => c.id);
+            const remainingIds = allTargetIds.filter(id => !processedContactIds.has(id));
+
+            setRunningEmailCampaign({
+              id: activeDbCampaign.id,
+              contactIds: remainingIds,
+              currentIndex: 0
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching email campaigns:', err);
+    } finally {
+      setLoadingEmailCampaigns(false);
+    }
+  }
+
+  const handleSaveEmailConfig = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/emails/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: emailProvider,
+          apiKey: emailApiKey,
+          sender: emailSender
+        })
+      });
+
+      if (res.ok) {
+        alert('Configurações de e-mail salvas com sucesso!');
+        fetchEmailConfig();
+      } else {
+        const data = await res.json();
+        alert(`Erro ao salvar: ${data.error}`);
+      }
+    } catch (err) {
+      console.error('Error saving email config:', err);
+      alert('Erro de conexão.');
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailRecipient) {
+      alert('Digite o e-mail do destinatário.');
+      return;
+    }
+
+    setSendingTestEmail(true);
+    try {
+      const res = await fetch('/api/emails/send-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: emailProvider,
+          apiKey: emailApiKey,
+          sender: emailSender,
+          to: testEmailRecipient
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'E-mail de teste enviado com sucesso!');
+      } else {
+        alert(`Falha no envio: ${data.error}`);
+      }
+    } catch (err) {
+      console.error('Error sending test email:', err);
+      alert('Erro de conexão.');
+    } finally {
+      setSendingTestEmail(false);
+    }
+  };
+
+  const handleCreateEmailCampaign = async (e) => {
+    e.preventDefault();
+    if (!emailCampaignName.trim() || !emailSubject.trim() || !emailBody.trim()) {
+      alert('Preencha todos os campos obrigatórios da campanha.');
+      return;
+    }
+
+    let targetContactIds = [];
+    if (emailTargetType === 'selected') {
+      if (selectedContactIds.length === 0) {
+        alert('Nenhum contato selecionado no CRM.');
+        return;
+      }
+      targetContactIds = selectedContactIds;
+    }
+
+    try {
+      const res = await fetch('/api/emails/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: emailCampaignName,
+          subject: emailSubject,
+          body: emailBody,
+          targetType: emailTargetType,
+          targetContactIds,
+          tagFilter: emailTagFilter
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        // Clear form
+        setEmailCampaignName('');
+        setEmailSubject('');
+        setEmailBody('');
+        
+        alert('Campanha de e-mail criada com sucesso! O progresso será exibido abaixo.');
+        
+        // Start campaign sending immediately
+        await updateEmailCampaignStatus(data.campaign.id, 'RUNNING');
+        setRunningEmailCampaign({
+          id: data.campaign.id,
+          contactIds: data.recipientIds,
+          currentIndex: 0
+        });
+        
+        fetchEmailCampaigns();
+      } else {
+        alert(`Erro ao criar campanha: ${data.error}`);
+      }
+    } catch (err) {
+      console.error('Error creating email campaign:', err);
+      alert('Erro de conexão.');
+    }
+  };
+
+  const updateEmailCampaignStatus = async (campaignId, status) => {
+    try {
+      await fetch('/api/emails/campaigns', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId, status })
+      });
+    } catch (err) {
+      console.error('Error updating email campaign status:', err);
+    }
+  };
+
+  const handleStartEmailCampaign = async (campaign) => {
+    // Fetch logs for this campaign to see who already received it
+    let processedContactIds = new Set();
+    try {
+      const detailRes = await fetch(`/api/emails/campaigns?campaignId=${campaign.id}`);
+      if (detailRes.ok) {
+        const detailData = await detailRes.json();
+        processedContactIds = new Set(detailData.logs.map(l => l.contactId));
+      }
+    } catch (e) {
+      console.error('Error fetching campaign logs for resume:', e);
+    }
+
+    // Get all targets
+    let targetIds = [];
+    const allTargets = contacts.filter(c => c.email).map(c => c.id);
+    const remainingIds = allTargets.filter(id => !processedContactIds.has(id));
+
+    await updateEmailCampaignStatus(campaign.id, 'RUNNING');
+    setRunningEmailCampaign({
+      id: campaign.id,
+      contactIds: remainingIds,
+      currentIndex: 0
+    });
+    fetchEmailCampaigns();
+  };
+
+  const handlePauseEmailCampaign = async (campaignId) => {
+    await updateEmailCampaignStatus(campaignId, 'PAUSED');
+    setRunningEmailCampaign(null);
+    fetchEmailCampaigns();
+  };
+
+  const handleDeleteEmailCampaign = async (campaignId) => {
+    if (!confirm('Deseja excluir permanentemente esta campanha de e-mail?')) return;
+    try {
+      const res = await fetch(`/api/emails/campaigns?campaignId=${campaignId}`, { method: 'DELETE' });
+      if (res.ok) {
+        if (runningEmailCampaign?.id === campaignId) {
+          setRunningEmailCampaign(null);
+        }
+        fetchEmailCampaigns();
+      }
+    } catch (err) {
+      console.error('Error deleting email campaign:', err);
+    }
+  };
 
   async function fetchBroadcasts() {
     setLoadingBroadcasts(true);
@@ -418,12 +727,15 @@ export default function CRMPage() {
     <div className="page-container">
       <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <h1 className="page-title">CRM &amp; Disparos em Massa</h1>
-        <div className="tabs-scrollable" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', padding: '4px', borderRadius: '12px' }}>
+        <div className="tabs-scrollable" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', padding: '4px', borderRadius: '12px', display: 'flex', gap: '4px' }}>
           <button onClick={() => setActiveSubTab('crm')} className={`btn ${activeSubTab === 'crm' ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '8px 16px', fontSize: '0.85rem', border: activeSubTab === 'crm' ? 'none' : undefined }}>
             👤 Gestão de Leads (CRM)
           </button>
           <button onClick={() => setActiveSubTab('broadcasts')} className={`btn ${activeSubTab === 'broadcasts' ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '8px 16px', fontSize: '0.85rem', border: activeSubTab === 'broadcasts' ? 'none' : undefined }}>
-            📢 Campanhas de Disparo
+            📢 Disparos WhatsApp
+          </button>
+          <button onClick={() => setActiveSubTab('emails')} className={`btn ${activeSubTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '8px 16px', fontSize: '0.85rem', border: activeSubTab === 'emails' ? 'none' : undefined }}>
+            ✉️ Disparos E-mail
           </button>
         </div>
       </header>
@@ -875,6 +1187,289 @@ export default function CRMPage() {
                             {(camp.status === 'COMPLETED' || camp.status === 'CANCELLED' || camp.status === 'PENDING') && (
                               <button 
                                 onClick={() => handleDeleteCampaign(camp.id)} 
+                                className="btn" 
+                                style={{ padding: '4px 10px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.02)', color: 'var(--text-muted)', border: '1px solid var(--border-glass)' }}
+                              >
+                                Excluir
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* =====================================================================
+            EMAIL MARKETING TAB
+            ===================================================================== */}
+        {activeSubTab === 'emails' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* 1. Configuration Panel */}
+            <div className="glass-panel" style={{ padding: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>⚙️</span> Configuração do Provedor de E-mail
+              </h3>
+              
+              <form onSubmit={handleSaveEmailConfig} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', alignItems: 'end' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Provedor de E-mail</label>
+                  <select 
+                    className="form-select" 
+                    value={emailProvider} 
+                    onChange={(e) => setEmailProvider(e.target.value)}
+                    style={{ margin: 0, width: '100%' }}
+                  >
+                    <option value="resend">Resend (3.000 grátis/mês)</option>
+                    <option value="brevo">Brevo / Sendinblue (300 grátis/dia)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Chave de API (API Key)</label>
+                  <input 
+                    type="password" 
+                    placeholder="Cole a chave de API..." 
+                    className="form-input" 
+                    value={emailApiKey}
+                    onChange={(e) => setEmailApiKey(e.target.value)}
+                    style={{ margin: 0, width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>E-mail do Remetente (Verificado)</label>
+                  <input 
+                    type="email" 
+                    placeholder="ex: contato@seu-dominio.com" 
+                    className="form-input" 
+                    value={emailSender}
+                    onChange={(e) => setEmailSender(e.target.value)}
+                    style={{ margin: 0, width: '100%' }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <button type="submit" className="btn btn-primary" style={{ width: '100%', height: '38px' }}>
+                    Salvar Configurações
+                  </button>
+                </div>
+              </form>
+
+              {/* Send Test Email Section */}
+              <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border-glass)', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Enviar E-mail de Teste:</span>
+                <input 
+                  type="email" 
+                  placeholder="Seu e-mail de teste..." 
+                  className="form-input"
+                  value={testEmailRecipient}
+                  onChange={(e) => setTestEmailRecipient(e.target.value)}
+                  style={{ maxWidth: '240px', margin: 0, height: '32px', fontSize: '0.78rem' }}
+                />
+                <button 
+                  type="button" 
+                  onClick={handleSendTestEmail} 
+                  className="btn btn-secondary" 
+                  style={{ height: '32px', padding: '0 16px', fontSize: '0.75rem' }}
+                  disabled={sendingTestEmail}
+                >
+                  {sendingTestEmail ? 'Enviando...' : 'Testar Conexão'}
+                </button>
+              </div>
+            </div>
+
+            {/* 2. Create Campaign & Campaigns History */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', alignItems: 'start' }}>
+              
+              {/* Creator Form */}
+              <div className="glass-panel" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>✉️</span> Nova Campanha de E-mail
+                </h3>
+
+                <form onSubmit={handleCreateEmailCampaign} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Nome da Campanha (Interno)</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: Pós-Venda - Clientes Pix" 
+                      className="form-input"
+                      value={emailCampaignName}
+                      onChange={(e) => setEmailCampaignName(e.target.value)}
+                      style={{ margin: 0, width: '100%' }}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Assunto do E-mail</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: Olá {primeiro_nome}, seu acesso foi liberado! 🎉" 
+                      className="form-input"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      style={{ margin: 0, width: '100%' }}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Corpo do E-mail (HTML Suportado)</label>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Variáveis: <code>{`{nome}`}</code>, <code>{`{primeiro_nome}`}</code>, <code>{`{email}`}</code></span>
+                    </div>
+                    <textarea 
+                      placeholder="Escreva a mensagem em texto ou HTML..." 
+                      className="form-textarea"
+                      rows={8}
+                      value={emailBody}
+                      onChange={(e) => setEmailBody(e.target.value)}
+                      style={{ margin: 0, width: '100%', fontFamily: 'monospace', fontSize: '0.78rem' }}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Alvo do Disparo</label>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                        <input type="radio" name="emailTarget" checked={emailTargetType === 'all'} onChange={() => setEmailTargetType('all')} />
+                        Todos os Leads
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                        <input type="radio" name="emailTarget" checked={emailTargetType === 'tag'} onChange={() => setEmailTargetType('tag')} />
+                        Filtrar por Tag
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                        <input type="radio" name="emailTarget" checked={emailTargetType === 'selected'} onChange={() => setEmailTargetType('selected')} />
+                        Contatos Selecionados ({selectedContactIds.length})
+                      </label>
+                    </div>
+
+                    {emailTargetType === 'tag' && (
+                      <select 
+                        className="form-select"
+                        value={emailTagFilter}
+                        onChange={(e) => setEmailTagFilter(e.target.value)}
+                        style={{ margin: 0, width: '100%', maxWidth: '280px' }}
+                        required
+                      >
+                        <option value="">Selecione uma tag...</option>
+                        {allTags.map(tag => (
+                          <option key={tag} value={tag}>{tag}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    style={{ height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: 700 }}
+                    disabled={runningEmailCampaign !== null}
+                  >
+                    ✉️ Criar e Iniciar Disparos
+                  </button>
+                </form>
+              </div>
+
+              {/* History List */}
+              <div className="glass-panel" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📊</span> Histórico de Campanhas
+                </h3>
+
+                {loadingEmailCampaigns && emailCampaigns.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Carregando campanhas...</div>
+                ) : emailCampaigns.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    Nenhuma campanha de e-mail criada ainda.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {emailCampaigns.map((camp) => {
+                      const pct = camp.totalRecipients > 0 ? Math.round(((camp.sentCount + camp.failedCount) / camp.totalRecipients) * 100) : 0;
+                      
+                      const statusStyles = {
+                        'PENDING': { bg: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', label: 'Aguardando' },
+                        'RUNNING': { bg: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', label: 'Enviando' },
+                        'PAUSED': { bg: 'rgba(251,191,36,0.15)', color: '#fbbf24', label: 'Pausado' },
+                        'COMPLETED': { bg: 'rgba(74,222,128,0.15)', color: '#4ade80', label: 'Finalizado' },
+                        'FAILED': { bg: 'rgba(239, 68, 68, 0.15)', color: '#f87171', label: 'Falhou' }
+                      };
+                      const st = statusStyles[camp.status] || statusStyles['PENDING'];
+
+                      return (
+                        <div 
+                          key={camp.id} 
+                          style={{ 
+                            padding: '16px', 
+                            background: 'rgba(255,255,255,0.01)', 
+                            border: '1px solid var(--border-glass)', 
+                            borderRadius: '12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{camp.name}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                Assunto: <span style={{ color: 'var(--text-secondary)' }}>{camp.subject}</span>
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                Criada em {new Date(camp.createdAt).toLocaleDateString('pt-BR')} • {camp.totalRecipients} destinatários
+                              </div>
+                            </div>
+                            <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 600, background: st.bg, color: st.color }}>
+                              {st.label}
+                            </span>
+                          </div>
+
+                          {/* Progress bar */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            <span>Progresso: {pct}%</span>
+                            <span>{camp.sentCount} enviados • {camp.failedCount} falhas</span>
+                          </div>
+                          
+                          <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${pct}%`, background: camp.status === 'COMPLETED' ? '#4ade80' : '#3b82f6', borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                          </div>
+
+                          {/* Actions */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-glass)' }}>
+                            {camp.status === 'PAUSED' && (
+                              <button 
+                                onClick={() => handleStartEmailCampaign(camp)} 
+                                className="btn btn-primary" 
+                                style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+                                disabled={runningEmailCampaign !== null}
+                              >
+                                Retomar
+                              </button>
+                            )}
+                            {camp.status === 'RUNNING' && (
+                              <button 
+                                onClick={() => handlePauseEmailCampaign(camp.id)} 
+                                className="btn" 
+                                style={{ padding: '4px 10px', fontSize: '0.72rem', background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}
+                              >
+                                Pausar
+                              </button>
+                            )}
+                            {(camp.status === 'COMPLETED' || camp.status === 'FAILED' || camp.status === 'PENDING' || camp.status === 'PAUSED') && (
+                              <button 
+                                onClick={() => handleDeleteEmailCampaign(camp.id)} 
                                 className="btn" 
                                 style={{ padding: '4px 10px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.02)', color: 'var(--text-muted)', border: '1px solid var(--border-glass)' }}
                               >
