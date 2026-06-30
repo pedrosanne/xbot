@@ -153,6 +153,56 @@ const renderTicks = (status) => {
   );
 };
 
+// Helper to get beautiful, consistent color schemes for tags in dark mode
+const getTagStyle = (tag) => {
+  const t = tag.trim().toLowerCase();
+  
+  // 1. System Specific Tags
+  if (t.startsWith('status: novo') || t === 'novo') {
+    return { bg: 'rgba(59, 130, 246, 0.15)', text: '#60a5fa', border: 'rgba(59, 130, 246, 0.3)' };
+  }
+  if (t.startsWith('status: aprovado') || t === 'pago' || t === 'aprovado') {
+    return { bg: 'rgba(34, 197, 94, 0.15)', text: '#4ade80', border: 'rgba(34, 197, 94, 0.3)' };
+  }
+  if (t.startsWith('status: pendente') || t === 'pendente') {
+    return { bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', border: 'rgba(245, 158, 11, 0.3)' };
+  }
+  if (t.startsWith('status: manual') || t === 'manual') {
+    return { bg: 'rgba(168, 85, 247, 0.15)', text: '#c084fc', border: 'rgba(168, 85, 247, 0.3)' };
+  }
+  if (t.startsWith('status: robô') || t.startsWith('status: robo') || t === 'robo' || t === 'robô') {
+    return { bg: 'rgba(99, 102, 241, 0.15)', text: '#818cf8', border: 'rgba(99, 102, 241, 0.3)' };
+  }
+  if (t.startsWith('origem:') || t.startsWith('utm')) {
+    return { bg: 'rgba(236, 72, 153, 0.15)', text: '#f472b6', border: 'rgba(236, 72, 153, 0.3)' };
+  }
+  if (t.startsWith('fluxo:')) {
+    return { bg: 'rgba(249, 115, 22, 0.15)', text: '#fb923c', border: 'rgba(249, 115, 22, 0.3)' };
+  }
+  if (t.startsWith('produto:')) {
+    return { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', border: 'rgba(16, 185, 129, 0.3)' };
+  }
+  
+  // 2. Hash-based Custom Tags
+  let hash = 0;
+  for (let i = 0; i < t.length; i++) {
+    hash = t.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const colors = [
+    { bg: 'rgba(14, 165, 233, 0.15)', text: '#38bdf8', border: 'rgba(14, 165, 233, 0.3)' }, // Sky
+    { bg: 'rgba(20, 184, 166, 0.15)', text: '#2dd4bf', border: 'rgba(20, 184, 166, 0.3)' }, // Teal
+    { bg: 'rgba(234, 179, 8, 0.15)', text: '#facc15', border: 'rgba(234, 179, 8, 0.3)' },   // Yellow
+    { bg: 'rgba(244, 63, 94, 0.15)', text: '#fb7185', border: 'rgba(244, 63, 94, 0.3)' },   // Rose
+    { bg: 'rgba(217, 70, 239, 0.15)', text: '#e879f9', border: 'rgba(217, 70, 239, 0.3)' }, // Fuchsia
+    { bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa', border: 'rgba(139, 92, 246, 0.3)' }, // Violet
+    { bg: 'rgba(100, 116, 139, 0.15)', text: '#94a3b8', border: 'rgba(100, 116, 139, 0.3)' } // Slate
+  ];
+  
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
+
 export default function ChatPage() {
   const [contacts, setContacts] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
@@ -1573,12 +1623,26 @@ export default function ChatPage() {
                     
                     {/* Render Tags */}
                     {contact.tags && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' }}>
-                        {contact.tags.split(',').map(t => t.trim()).filter(Boolean).map((tag, idx) => (
-                          <span key={idx} style={{ fontSize: '0.6rem', padding: '1px 4px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', borderRadius: '3px' }}>
-                            {tag}
-                          </span>
-                        ))}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                        {contact.tags.split(',').map(t => t.trim()).filter(Boolean).map((tag, idx) => {
+                          const style = getTagStyle(tag);
+                          return (
+                            <span 
+                              key={idx} 
+                              style={{ 
+                                fontSize: '0.65rem', 
+                                padding: '2px 6px', 
+                                background: style.bg, 
+                                color: style.text, 
+                                border: `1px solid ${style.border}`,
+                                borderRadius: '4px',
+                                fontWeight: 500
+                              }}
+                            >
+                              {tag}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
 
@@ -2474,11 +2538,25 @@ export default function ChatPage() {
                   <div>
                     <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Tags</label>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {selectedContact.tags ? selectedContact.tags.split(',').map((tag, idx) => (
-                        <span key={idx} style={{ padding: '2px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', fontSize: '0.7rem', color: 'var(--text-secondary)', border: '1px solid var(--border-glass)' }}>
-                          {tag.trim()}
-                        </span>
-                      )) : <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Nenhuma tag cadastrada.</span>}
+                      {selectedContact.tags ? selectedContact.tags.split(',').map(t => t.trim()).filter(Boolean).map((tag, idx) => {
+                        const style = getTagStyle(tag);
+                        return (
+                          <span 
+                            key={idx} 
+                            style={{ 
+                              padding: '3px 10px', 
+                              borderRadius: '12px', 
+                              background: style.bg, 
+                              color: style.text, 
+                              border: `1px solid ${style.border}`,
+                              fontSize: '0.7rem', 
+                              fontWeight: 500
+                            }}
+                          >
+                            {tag}
+                          </span>
+                        );
+                      }) : <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Nenhuma tag cadastrada.</span>}
                     </div>
                   </div>
 
