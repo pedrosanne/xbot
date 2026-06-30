@@ -157,50 +157,38 @@ const renderTicks = (status) => {
 const getTagStyle = (tag) => {
   const t = tag.trim().toLowerCase();
   
-  // 1. System Specific Tags
-  if (t.startsWith('status: novo') || t === 'novo') {
-    return { bg: 'rgba(59, 130, 246, 0.15)', text: '#60a5fa', border: 'rgba(59, 130, 246, 0.3)' };
-  }
+  // 1. Status Tags (High Priority Contrast Colors)
   if (t.startsWith('status: aprovado') || t === 'pago' || t === 'aprovado') {
-    return { bg: 'rgba(34, 197, 94, 0.15)', text: '#4ade80', border: 'rgba(34, 197, 94, 0.3)' };
+    return { bg: 'rgba(16, 185, 129, 0.18)', text: '#34d399', border: 'rgba(16, 185, 129, 0.3)' };
   }
-  if (t.startsWith('status: pendente') || t === 'pendente') {
-    return { bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', border: 'rgba(245, 158, 11, 0.3)' };
+  if (t.startsWith('status: novo') || t === 'novo') {
+    return { bg: 'rgba(59, 130, 246, 0.18)', text: '#60a5fa', border: 'rgba(59, 130, 246, 0.3)' };
   }
   if (t.startsWith('status: manual') || t === 'manual') {
-    return { bg: 'rgba(168, 85, 247, 0.15)', text: '#c084fc', border: 'rgba(168, 85, 247, 0.3)' };
+    return { bg: 'rgba(245, 158, 11, 0.18)', text: '#fbbf24', border: 'rgba(245, 158, 11, 0.3)' };
   }
   if (t.startsWith('status: robô') || t.startsWith('status: robo') || t === 'robo' || t === 'robô') {
-    return { bg: 'rgba(99, 102, 241, 0.15)', text: '#818cf8', border: 'rgba(99, 102, 241, 0.3)' };
+    return { bg: 'rgba(139, 92, 246, 0.18)', text: '#a78bfa', border: 'rgba(139, 92, 246, 0.3)' };
   }
+  if (t.startsWith('status: pendente') || t === 'pendente') {
+    return { bg: 'rgba(239, 68, 68, 0.15)', text: '#f87171', border: 'rgba(239, 68, 68, 0.3)' };
+  }
+
+  // 2. Origin/UTM Tags (Medium Priority)
   if (t.startsWith('origem:') || t.startsWith('utm')) {
-    return { bg: 'rgba(236, 72, 153, 0.15)', text: '#f472b6', border: 'rgba(236, 72, 153, 0.3)' };
+    return { bg: 'rgba(236, 72, 153, 0.15)', text: '#f472b6', border: 'rgba(236, 72, 153, 0.25)' };
   }
+
+  // 3. Flow and Product Tags (Muted / Minimalist)
   if (t.startsWith('fluxo:')) {
-    return { bg: 'rgba(249, 115, 22, 0.15)', text: '#fb923c', border: 'rgba(249, 115, 22, 0.3)' };
+    return { bg: 'rgba(255, 255, 255, 0.04)', text: '#a3a3a3', border: 'rgba(255, 255, 255, 0.08)' };
   }
   if (t.startsWith('produto:')) {
-    return { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', border: 'rgba(16, 185, 129, 0.3)' };
+    return { bg: 'rgba(20, 184, 166, 0.08)', text: '#2dd4bf', border: 'rgba(20, 184, 166, 0.15)' };
   }
   
-  // 2. Hash-based Custom Tags
-  let hash = 0;
-  for (let i = 0; i < t.length; i++) {
-    hash = t.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  
-  const colors = [
-    { bg: 'rgba(14, 165, 233, 0.15)', text: '#38bdf8', border: 'rgba(14, 165, 233, 0.3)' }, // Sky
-    { bg: 'rgba(20, 184, 166, 0.15)', text: '#2dd4bf', border: 'rgba(20, 184, 166, 0.3)' }, // Teal
-    { bg: 'rgba(234, 179, 8, 0.15)', text: '#facc15', border: 'rgba(234, 179, 8, 0.3)' },   // Yellow
-    { bg: 'rgba(244, 63, 94, 0.15)', text: '#fb7185', border: 'rgba(244, 63, 94, 0.3)' },   // Rose
-    { bg: 'rgba(217, 70, 239, 0.15)', text: '#e879f9', border: 'rgba(217, 70, 239, 0.3)' }, // Fuchsia
-    { bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa', border: 'rgba(139, 92, 246, 0.3)' }, // Violet
-    { bg: 'rgba(100, 116, 139, 0.15)', text: '#94a3b8', border: 'rgba(100, 116, 139, 0.3)' } // Slate
-  ];
-  
-  const index = Math.abs(hash) % colors.length;
-  return colors[index];
+  // 4. Custom Tags (Muted slate fallback)
+  return { bg: 'rgba(255, 255, 255, 0.03)', text: '#d4d4d8', border: 'rgba(255, 255, 255, 0.06)' };
 };
 
 export default function ChatPage() {
@@ -1621,22 +1609,39 @@ export default function ChatPage() {
                       <span className={`status-indicator ${isManual ? 'manual' : 'auto'}`} />
                     </div>
                     
-                    {/* Render Tags */}
+                    {/* Render Tags (Horizontal Scrollable Row) */}
                     {contact.tags && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                      <div 
+                        className="no-scrollbar"
+                        style={{ 
+                          display: 'flex', 
+                          flexWrap: 'nowrap', 
+                          overflowX: 'auto', 
+                          gap: '4px', 
+                          marginTop: '4px',
+                          marginBottom: '2px',
+                          paddingBottom: '2px',
+                          WebkitOverflowScrolling: 'touch',
+                          msOverflowStyle: 'none',
+                          scrollbarWidth: 'none'
+                        }}
+                      >
                         {contact.tags.split(',').map(t => t.trim()).filter(Boolean).map((tag, idx) => {
                           const style = getTagStyle(tag);
                           return (
                             <span 
                               key={idx} 
                               style={{ 
-                                fontSize: '0.65rem', 
-                                padding: '2px 6px', 
+                                fontSize: '0.62rem', 
+                                padding: '1px 6px', 
                                 background: style.bg, 
                                 color: style.text, 
                                 border: `1px solid ${style.border}`,
                                 borderRadius: '4px',
-                                fontWeight: 500
+                                fontWeight: 500,
+                                whiteSpace: 'nowrap',
+                                display: 'inline-block',
+                                flexShrink: 0
                               }}
                             >
                               {tag}
@@ -2550,7 +2555,8 @@ export default function ChatPage() {
                               color: style.text, 
                               border: `1px solid ${style.border}`,
                               fontSize: '0.7rem', 
-                              fontWeight: 500
+                              fontWeight: 500,
+                              whiteSpace: 'nowrap'
                             }}
                           >
                             {tag}
