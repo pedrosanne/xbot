@@ -22,6 +22,9 @@ model Setting {
   vapiPhoneNumberId   String   @default("")
   vapiAssistantId     String   @default("")
   publicBaseUrl       String   @default("")
+  pushNotificationTitle String @default("Atendimento Manual: {nome} 💬")
+  pushNotificationBody  String @default("{mensagem}")
+  pushNotificationSound String @default("default")
   updatedAt           DateTime @updatedAt
 
   // Global Meta Pixel & CAPI Settings

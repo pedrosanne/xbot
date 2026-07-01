@@ -54,6 +54,11 @@ export default function SettingsPage() {
   const [notificationPermission, setNotificationPermission] = useState('default');
   const [subLoading, setSubLoading] = useState(false);
   
+  // Push Customization Options
+  const [pushNotificationTitle, setPushNotificationTitle] = useState('Atendimento Manual: {nome} 💬');
+  const [pushNotificationBody, setPushNotificationBody] = useState('{mensagem}');
+  const [pushNotificationSound, setPushNotificationSound] = useState('default');
+
   // Test Push Customization
   const [testTitle, setTestTitle] = useState('Mensagem do Xbot ⚡');
   const [testBody, setTestBody] = useState('Uma nova mensagem precisa de atendimento humano no painel!');
@@ -72,6 +77,9 @@ export default function SettingsPage() {
         setElevenLabsVoiceId(data.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM');
         setVapidPublicKey(data.vapidPublicKey || '');
         setVapidPrivateKey(data.vapidPrivateKey || '');
+        setPushNotificationTitle(data.pushNotificationTitle || 'Atendimento Manual: {nome} 💬');
+        setPushNotificationBody(data.pushNotificationBody || '{mensagem}');
+        setPushNotificationSound(data.pushNotificationSound || 'default');
       }
     } catch (err) {
       console.error('Error fetching settings:', err);
@@ -123,7 +131,10 @@ export default function SettingsPage() {
           elevenLabsApiKey,
           elevenLabsVoiceId,
           vapidPublicKey,
-          vapidPrivateKey
+          vapidPrivateKey,
+          pushNotificationTitle,
+          pushNotificationBody,
+          pushNotificationSound
         })
       });
 
@@ -622,6 +633,68 @@ export default function SettingsPage() {
                     disabled={!vapidPrivateKey}
                   >
                     {copiedPrivate ? 'Copiado!' : 'Copiar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            {/* Push Notification Customization */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '24px', marginBottom: '24px' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Personalização das Notificações Push</h4>
+              
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Formato do Título</label>
+                <input
+                  type="text"
+                  value={pushNotificationTitle}
+                  onChange={(e) => setPushNotificationTitle(e.target.value)}
+                  className="form-input"
+                  style={{ padding: '8px' }}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
+                  Use <code>{'{nome}'}</code> para o nome do contato. Padrão: <code>Atendimento Manual: {'{nome}'} 💬</code>
+                </span>
+              </div>
+              
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Formato da Mensagem</label>
+                <input
+                  type="text"
+                  value={pushNotificationBody}
+                  onChange={(e) => setPushNotificationBody(e.target.value)}
+                  className="form-input"
+                  style={{ padding: '8px' }}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
+                  Use <code>{'{mensagem}'}</code> para o conteúdo. Padrão: <code>{'{mensagem}'}</code>
+                </span>
+              </div>
+              
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Efeito Sonoro (PWA)</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    value={pushNotificationSound}
+                    onChange={(e) => setPushNotificationSound(e.target.value)}
+                    className="form-input"
+                    style={{ padding: '8px', flex: 1 }}
+                  >
+                    <option value="default">Padrão (Beep duplo suave)</option>
+                    <option value="message">Sino / Chime Agradável (Mensagem)</option>
+                    <option value="sale">Venda (Caixa Registradora / Cha-Ching)</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.controller.postMessage({ type: 'PLAY_SOUND', soundType: pushNotificationSound });
+                      } else {
+                        import('@/lib/audioSynth').then(m => m.playSynthesizedSound(pushNotificationSound));
+                      }
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                  >
+                    Ouvir 🔊
                   </button>
                 </div>
               </div>

@@ -24,7 +24,16 @@ export async function getSystemSettings() {
           geminiApiKey: '',
           elevenLabsApiKey: '',
           elevenLabsVoiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel
-          publicBaseUrl: ''
+          vapidPublicKey: '',
+          vapidPrivateKey: '',
+          vapiApiKey: '',
+          vapiPhoneNumberId: '',
+          vapiAssistantId: '',
+          publicBaseUrl: '',
+          pushNotificationTitle: 'Atendimento Manual: {nome} 💬',
+          pushNotificationBody: '{mensagem}',
+          pushNotificationSound: 'default',
+          globalPixelId: ''
         }
       });
     } catch (err) {

@@ -35,7 +35,10 @@ export async function POST(request) {
         publicBaseUrl: data.publicBaseUrl !== undefined ? data.publicBaseUrl : undefined,
         globalPixelId: data.globalPixelId !== undefined ? data.globalPixelId : undefined,
         globalPixelToken: data.globalPixelToken !== undefined ? data.globalPixelToken : undefined,
-        globalPixelTestCode: data.globalPixelTestCode !== undefined ? data.globalPixelTestCode : undefined
+        globalPixelTestCode: data.globalPixelTestCode !== undefined ? data.globalPixelTestCode : undefined,
+        pushNotificationTitle: data.pushNotificationTitle !== undefined ? data.pushNotificationTitle : undefined,
+        pushNotificationBody: data.pushNotificationBody !== undefined ? data.pushNotificationBody : undefined,
+        pushNotificationSound: data.pushNotificationSound !== undefined ? data.pushNotificationSound : undefined
       }
     });
 

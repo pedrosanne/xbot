@@ -184,12 +184,21 @@ export async function processSingleMessageWrapper(contactId, messageData) {
           ? (messageData.content.length > 60 ? messageData.content.substring(0, 60) + '...' : messageData.content) 
           : 'Mídia recebida';
 
+        const settings = await getCachedSettings();
+        
+        const titleFormat = settings.pushNotificationTitle || 'Atendimento Manual: {nome} 💬';
+        const bodyFormat = settings.pushNotificationBody || '{mensagem}';
+        const soundFormat = settings.pushNotificationSound || 'default';
+        
+        const finalTitle = titleFormat.replace('{nome}', contactName);
+        const finalBody = bodyFormat.replace('{mensagem}', messageSnippet);
+
         await sendPushNotification(
-          `Atendimento Manual: ${contactName} 💬`,
-          messageSnippet,
+          finalTitle,
+          finalBody,
           `/chat?contactId=${contactId}`,
           targetUserIds,
-          'message'
+          soundFormat
         );
         return;
       }
