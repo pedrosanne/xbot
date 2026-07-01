@@ -1940,10 +1940,10 @@ export default function ChatPage() {
                             )}
 
                             {/* Media Renderers */}
-                            {msg.type === 'image' && msg.mediaUrl && (
+                            {(msg.type === 'image' || msg.type === 'sticker') && msg.mediaUrl && (
                               <div style={{ marginBottom: '8px', borderRadius: '8px', overflow: 'hidden' }}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={msg.mediaUrl} alt="WhatsApp Image" style={{ maxWidth: '100%', maxHeight: '250px', display: 'block' }} />
+                                <img src={msg.mediaUrl} alt={msg.type === 'sticker' ? 'Figurinha' : 'WhatsApp Image'} style={{ maxWidth: '100%', maxHeight: msg.type === 'sticker' ? '150px' : '250px', display: 'block', background: msg.type === 'sticker' ? 'transparent' : 'inherit' }} />
                               </div>
                             )}
 

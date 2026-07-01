@@ -223,6 +223,12 @@ export async function POST(request) {
       await logToDb('INFO', 'WEBHOOK', `Baixando arquivo de documento. ID: ${mediaId}`);
       mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType, tokenToUse);
       content = message.document?.caption || message.document?.filename || '[Documento]';
+    } else if (type === 'sticker') {
+      const mediaId = message.sticker?.id;
+      const mimeType = message.sticker?.mime_type || 'image/webp';
+      await logToDb('INFO', 'WEBHOOK', `Baixando arquivo de figurinha. ID: ${mediaId}`);
+      mediaUrl = await downloadWhatsAppMedia(mediaId, mimeType, tokenToUse);
+      content = '[Figurinha]';
     } else {
       content = `[Mídia não suportada: ${type}]`;
       await logToDb('WARN', 'WEBHOOK', `Tipo de mídia não suportado recebido: ${type}`);
