@@ -871,7 +871,13 @@ export default function SettingsPage() {
                   >
                     <option value="default">Padrão (Beep Curto)</option>
                     <option value="message">Sino Alegre (Mensagem)</option>
-                    <option value="sale">Caixa Registradora (Venda/Pix)</option>
+                    <option value="sale">Caixa Registradora Nativa</option>
+                    {pushSoundSale && pushSoundSale !== 'sale' && pushSoundSale !== 'default' && pushSoundSale !== 'message' && (
+                      <option value={pushSoundSale}>Som Personalizado (Venda/Pix)</option>
+                    )}
+                    {pushSoundManual && pushSoundManual !== 'sale' && pushSoundManual !== 'default' && pushSoundManual !== 'message' && (
+                      <option value={pushSoundManual}>Som Personalizado (Atendimento)</option>
+                    )}
                   </select>
                 </div>
               </div>

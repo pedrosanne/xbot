@@ -14,9 +14,12 @@ export async function GET(request, { params }) {
     const encodedFilename = encodeURIComponent(decodedFilename).replace(/%2F/g, '/');
     let publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${encodedFilename}`;
 
-    // Redirect non-webp files directly to Supabase public URL if they exist (bypasses 4.5MB Vercel response payload limit)
+    // Redirect non-webp and non-audio files directly to Supabase public URL if they exist (bypasses 4.5MB Vercel response payload limit)
+    // We proxy audio files same-origin to avoid CORS issues with Web Audio API fetch() on iOS
     const ext = path.extname(filename).toLowerCase();
-    if (ext !== '.webp') {
+    const isAudio = ['.mp3', '.ogg', '.wav', '.m4a', '.aac'].includes(ext);
+    
+    if (ext !== '.webp' && !isAudio) {
       const checkRes = await fetch(publicUrl, { method: 'HEAD' });
       if (checkRes.ok) {
         return new Response(null, {
