@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { generateAIResponse, extractAmountFromText } from './gemini';
-import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton, sendTypingIndicator, markWhatsAppMessageAsRead, sendPixPaymentRequest } from './whatsapp';
+import { sendText, sendAudio, sendImage, sendDocument, sendVideo, sendButtons, sendCTAUrlButton, sendTypingIndicator, markWhatsAppMessageAsRead, sendPixPaymentRequest, sendReaction } from './whatsapp';
 import { textToSpeech } from './tts';
 import { logToDb } from './log';
 import { sendPushNotification } from './push';
@@ -374,8 +374,22 @@ async function processSingleMessage(contact, messageData) {
 
     await logToDb('INFO', 'FLOW', `Entrada consolidada - Texto: "${text}", Botão ID: "${clickedButtonId}"`);
 
-    // Intercept image or PDF document attachments to check for Pix Receipts
-    if ((messageData.type === 'image' || messageData.type === 'document') && mediaUrl) {
+    // Check if user is currently in a Pix Confirm flow step
+    let isInPixConfirmStep = false;
+    if (freshContact.botMode === 'FLOW' && freshContact.activeFlowId && freshContact.currentStepId) {
+      const allActiveFlows = await getCachedActiveFlows();
+      const currentFlow = allActiveFlows.find(f => f.id === freshContact.activeFlowId);
+      if (currentFlow) {
+        const steps = JSON.parse(currentFlow.steps || '[]');
+        const currentStep = steps.find(s => s.id === freshContact.currentStepId);
+        if (currentStep && currentStep.waitPixReceipt) {
+          isInPixConfirmStep = true;
+        }
+      }
+    }
+
+    // Intercept image or PDF document attachments to check for Pix Receipts globally
+    if (!isInPixConfirmStep && (messageData.type === 'image' || messageData.type === 'document') && mediaUrl) {
       try {
         await logToDb('INFO', 'FLOW', `${messageData.type === 'image' ? 'Imagem' : 'Documento'} recebido. Iniciando análise de comprovante Pix via IA...`);
         const { analyzePixReceipt, processPixReceiptPayment } = await import('./receipt');
@@ -638,25 +652,27 @@ async function processSingleMessage(contact, messageData) {
             };
 
             if (isMedia && messageData.mediaUrl) {
-              const { processPixReceiptPayment } = await import('./receipt');
-              let receiptData = null;
-
-              if (behavior === 'approve_on_any_receipt') {
-                // Automatically mock validate and approve any image or PDF without calling Gemini or Mercado Pago
-                receiptData = {
-                  isPixReceipt: true,
-                  amount: currentStep.pixAmount || 0,
-                  transactionId: `auto_${Date.now()}`,
-                  payerName: freshContact.name || freshContact.profileName || 'Cliente'
-                };
-              } else {
-                const mimeType = messageData.type === 'image' ? 'image/png' : 'application/pdf';
-                const { analyzePixReceipt } = await import('./receipt');
-                receiptData = await analyzePixReceipt(messageData.mediaUrl, mimeType);
-              }
+              const { processPixReceiptPayment, analyzePixReceipt } = await import('./receipt');
+              const mimeType = messageData.type === 'image' ? 'image/png' : 'application/pdf';
+              
+              // Sempre analisa o comprovante com a IA para obter o valor, independentemente do modo
+              const receiptData = await analyzePixReceipt(messageData.mediaUrl, mimeType);
               
               if (receiptData && receiptData.isPixReceipt) {
-                // 2. Verify in Mercado Pago and approve payment
+                // Se NÃO for aprovação rápida (sem API), rejeita agendamentos antes de chamar o Mercado Pago
+                if (behavior !== 'approve_on_any_receipt' && receiptData.isScheduled) {
+                  const warningMsg = `Identifiquei que este é um AGENDAMENTO de Pix de R$ ${receiptData.amount.toFixed(2).replace('.', ',')}, e não o pagamento final. Por favor, envie o comprovante de pagamento definitivo para que eu possa liberar seu acesso! ⚠️`;
+                  await sendText(contactId, warningMsg, messageData.id, freshContact.connection);
+                  await saveOutgoingMessage(`bot_${Date.now()}_scheduled`, contactId, 'text', '', warningMsg);
+                  return;
+                }
+
+                if (behavior === 'approve_on_any_receipt') {
+                  // Reage com coraçãozinho ao aprovar
+                  await sendReaction(contactId, messageData.id, "❤️", freshContact.connection);
+                }
+
+                // Verify in Mercado Pago (or mock verify if approve_on_any_receipt)
                 const result = await processPixReceiptPayment(freshContact, receiptData, behavior === 'approve_on_any_receipt');
                 if (result.success) {
                   // Send confirmation message (custom or default)
