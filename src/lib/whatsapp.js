@@ -92,20 +92,6 @@ export async function sendText(to, text, contextMessageId = null, connection = n
   return sendWhatsAppMessage(payload, connection);
 }
 
-export async function sendReaction(to, messageId, emoji = "❤️", connection = null) {
-  const payload = {
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to,
-    type: 'reaction',
-    reaction: {
-      message_id: messageId,
-      emoji: emoji
-    }
-  };
-  return sendWhatsAppMessage(payload, connection);
-}
-
 export async function sendAudio(to, audioUrl, contextMessageId = null, connection = null) {
   const resolvedUrl = resolveSupabaseUrl(audioUrl);
   const isOgg = typeof resolvedUrl === 'string' && resolvedUrl.toLowerCase().split('?')[0].endsWith('.ogg');
