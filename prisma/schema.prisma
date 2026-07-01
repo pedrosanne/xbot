@@ -447,11 +447,31 @@ model AiUsage {
   id        String   @id @default(uuid())
   provider  String   @default("GEMINI")
   model     String   @default("")
-  action    String   @default("")
-  tokens    Int      @default(0)
-  cost      Float    @default(0)
-  timestamp DateTime @default(now())
+  action     String   @default("")
+  tokens     Int      @default(0)
+  cost       Float    @default(0)
+  status     String   @default("SUCCESS")
+  durationMs Int      @default(0)
+  error      String   @default("")
+  timestamp  DateTime @default(now())
+  providerId String?
+
+  providerRelation AiProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
 
   @@index([timestamp])
   @@index([provider])
+}
+
+model AiProvider {
+  id          String   @id @default(uuid())
+  name        String
+  provider    String   @default("GEMINI")
+  model       String   @default("gemini-2.5-flash")
+  apiKey      String
+  isActive    Boolean  @default(true)
+  usageCount  Int      @default(0)
+  errorCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  usages      AiUsage[]
 }

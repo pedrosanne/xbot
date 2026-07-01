@@ -5,6 +5,33 @@ import { prisma } from './prisma';
 import { getSystemSettings } from './settings';
 import { logToDb } from './log';
 
+// Helper for AI Provider Rotation (Load Balancing & Contingency)
+async function getNextAiProvider(preferredModel = null) {
+  const providers = await prisma.aiProvider.findMany({
+    where: { isActive: true },
+    orderBy: { usageCount: 'asc' } // Round-robin based on usage
+  });
+  
+  if (providers.length === 0) return null;
+  return providers[0];
+}
+
+async function markProviderUsage(id, success) {
+  if (!id) return;
+  if (success) {
+    await prisma.aiProvider.update({
+      where: { id },
+      data: { usageCount: { increment: 1 } }
+    });
+  } else {
+    await prisma.aiProvider.update({
+      where: { id },
+      data: { usageCount: { increment: 1 }, errorCount: { increment: 1 } }
+    });
+  }
+}
+
+
 export async function generateAIResponse(contactId, incomingText = '', mediaUrl = '', mimeType = '', customAgentId = null, returningCustomerFlows = null) {
   // 1. Fetch designated agent or globally active agent
   let agent = null;
@@ -235,29 +262,6 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
 
     return textResponse;
   } catch (error) {
-    // If it is a transient error on gemini-2.5 models, try calling stable gemini-1.5-flash as fallback
-    if (modelName !== 'gemini-1.5-flash' && (error.message.includes('503') || error.message.includes('demand') || error.message.includes('Unavailable'))) {
-      console.warn(`Transient error on model ${modelName}. Retrying with stable gemini-1.5-flash...`);
-      try {
-        const fallbackModel = genAI.getGenerativeModel({
-          model: 'gemini-1.5-flash',
-          generationConfig: {
-            temperature: agent.temperature || 0.7,
-          }
-        });
-        const result = await fallbackModel.generateContent(promptParts);
-        const response = await result.response;
-        let textResponse = response.text().trim();
-        if (textResponse.startsWith('Atendente:')) {
-          textResponse = textResponse.replace(/^Atendente:\s*/, '');
-        }
-        await logToDb('WARN', 'AI', `Recuperado com sucesso usando fallback para gemini-1.5-flash após erro 503 no modelo principal ${modelName}`);
-        return textResponse;
-      } catch (fallbackError) {
-        console.error('Fallback model gemini-1.5-flash also failed:', fallbackError);
-      }
-    }
-
     console.error('Error generating AI response:', error);
     await logToDb('ERROR', 'AI', `Erro ao gerar resposta do Gemini para o agente ${agent.name}: ${error.message}`, {
       error: error.message,
@@ -295,8 +299,24 @@ export async function extractAmountFromText(incomingText, customAgentId = null) 
         // Fallback for retro-compatibility if needed, but primary is global setting
     }
 
-    const genAI = new GoogleGenerativeAI(apiKeyToUse);
-    const model = genAI.getGenerativeModel({ model: modelName });
+    // AI Provider Contingency Pool
+    const providers = await prisma.aiProvider.findMany({
+      where: { isActive: true },
+      orderBy: { usageCount: 'asc' }
+    });
+
+    let keysToTry = [];
+    if (providers.length > 0) {
+      keysToTry = providers.map(p => ({
+        id: p.id,
+        key: p.apiKey,
+        model: p.model || modelName,
+        name: p.name
+      }));
+    } else {
+      // Fallback to global setting if no providers in pool
+      keysToTry.push({ id: null, key: apiKeyToUse, model: modelName, name: 'System Default' });
+    }
 
     let promptTemplate = settings.geminiPixPrompt || `Analise o seguinte texto enviado por um cliente que quer fazer um pagamento e extraia o valor numérico em reais (BRL).\nResponda APENAS com o número decimal puro (ex: 150.00 ou 30.50), usando ponto como separador decimal.\nSe o texto não contiver nenhuma menção de valor ou quantidade financeira, responda EXATAMENTE "null" (sem aspas).\n\nTexto do cliente: "{texto}"`;
     
@@ -305,40 +325,78 @@ export async function extractAmountFromText(incomingText, customAgentId = null) 
         ? promptTemplate.replace('{texto}', incomingText) 
         : `${promptTemplate}\n\nTexto do cliente: "${incomingText}"`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const textResponse = response.text().trim().toLowerCase();
-    
-    // Log AI Usage
-    const usageMetadata = response.usageMetadata;
-    if (usageMetadata) {
-      const totalTokens = usageMetadata.totalTokenCount || 0;
-      const estimatedCost = (totalTokens / 1000000) * 0.15;
-      
+    const startTime = Date.now();
+    let lastError = null;
+
+    // Retry loop for Contingency
+    for (let i = 0; i < keysToTry.length; i++) {
+      const currentProvider = keysToTry[i];
       try {
-        await prisma.aiUsage.create({
-          data: {
-            provider: 'GEMINI',
-            model: modelName,
-            action: 'extractAmount',
-            tokens: totalTokens,
-            cost: estimatedCost
-          }
-        });
-      } catch (logErr) {
-        console.error('Failed to log AI usage for extractAmount:', logErr);
+        const genAI = new GoogleGenerativeAI(currentProvider.key);
+        const model = genAI.getGenerativeModel({ model: currentProvider.model });
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const textResponse = response.text().trim().toLowerCase();
+        const durationMs = Date.now() - startTime;
+        
+        // Log AI Usage - Success
+        const usageMetadata = response.usageMetadata;
+        let totalTokens = usageMetadata?.totalTokenCount || 0;
+        let estimatedCost = (totalTokens / 1000000) * 0.15;
+        
+        try {
+          await prisma.aiUsage.create({
+            data: {
+              provider: 'GEMINI',
+              model: currentProvider.model,
+              action: 'extractAmount',
+              tokens: totalTokens,
+              cost: estimatedCost,
+              status: 'SUCCESS',
+              durationMs,
+              providerId: currentProvider.id
+            }
+          });
+          await markProviderUsage(currentProvider.id, true);
+        } catch (logErr) {
+          console.error('Failed to log AI usage for extractAmount:', logErr);
+        }
+
+        if (textResponse === 'null' || textResponse.includes('null')) {
+          return null;
+        }
+
+        const cleanNumStr = textResponse.replace(/[^0-9.]/g, '');
+        const amount = parseFloat(cleanNumStr);
+        return isNaN(amount) ? null : amount;
+      } catch (err) {
+        console.error(`AI Provider [${currentProvider.name}] failed:`, err.message);
+        lastError = err.message;
+        await markProviderUsage(currentProvider.id, false);
+        // Continue to next provider in the loop...
       }
     }
 
-    if (textResponse === 'null' || textResponse.includes('null')) {
-      return null;
-    }
+    // If we exhausted all keys
+    const durationMs = Date.now() - startTime;
+    try {
+      await prisma.aiUsage.create({
+        data: {
+          provider: 'GEMINI',
+          model: modelName,
+          action: 'extractAmount',
+          status: 'FAILED',
+          durationMs,
+          error: lastError || 'All providers failed'
+        }
+      });
+    } catch (logErr) {}
 
-    const cleanNumStr = textResponse.replace(/[^0-9.]/g, '');
-    const amount = parseFloat(cleanNumStr);
-    return isNaN(amount) ? null : amount;
+    return null;
   } catch (err) {
     console.error('Error in extractAmountFromText:', err);
     return null;
   }
 }
+
