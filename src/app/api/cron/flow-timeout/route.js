@@ -7,7 +7,10 @@ export async function GET(request) {
   try {
     // 1. Authorization check
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const isValidVercel = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+    const isValidSupabase = authHeader === `Bearer ${process.env.SUPABASE_CRON_SECRET || 'xbot_supabase_cron_5599'}`;
+    
+    if (!isValidVercel && !isValidSupabase) {
       if (process.env.NODE_ENV === 'production') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
