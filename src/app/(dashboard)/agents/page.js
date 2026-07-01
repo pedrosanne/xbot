@@ -2280,6 +2280,21 @@ export default function AgentsPage() {
                       </div>
 
                       <div>
+                        <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Fluxo a disparar após aprovação:</label>
+                        <select
+                          className="form-select"
+                          style={{ padding: '4px 8px', fontSize: '0.78rem', height: '30px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
+                          value={selectedNode.pixConfirmFlowId || ''}
+                          onChange={(e) => updateNode(selectedNodeId, { pixConfirmFlowId: e.target.value })}
+                        >
+                          <option value="" style={{ background: 'var(--bg-primary)' }}>Nenhum (usar padrão do produto)</option>
+                          {flows.filter(f => f.id !== editingFlowId).map(f => (
+                            <option key={f.id} value={f.id} style={{ background: 'var(--bg-primary)' }}>{f.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
                         <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Se enviar texto / não-comprovante:</label>
                         <select
                           className="form-select"

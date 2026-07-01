@@ -661,6 +661,17 @@ async function processSingleMessage(contact, messageData) {
 
                   // Payment approved! Trigger post-sale flow
                   let nextFlow = result.triggeredFlow;
+
+                  // Override with custom approval flow if defined in step
+                  if (currentStep.pixConfirmFlowId) {
+                    const customFlow = await prisma.flow.findUnique({
+                      where: { id: currentStep.pixConfirmFlowId }
+                    });
+                    if (customFlow) {
+                      nextFlow = customFlow;
+                    }
+                  }
+
                   if (nextFlow) {
                     const nextSteps = JSON.parse(nextFlow.steps || '[]');
                     const firstStep = nextSteps[0];
