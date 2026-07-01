@@ -211,6 +211,28 @@ export async function generateAIResponse(contactId, incomingText = '', mediaUrl 
       textResponse = textResponse.replace(/^Atendente:\s*/, '');
     }
 
+    // Log AI Usage
+    const usageMetadata = response.usageMetadata;
+    if (usageMetadata) {
+      const totalTokens = usageMetadata.totalTokenCount || 0;
+      // Calculate estimated cost: Gemini 1.5/2.5 Flash is roughly $0.15 per 1M blended tokens
+      const estimatedCost = (totalTokens / 1000000) * 0.15;
+      
+      try {
+        await prisma.aiUsage.create({
+          data: {
+            provider: 'GEMINI',
+            model: modelName,
+            action: 'chat',
+            tokens: totalTokens,
+            cost: estimatedCost
+          }
+        });
+      } catch (logErr) {
+        console.error('Failed to log AI usage:', logErr);
+      }
+    }
+
     return textResponse;
   } catch (error) {
     // If it is a transient error on gemini-2.5 models, try calling stable gemini-1.5-flash as fallback
@@ -282,8 +304,30 @@ Se o texto não contiver nenhuma menção de valor ou quantidade financeira, res
 Texto do cliente: "${incomingText}"`;
 
     const result = await model.generateContent(prompt);
-    const textResponse = (await result.response).text().trim().toLowerCase();
+    const response = await result.response;
+    const textResponse = response.text().trim().toLowerCase();
     
+    // Log AI Usage
+    const usageMetadata = response.usageMetadata;
+    if (usageMetadata) {
+      const totalTokens = usageMetadata.totalTokenCount || 0;
+      const estimatedCost = (totalTokens / 1000000) * 0.15;
+      
+      try {
+        await prisma.aiUsage.create({
+          data: {
+            provider: 'GEMINI',
+            model: modelName,
+            action: 'extractAmount',
+            tokens: totalTokens,
+            cost: estimatedCost
+          }
+        });
+      } catch (logErr) {
+        console.error('Failed to log AI usage for extractAmount:', logErr);
+      }
+    }
+
     if (textResponse === 'null' || textResponse.includes('null')) {
       return null;
     }

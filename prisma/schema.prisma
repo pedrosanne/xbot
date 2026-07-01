@@ -440,3 +440,16 @@ model GroupAutomation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model AiUsage {
+  id        String   @id @default(uuid())
+  provider  String   @default("GEMINI")
+  model     String   @default("")
+  action    String   @default("")
+  tokens    Int      @default(0)
+  cost      Float    @default(0)
+  timestamp DateTime @default(now())
+
+  @@index([timestamp])
+  @@index([provider])
+}

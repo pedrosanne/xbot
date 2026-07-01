@@ -68,6 +68,23 @@ export async function textToSpeech(text, customAgentId = null) {
       }
     });
 
+    // Log AI Usage (ElevenLabs charges by characters. $0.30 per 1000 chars roughly for standard models)
+    try {
+      const charCount = text.length;
+      const estimatedCost = (charCount / 1000) * 0.30;
+      await prisma.aiUsage.create({
+        data: {
+          provider: 'ELEVENLABS',
+          model: 'eleven_multilingual_v2',
+          action: 'tts',
+          tokens: charCount,
+          cost: estimatedCost
+        }
+      });
+    } catch (logErr) {
+      console.error('Failed to log ElevenLabs TTS usage:', logErr);
+    }
+
     console.log(`Saved TTS voice file to database: ${filename}`);
     return `/api/uploads/${filename}`;
   } catch (error) {
