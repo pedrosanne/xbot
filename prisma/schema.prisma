@@ -93,6 +93,7 @@ model Contact {
   isBlocked         Boolean             @default(false)
   isPinned          Boolean             @default(false)
   reminderDate      DateTime?
+  flowStepEnteredAt DateTime            @default(now())
   calls             Call[]
   assignedUser      User?               @relation(fields: [assignedUserId], references: [id])
   connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)

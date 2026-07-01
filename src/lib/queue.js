@@ -723,7 +723,8 @@ async function processSingleMessage(contact, messageData) {
                         data: {
                           botMode: 'FLOW',
                           activeFlowId: nextFlow.id,
-                          currentStepId: firstStep.id
+                          currentStepId: firstStep.id,
+                          flowStepEnteredAt: new Date()
                         }
                       });
                       await sendStepResponse(contactId, firstStep, nextSteps, messageData.id, freshContact.connection);
@@ -832,7 +833,7 @@ async function processSingleMessage(contact, messageData) {
                 await logToDb('INFO', 'FLOW', `Entrada de texto livre. Avançando contato para a próxima etapa configurada '${nextStep.id}'`);
                 await prisma.contact.update({
                   where: { id: contactId },
-                  data: { currentStepId: nextStep.id }
+                  data: { currentStepId: nextStep.id, flowStepEnteredAt: new Date() }
                 });
                 await sendStepResponse(contactId, nextStep, steps, messageData.id, freshContact.connection);
                 return;
@@ -1205,6 +1206,7 @@ export async function startFlowForContact(contact, flow, incomingMessageId = nul
       botMode: 'FLOW',
       activeFlowId: flow.id,
       currentStepId: startStep.id,
+      flowStepEnteredAt: new Date(),
       designatedAgentId: flow.agentId || null,
       passedFlows: updatedPassedFlows,
       tags: currentTags.join(', ')
@@ -1672,7 +1674,7 @@ export async function sendStepResponse(contactId, step, steps, incomingMessageId
       await logToDb('INFO', 'FLOW', `Auto-avançando etapa sem botões de '${step.id}' para '${nextStep.id}'`);
       await prisma.contact.update({
         where: { id: contactId },
-        data: { currentStepId: nextStep.id }
+        data: { currentStepId: nextStep.id, flowStepEnteredAt: new Date() }
       });
       await sendStepResponse(contactId, nextStep, steps, quoteMessageId, connection);
     }
@@ -1694,7 +1696,7 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
       await logToDb('INFO', 'FLOW', `Avançando contato ${contact.id} para a etapa '${nextStep.id}'`);
       await prisma.contact.update({
         where: { id: contact.id },
-        data: { currentStepId: nextStep.id }
+        data: { currentStepId: nextStep.id, flowStepEnteredAt: new Date() }
       });
       await sendStepResponse(contact.id, nextStep, steps, incomingMessageId, contact.connection);
     } else {

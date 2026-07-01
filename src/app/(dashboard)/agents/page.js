@@ -1763,11 +1763,11 @@ export default function AgentsPage() {
                     }}
                   />
                   <label htmlFor="timeout-enabled" style={{ fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600', color: '#ffb020', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    ⏱️ Timeout / Reenviar sem resposta
+                    ⏱️ Avanço Automático (Delay)
                   </label>
                 </div>
                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 10px 20px', lineHeight: '1.3' }}>
-                  Se ativado, o bot avançará automaticamente para outra etapa após o tempo configurado caso o contato não responda à mensagem.
+                  Se ativado, o bot avançará automaticamente para outra etapa após o tempo configurado, independentemente da ação ou resposta do contato.
                 </p>
 
                 {selectedNode.timeoutEnabled && (

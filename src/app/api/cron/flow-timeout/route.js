@@ -57,7 +57,8 @@ export async function GET(request) {
           thresholdMs = duration * 24 * 60 * 60 * 1000;
         }
 
-        const elapsedMs = now.getTime() - new Date(contact.lastInteraction).getTime();
+        const enteredAt = contact.flowStepEnteredAt || contact.lastInteraction;
+        const elapsedMs = now.getTime() - new Date(enteredAt).getTime();
 
         if (elapsedMs >= thresholdMs) {
           await logToDb('INFO', 'FLOW', `Timeout atingido para contato ${contact.id} na etapa '${currentStep.id}' do fluxo '${flow.name}'. Tempo decorrido: ${Math.round(elapsedMs / 1000 / 60)} min.`);

@@ -512,7 +512,7 @@ export async function POST(request, { params }) {
                 
                 await prisma.contact.update({
                   where: { id: contact.id },
-                  data: { currentStepId: nextStep.id }
+                  data: { currentStepId: nextStep.id, flowStepEnteredAt: new Date() }
                 });
                 
                 // Import dynamic execution from queue.js
