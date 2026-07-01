@@ -74,7 +74,7 @@ export async function sendMetaCapiPurchase({ contact, payment }) {
       event_name: 'Purchase',
       event_time: eventTime,
       event_id: eventId,
-      event_source_url: settings.publicBaseUrl || 'https://xbot.com',
+      event_source_url: settings.publicBaseUrl || 'https://xbotting.com.br',
       action_source: 'chat',
       user_data: userData,
       custom_data: customData

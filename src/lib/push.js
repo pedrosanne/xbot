@@ -12,7 +12,7 @@ export async function sendPushNotification(title, body, url = '/chat', targetUse
       return { success: false, reason: 'VAPID keys not configured' };
     }
 
-    const subject = 'mailto:admin@xbot.com';
+    const subject = 'mailto:admin@xbotting.com.br';
     webPush.setVapidDetails(
       subject,
       settings.vapidPublicKey,
