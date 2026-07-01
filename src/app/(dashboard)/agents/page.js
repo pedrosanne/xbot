@@ -2155,55 +2155,146 @@ export default function AgentsPage() {
 
               </div>
 
-              {/* Comprovante de Pix (IA) */}
-              <div className="flow-sidebar-section">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <input
-                    type="checkbox"
-                    id="wait-pix-receipt"
-                    checked={!!selectedNode.waitPixReceipt}
-                    onChange={(e) => {
-                      const isChecked = e.target.checked;
-                      updateNode(selectedNodeId, {
-                        waitPixReceipt: isChecked,
-                        ...(!isChecked && { waitPixReceiptBehavior: null })
-                      });
-                    }}
-                  />
-                  <label htmlFor="wait-pix-receipt" style={{ fontSize: '0.85rem', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    🤖 Aguardar Comprovante Pix (IA)
-                  </label>
+              {/* Comprovantes de Pix - API vs Simulado */}
+              <div className="flow-sidebar-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h4 style={{ margin: '0 0 4px 0' }}>🤖 Validação de Comprovante Pix (IA)</h4>
+                
+                {/* 1. Validação Automática via API */}
+                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-glass)', borderRadius: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <input
+                      type="checkbox"
+                      id="wait-pix-receipt-api"
+                      checked={!!selectedNode.waitPixReceipt && selectedNode.waitPixReceiptBehavior !== 'approve_on_any_receipt'}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        updateNode(selectedNodeId, {
+                          waitPixReceipt: isChecked,
+                          waitPixReceiptBehavior: isChecked ? 'request_receipt' : null
+                        });
+                      }}
+                    />
+                    <label htmlFor="wait-pix-receipt-api" style={{ fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600', color: 'var(--text-primary)' }}>
+                      🤖 Pix Automático (Validar via API)
+                    </label>
+                  </div>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '0 0 10px 22px', lineHeight: '1.3' }}>
+                    O bot aguarda o comprovante e valida o recebimento do Pix diretamente na sua conta do Mercado Pago.
+                  </p>
+                  
+                  {selectedNode.waitPixReceipt && selectedNode.waitPixReceiptBehavior !== 'approve_on_any_receipt' && (
+                    <div style={{ marginLeft: '22px', borderLeft: '2px solid var(--border-glass)', paddingLeft: '10px' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Se enviar texto / não-comprovante:</label>
+                      <select
+                        className="form-select"
+                        style={{ padding: '4px 8px', fontSize: '0.78rem', height: '30px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
+                        value={selectedNode.waitPixReceiptBehavior || 'request_receipt'}
+                        onChange={(e) => updateNode(selectedNodeId, { waitPixReceiptBehavior: e.target.value })}
+                      >
+                        <option value="request_receipt" style={{ background: 'var(--bg-primary)' }}>💬 Responder pedindo comprovante</option>
+                        <option value="ignore_and_notify" style={{ background: 'var(--bg-primary)' }}>🤫 Ignorar bot e notificar atendente</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '4px 0 0 20px', lineHeight: '1.3' }}>
-                  Ao ativar, o fluxo pausará nesta etapa até o cliente enviar uma imagem ou PDF de comprovante. A IA analisará e confirmará o Pix no Mercado Pago.
-                </p>
 
-                <div style={{ marginTop: '12px', paddingLeft: '20px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '600', color: selectedNode.waitPixReceipt ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', display: 'block', marginBottom: '4px' }}>
-                    Reação a mensagens que não são comprovante:
-                  </label>
-                  <select
-                    className="form-select"
-                    style={{ 
-                      padding: '6px 10px', 
-                      fontSize: '0.82rem', 
-                      height: '34px', 
-                      background: 'var(--bg-glass)', 
-                      color: selectedNode.waitPixReceipt ? 'var(--text-primary)' : 'rgba(255,255,255,0.25)', 
-                      border: '1px solid var(--border-glass)', 
-                      width: '100%',
-                      opacity: selectedNode.waitPixReceipt ? 1 : 0.4,
-                      pointerEvents: selectedNode.waitPixReceipt ? 'auto' : 'none'
-                    }}
-                    value={selectedNode.waitPixReceiptBehavior || 'request_receipt'}
-                    onChange={(e) => updateNode(selectedNodeId, { waitPixReceiptBehavior: e.target.value })}
-                    disabled={!selectedNode.waitPixReceipt}
-                  >
-                    <option value="request_receipt" style={{ background: 'var(--bg-primary)' }}>💬 Responder pedindo comprovante</option>
-                    <option value="ignore_and_notify" style={{ background: 'var(--bg-primary)' }}>🤫 Ignorar bot e notificar atendente</option>
-                    <option value="approve_on_any_receipt" style={{ background: 'var(--bg-primary)' }}>🤖 Aprovar qualquer comprovante válido (Sem API)</option>
-                  </select>
+                {/* 2. Aprovação Rápida por IA (Destaque Premium) */}
+                <div style={{ 
+                  padding: '12px', 
+                  background: selectedNode.waitPixReceipt && selectedNode.waitPixReceiptBehavior === 'approve_on_any_receipt' 
+                    ? 'rgba(251, 191, 36, 0.05)' 
+                    : 'rgba(255,255,255,0.02)', 
+                  border: selectedNode.waitPixReceipt && selectedNode.waitPixReceiptBehavior === 'approve_on_any_receipt'
+                    ? '1px solid rgba(251, 191, 36, 0.3)'
+                    : '1px solid var(--border-glass)', 
+                  borderRadius: '12px',
+                  position: 'relative'
+                }}>
+                  <span style={{ 
+                    position: 'absolute', 
+                    top: '-8px', 
+                    right: '12px', 
+                    background: '#fbbf24', 
+                    color: '#000000', 
+                    fontSize: '0.62rem', 
+                    fontWeight: '800', 
+                    padding: '2px 6px', 
+                    borderRadius: '10px',
+                    textTransform: 'uppercase'
+                  }}>
+                    Pix Manual
+                  </span>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <input
+                      type="checkbox"
+                      id="wait-pix-receipt-mock"
+                      checked={!!selectedNode.waitPixReceipt && selectedNode.waitPixReceiptBehavior === 'approve_on_any_receipt'}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        updateNode(selectedNodeId, {
+                          waitPixReceipt: isChecked,
+                          waitPixReceiptBehavior: isChecked ? 'approve_on_any_receipt' : null,
+                          ...(isChecked && { 
+                            pixConfirmMessage: selectedNode.pixConfirmMessage || 'Confirmamos seu pagamento de R$ {valor}! Obrigado pela compra. 🎉',
+                            waitPixReceiptMockBehavior: selectedNode.waitPixReceiptMockBehavior || 'request_receipt'
+                          })
+                        });
+                      }}
+                    />
+                    <label htmlFor="wait-pix-receipt-mock" style={{ fontSize: '0.85rem', cursor: 'pointer', fontWeight: '700', color: '#fbbf24' }}>
+                      ⚡ Aprovação Rápida (Sem API)
+                    </label>
+                  </div>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '0 0 10px 22px', lineHeight: '1.3' }}>
+                    A IA apenas valida se o cliente enviou uma imagem/PDF e aprova a compra imediatamente (ótimo para chaves Pix normais de CNPJ).
+                  </p>
+
+                  {selectedNode.waitPixReceipt && selectedNode.waitPixReceiptBehavior === 'approve_on_any_receipt' && (
+                    <div style={{ marginLeft: '22px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '0.72rem', fontWeight: '600', color: '#fbbf24', display: 'block', marginBottom: '4px' }}>
+                          💬 Mensagem de Aprovação Personalizada:
+                        </label>
+                        <textarea
+                          className="form-input"
+                          style={{ 
+                            padding: '8px 10px', 
+                            fontSize: '0.78rem', 
+                            background: 'var(--bg-glass)', 
+                            color: 'var(--text-primary)', 
+                            border: '1px solid rgba(251, 191, 36, 0.2)', 
+                            borderRadius: '8px',
+                            width: '100%',
+                            minHeight: '60px',
+                            resize: 'vertical',
+                            lineHeight: '1.4'
+                          }}
+                          value={selectedNode.pixConfirmMessage || ''}
+                          onChange={(e) => updateNode(selectedNodeId, { pixConfirmMessage: e.target.value })}
+                          placeholder="Digite a mensagem personalizada..."
+                        />
+                        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
+                          Tags disponíveis: <code>{"{nome}"}</code>, <code>{"{valor}"}</code>.
+                        </span>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Se enviar texto / não-comprovante:</label>
+                        <select
+                          className="form-select"
+                          style={{ padding: '4px 8px', fontSize: '0.78rem', height: '30px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
+                          value={selectedNode.waitPixReceiptMockBehavior || 'request_receipt'}
+                          onChange={(e) => updateNode(selectedNodeId, { waitPixReceiptMockBehavior: e.target.value })}
+                        >
+                          <option value="request_receipt" style={{ background: 'var(--bg-primary)' }}>💬 Responder pedindo comprovante</option>
+                          <option value="ignore_and_notify" style={{ background: 'var(--bg-primary)' }}>🤫 Ignorar bot e notificar atendente</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
               </div>
 
               {/* Buttons */}

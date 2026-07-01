@@ -599,6 +599,8 @@ async function processSingleMessage(contact, messageData) {
             
             const isMedia = messageData.type === 'image' || messageData.type === 'document';
             const behavior = currentStep.waitPixReceiptBehavior || 'request_receipt';
+            const mockBehavior = currentStep.waitPixReceiptMockBehavior || 'request_receipt';
+            const activeBehavior = behavior === 'approve_on_any_receipt' ? mockBehavior : behavior;
 
             // Helper to notify human team in silent mode
             const notifyHumanTeam = async (alertReason) => {
@@ -648,6 +650,15 @@ async function processSingleMessage(contact, messageData) {
                 // 2. Verify in Mercado Pago and approve payment
                 const result = await processPixReceiptPayment(freshContact, receiptData, behavior === 'approve_on_any_receipt');
                 if (result.success) {
+                  // Send confirmation message (custom or default)
+                  const successMsg = currentStep.pixConfirmMessage || "Seu pagamento foi confirmado com sucesso! Obrigado pela compra. 🎉";
+                  const formattedMsg = successMsg
+                    .replace(/{nome}/g, freshContact.name || freshContact.profileName || 'Cliente')
+                    .replace(/{valor}/g, parseFloat(result.payment.amount || currentStep.pixAmount || 0).toFixed(2).replace('.', ','));
+                  
+                  await sendText(contactId, formattedMsg, messageData.id, freshContact.connection);
+                  await saveOutgoingMessage(`bot_${Date.now()}_pix_success`, contactId, 'text', '', formattedMsg);
+
                   // Payment approved! Trigger post-sale flow
                   let nextFlow = result.triggeredFlow;
                   if (nextFlow) {
@@ -675,13 +686,10 @@ async function processSingleMessage(contact, messageData) {
                       currentStepId: ''
                     }
                   });
-                  const successMsg = "Seu pagamento foi confirmado com sucesso! Obrigado pela compra. 🎉";
-                  await sendText(contactId, successMsg, messageData.id, freshContact.connection);
-                  await saveOutgoingMessage(`bot_${Date.now()}_pix_success`, contactId, 'text', '', successMsg);
                   return;
                 } else {
                   // Receipt analyzed but payment not confirmed or already used
-                  if (behavior === 'ignore_and_notify') {
+                  if (activeBehavior === 'ignore_and_notify') {
                     const reason = result.reason === 'already_used' ? 'Comprovante já utilizado' : 'Pix não localizado no MP';
                     await notifyHumanTeam(reason);
                     return;
@@ -697,7 +705,7 @@ async function processSingleMessage(contact, messageData) {
                 }
               } else {
                 // Sent media but it's not a Pix receipt
-                if (behavior === 'ignore_and_notify') {
+                if (activeBehavior === 'ignore_and_notify') {
                   await notifyHumanTeam('Envio de mídia (não comprovante)');
                   return;
                 }
@@ -709,7 +717,7 @@ async function processSingleMessage(contact, messageData) {
               }
             } else {
               // User sent text instead of media
-              if (behavior === 'ignore_and_notify') {
+              if (activeBehavior === 'ignore_and_notify') {
                 await notifyHumanTeam('Mensagem de texto do cliente');
                 return;
               }
