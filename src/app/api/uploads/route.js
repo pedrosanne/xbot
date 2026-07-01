@@ -42,7 +42,64 @@ export async function GET(request) {
       }
     });
 
-    return NextResponse.json({ success: true, uploads });
+    // 1. Collect ROOT active media URLs
+    const flows = await prisma.flow.findMany();
+    const activeMediaFilenames = new Set();
+    
+    flows.forEach(flow => {
+      try {
+        const steps = JSON.parse(flow.steps || '[]');
+        steps.forEach(step => {
+          if (step.media && step.media.url) {
+            const url = step.media.url;
+            if (url.startsWith('/api/uploads/')) {
+              activeMediaFilenames.add(url.replace('/api/uploads/', ''));
+            }
+          }
+        });
+      } catch (e) {}
+    });
+
+    const products = await prisma.product.findMany({ select: { imageUrl: true } });
+    products.forEach(p => {
+      if (p.imageUrl && p.imageUrl.startsWith('/api/uploads/')) {
+        activeMediaFilenames.add(p.imageUrl.replace('/api/uploads/', ''));
+      }
+    });
+
+    // 2. Identify duplicates by base name
+    const baseNameMap = {};
+    uploads.forEach(u => {
+      const ext = path.extname(u.filename) || '';
+      let base = u.filename;
+      if (u.filename.includes('___')) {
+        base = u.filename.split('___')[0] + ext;
+      }
+      if (!baseNameMap[base]) baseNameMap[base] = [];
+      baseNameMap[base].push(u.id);
+    });
+
+    const enrichedUploads = uploads.map(u => {
+      const ext = path.extname(u.filename) || '';
+      let base = u.filename;
+      if (u.filename.includes('___')) {
+        base = u.filename.split('___')[0] + ext;
+      }
+      
+      const isRoot = activeMediaFilenames.has(u.filename);
+      // A file is a duplicate if there's more than one with the same base name, and it is not the ROOT one 
+      // (or if none are root, just mark all but the newest as duplicate)
+      const group = baseNameMap[base];
+      const isDuplicate = group.length > 1 && !isRoot;
+
+      return {
+        ...u,
+        isRoot,
+        isDuplicate
+      };
+    });
+
+    return NextResponse.json({ success: true, uploads: enrichedUploads });
   } catch (error) {
     console.error('Error fetching uploads:', error);
     return NextResponse.json({ error: 'Erro ao listar mídias da galeria.' }, { status: 500 });
@@ -109,18 +166,52 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'ID do arquivo é obrigatório.' }, { status: 400 });
     }
 
+    // Helper to get active root media filenames
+    const getActiveMediaFilenames = async () => {
+      const activeMediaFilenames = new Set();
+      const flows = await prisma.flow.findMany();
+      flows.forEach(flow => {
+        try {
+          const steps = JSON.parse(flow.steps || '[]');
+          steps.forEach(step => {
+            if (step.media && step.media.url) {
+              const url = step.media.url;
+              if (url.startsWith('/api/uploads/')) {
+                activeMediaFilenames.add(url.replace('/api/uploads/', ''));
+              }
+            }
+          });
+        } catch (e) {}
+      });
+      const products = await prisma.product.findMany({ select: { imageUrl: true } });
+      products.forEach(p => {
+        if (p.imageUrl && p.imageUrl.startsWith('/api/uploads/')) {
+          activeMediaFilenames.add(p.imageUrl.replace('/api/uploads/', ''));
+        }
+      });
+      return activeMediaFilenames;
+    };
+
     if (id === 'all') {
       const allUploads = await prisma.upload.findMany();
       if (allUploads.length > 0) {
-        const filenames = allUploads.map(u => u.filename);
-        try {
-          await deleteFromSupabaseStorage(filenames);
-        } catch (storageErr) {
-          console.warn('Alguns ou todos os arquivos não puderam ser deletados do storage:', storageErr);
+        const activeMediaFilenames = await getActiveMediaFilenames();
+        const filenamesToDelete = allUploads
+          .map(u => u.filename)
+          .filter(filename => !activeMediaFilenames.has(filename));
+
+        if (filenamesToDelete.length > 0) {
+          try {
+            await deleteFromSupabaseStorage(filenamesToDelete);
+          } catch (storageErr) {
+            console.warn('Alguns ou todos os arquivos não puderam ser deletados do storage:', storageErr);
+          }
+          await prisma.upload.deleteMany({
+            where: { filename: { in: filenamesToDelete } }
+          });
         }
-        await prisma.upload.deleteMany();
       }
-      return NextResponse.json({ success: true, message: 'Todos os arquivos foram excluídos com sucesso.' });
+      return NextResponse.json({ success: true, message: 'Todos os arquivos (exceto os raizes) foram excluídos com sucesso.' });
     }
 
     const upload = await prisma.upload.findUnique({
@@ -131,12 +222,16 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'Arquivo não encontrado.' }, { status: 404 });
     }
 
+    const activeMediaFilenames = await getActiveMediaFilenames();
+    if (activeMediaFilenames.has(upload.filename)) {
+      return NextResponse.json({ error: 'Este arquivo é RAIZ e não pode ser apagado porque está em uso.' }, { status: 403 });
+    }
+
     // 1. Delete physical file from Supabase Storage
     try {
       await deleteFromSupabaseStorage([upload.filename]);
     } catch (storageErr) {
       console.warn(`Could not delete file ${upload.filename} from storage:`, storageErr);
-      // Proceed to delete DB record anyway to avoid orphan records in DB
     }
 
     // 2. Delete database record

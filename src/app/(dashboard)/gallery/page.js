@@ -115,18 +115,22 @@ export default function GalleryPage() {
   };
 
   // Handle delete upload
-  const handleDeleteUpload = async (id, filename) => {
-    if (!confirm(`Tem certeza de que deseja excluir permanentemente o arquivo "${getFriendlyName(filename)}"?`)) {
+  const handleDeleteUpload = async (upload) => {
+    if (upload.isRoot) {
+      alert("Atenção: Este arquivo é RAIZ (está sendo usado em um fluxo ou produto) e não pode ser apagado para não quebrar o sistema.");
+      return;
+    }
+    if (!confirm(`Tem certeza de que deseja excluir permanentemente o arquivo "${getFriendlyName(upload.filename)}"?`)) {
       return;
     }
 
     setStatusMsg({ type: '', text: '' });
     try {
-      const res = await fetch(`/api/uploads?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/uploads?id=${upload.id}`, { method: 'DELETE' });
       if (res.ok) {
         setStatusMsg({ type: 'success', text: 'Mídia excluída com sucesso da galeria e do servidor.' });
-        setUploads(prev => prev.filter(u => u.id !== id));
-        if (previewMedia && previewMedia.id === id) {
+        setUploads(prev => prev.filter(u => u.id !== upload.id));
+        if (previewMedia && previewMedia.id === upload.id) {
           setPreviewMedia(null);
         }
       } else {
@@ -141,7 +145,7 @@ export default function GalleryPage() {
 
   // Handle delete ALL uploads
   const handleDeleteAll = async () => {
-    if (!confirm('🚨 ATENÇÃO: Tem certeza de que deseja apagar TODOS os arquivos da galeria e do servidor? Esta ação é irreversível!')) {
+    if (!confirm('🚨 ATENÇÃO: Tem certeza de que deseja apagar TODOS os arquivos (exceto os RAIZES) da galeria e do servidor?')) {
       return;
     }
 
@@ -149,8 +153,8 @@ export default function GalleryPage() {
     try {
       const res = await fetch(`/api/uploads?id=all`, { method: 'DELETE' });
       if (res.ok) {
-        setStatusMsg({ type: 'success', text: 'Todos os arquivos foram excluídos com sucesso!' });
-        setUploads([]);
+        setStatusMsg({ type: 'success', text: 'Os arquivos (exceto raizes) foram excluídos com sucesso!' });
+        fetchUploads(); // Recarregar para mostrar apenas os raizes restantes
         setPreviewMedia(null);
       } else {
         const err = await res.json();
@@ -462,6 +466,45 @@ export default function GalleryPage() {
                   >
                     {getCategoryIcon(upload.mimeType)} {upload.mimeType.split('/')[0]?.toUpperCase()}
                   </span>
+
+                  {upload.isRoot && (
+                    <span 
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        background: 'rgba(59, 130, 246, 0.8)', // Blue for root
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '6px',
+                        padding: '2px 6px',
+                        fontSize: '0.68rem',
+                        fontWeight: '600',
+                        color: '#fff'
+                      }}
+                      title="Arquivo Raiz: Em uso no fluxo ou produto"
+                    >
+                      🛡️ RAIZ
+                    </span>
+                  )}
+                  {upload.isDuplicate && (
+                    <span 
+                      style={{
+                        position: 'absolute',
+                        bottom: '8px',
+                        right: '8px',
+                        background: 'rgba(245, 158, 11, 0.8)', // Orange for duplicate
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '6px',
+                        padding: '2px 6px',
+                        fontSize: '0.68rem',
+                        fontWeight: '600',
+                        color: '#fff'
+                      }}
+                      title="Cópia Repetida"
+                    >
+                      ⚠️ CÓPIA
+                    </span>
+                  )}
                 </div>
 
                 {/* Media Details */}
@@ -532,17 +575,20 @@ export default function GalleryPage() {
                     </button>
 
                     <button
-                      onClick={() => handleDeleteUpload(upload.id, upload.filename)}
-                      className="btn"
+                      onClick={() => handleDeleteUpload(upload)}
+                      className={`btn ${upload.isRoot ? 'disabled' : ''}`}
+                      disabled={upload.isRoot}
                       style={{ 
                         padding: '6px 10px', 
                         fontSize: '0.75rem', 
                         margin: 0,
-                        background: 'rgba(239,68,68,0.08)',
-                        border: '1px solid rgba(239,68,68,0.2)',
-                        color: '#f87171'
+                        background: upload.isRoot ? 'rgba(255,255,255,0.05)' : 'rgba(239,68,68,0.08)',
+                        border: upload.isRoot ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(239,68,68,0.2)',
+                        color: upload.isRoot ? 'var(--text-muted)' : '#f87171',
+                        opacity: upload.isRoot ? 0.5 : 1,
+                        cursor: upload.isRoot ? 'not-allowed' : 'pointer'
                       }}
-                      title="Excluir Mídia"
+                      title={upload.isRoot ? "Não é possível excluir um arquivo raiz" : "Excluir Mídia"}
                     >
                       🗑️
                     </button>
@@ -695,15 +741,19 @@ export default function GalleryPage() {
               </button>
               
               <button
-                onClick={() => handleDeleteUpload(previewMedia.id, previewMedia.filename)}
-                className="btn"
+                onClick={() => handleDeleteUpload(previewMedia)}
+                className={`btn ${previewMedia.isRoot ? 'disabled' : ''}`}
+                disabled={previewMedia.isRoot}
                 style={{ 
                   margin: 0, 
                   fontSize: '0.8rem',
-                  background: 'rgba(239,68,68,0.08)',
-                  border: '1px solid rgba(239,68,68,0.2)',
-                  color: '#f87171'
+                  background: previewMedia.isRoot ? 'rgba(255,255,255,0.05)' : 'rgba(239,68,68,0.08)',
+                  border: previewMedia.isRoot ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(239,68,68,0.2)',
+                  color: previewMedia.isRoot ? 'var(--text-muted)' : '#f87171',
+                  opacity: previewMedia.isRoot ? 0.5 : 1,
+                  cursor: previewMedia.isRoot ? 'not-allowed' : 'pointer'
                 }}
+                title={previewMedia.isRoot ? "Arquivo Raiz não pode ser apagado" : "Excluir permanentemente"}
               >
                 🗑️ Excluir permanentemente
               </button>
