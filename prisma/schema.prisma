@@ -1,11 +1,11 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
-}
-
-generator client {
-  provider = "prisma-client-js"
 }
 
 model Setting {
@@ -15,101 +15,89 @@ model Setting {
   whatsappVerifyToken String   @default("antigravity_token_123")
   geminiApiKey        String   @default("")
   elevenLabsApiKey    String   @default("")
-  elevenLabsVoiceId   String   @default("21m00Tcm4TlvDq8ikWAM") // Rachel
-  vapidPublicKey      String   @default("")
-  vapidPrivateKey     String   @default("")
-  vapiApiKey          String   @default("")
-  vapiPhoneNumberId   String   @default("")
-  vapiAssistantId     String   @default("")
-  publicBaseUrl       String   @default("")
-  pushTitleManual      String @default("Atendimento Manual: {nome} 💬")
-  pushBodyManual       String @default("{mensagem}")
-  pushSoundManual      String @default("default")
-
-  pushTitleSale        String @default("Venda Aprovada! 🎉")
-  pushBodySale         String @default("R$ {valor} - {nome}")
-  pushSoundSale        String @default("sale")
-
-  pushTitleAlert       String @default("Alerta do Sistema ⚠️")
-  pushBodyAlert        String @default("{mensagem}")
-  pushSoundAlert       String @default("default")
-
-  pushTitleLead        String @default("Ação Necessária: {nome} 👤")
-  pushBodyLead         String @default("{mensagem}")
-  pushSoundLead        String @default("message")
+  elevenLabsVoiceId   String   @default("21m00Tcm4TlvDq8ikWAM")
   updatedAt           DateTime @updatedAt
-
-  // Global Meta Pixel & CAPI Settings
+  vapidPrivateKey     String   @default("")
+  vapidPublicKey      String   @default("")
+  vapiApiKey          String   @default("")
+  vapiAssistantId     String   @default("")
+  vapiPhoneNumberId   String   @default("")
+  publicBaseUrl       String   @default("")
   globalPixelId       String   @default("")
-  globalPixelToken    String   @default("")
   globalPixelTestCode String   @default("")
-
-  // Email Marketing Settings
-  emailProvider       String   @default("resend")
+  globalPixelToken    String   @default("")
   emailApiKey         String   @default("")
+  emailProvider       String   @default("resend")
   emailSender         String   @default("")
+  pushBodyAlert       String   @default("{mensagem}")
+  pushBodyLead        String   @default("{mensagem}")
+  pushBodyManual      String   @default("{mensagem}")
+  pushBodySale        String   @default("R$ {valor} - {nome}")
+  pushSoundAlert      String   @default("default")
+  pushSoundLead       String   @default("message")
+  pushSoundManual     String   @default("default")
+  pushSoundSale       String   @default("sale")
+  pushTitleAlert      String   @default("Alerta do Sistema ⚠️")
+  pushTitleLead       String   @default("Ação Necessária: {nome} 👤")
+  pushTitleManual     String   @default("Atendimento Manual: {nome} 💬")
+  pushTitleSale       String   @default("Venda Aprovada! 🎉")
 }
 
 model Agent {
-  id                String   @id @default(uuid())
+  id                String              @id @default(uuid())
   name              String
-  description       String   @default("")
-  systemPrompt      String   @default("Você é um atendente virtual simpático da nossa empresa. Responda de maneira clara, prestativa e natural, simulando um contato humano.")
-  model             String   @default("gemini-1.5-flash")
-  temperature       Float    @default(0.7)
-  isActive          Boolean  @default(false)
-  geminiApiKey      String   @default("")
-  elevenLabsApiKey  String   @default("")
-  elevenLabsVoiceId String   @default("")
-  createdAt         DateTime @default(now())
-  flows             Flow[]
-
+  description       String              @default("")
+  systemPrompt      String              @default("Você é um atendente virtual simpático da nossa empresa. Responda de maneira clara, prestativa e natural, simulando um contato humano.")
+  model             String              @default("gemini-1.5-flash")
+  temperature       Float               @default(0.7)
+  isActive          Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  elevenLabsApiKey  String              @default("")
+  elevenLabsVoiceId String              @default("")
+  geminiApiKey      String              @default("")
   connectionId      String?
-  connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   productId         String?
-  product           Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id])
+  product           Product?            @relation(fields: [productId], references: [id])
+  flows             Flow[]
 }
 
 model Contact {
-  id              String    @id
-  name            String    @default("Cliente WhatsApp")
-  profileName     String    @default("")
-  email           String    @default("")
-  notes           String    @default("")
-  tags            String    @default("")
-  avatarUrl       String    @default("")
-  status          String    @default("AUTO") // "AUTO" ou "MANUAL" (transbordo humano)
-  botMode         String    @default("FLOW") // "FLOW" ou "IA"
-  currentStepId   String    @default("")
-  activeFlowId    String    @default("")
-  lastInteraction DateTime  @default(now())
-  messages        Message[]
-  calls           Call[]
-  payments        Payment[]
-  createdAt       DateTime  @default(now())
-  passedFlows     String    @default("")
-  isPinned        Boolean   @default(false)
-  isBlocked       Boolean   @default(false)
-  reminderDate    DateTime?
-  
-  // Scoping fields for multi-number support
-  phoneNumberId   String    @default("")
-  clientPhone     String    @default("")
+  id                String              @id
+  name              String              @default("Cliente WhatsApp")
+  profileName       String              @default("")
+  status            String              @default("AUTO")
+  lastInteraction   DateTime            @default(now())
+  createdAt         DateTime            @default(now())
+  activeFlowId      String              @default("")
+  botMode           String              @default("FLOW")
+  currentStepId     String              @default("")
+  avatarUrl         String              @default("")
+  email             String              @default("")
+  notes             String              @default("")
+  tags              String              @default("")
+  clientPhone       String              @default("")
   connectionId      String?
-  connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  phoneNumberId     String              @default("")
   designatedAgentId String?
   typingState       String              @default("IDLE")
   assignedUserId    String?
-  assignedUser      User?               @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
-
-  // Tracking (UTM & Ads Cookies)
-  utmSource    String   @default("")
-  utmMedium    String   @default("")
-  utmCampaign  String   @default("")
-  utmContent   String   @default("")
-  utmTerm      String   @default("")
-  fbp          String   @default("")
-  fbc          String   @default("")
+  passedFlows       String              @default("")
+  fbc               String              @default("")
+  fbp               String              @default("")
+  utmCampaign       String              @default("")
+  utmContent        String              @default("")
+  utmMedium         String              @default("")
+  utmSource         String              @default("")
+  utmTerm           String              @default("")
+  isBlocked         Boolean             @default(false)
+  isPinned          Boolean             @default(false)
+  reminderDate      DateTime?
+  calls             Call[]
+  assignedUser      User?               @relation(fields: [assignedUserId], references: [id])
+  connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  messages          Message[]
+  payments          Payment[]
 
   @@index([connectionId])
   @@index([assignedUserId])
@@ -119,97 +107,92 @@ model Contact {
 }
 
 model WhatsAppConnection {
-  id                  String    @id @default(uuid())
-  name                String    // Ex: "Vendas", "Suporte"
-  phoneNumber         String    @default("") // Ex: +5511999999999
-  whatsappToken       String    @default("")
-  whatsappPhoneId     String    @unique
-  whatsappVerifyToken String    @default("antigravity_token_123")
-  isActive            Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  contacts            Contact[]
-  agents              Agent[]
-  flows               Flow[]
-  users               User[]
-
-  // Lead Distribution & Load Balancing
-  isDistributionEnabled Boolean  @default(false)
-  distributionWeight    Int      @default(1)
-  dailyLeadLimit        Int      @default(1000)
-  currentDayLeads       Int      @default(0)
-  qualityRating         String   @default("GREEN")
-  messagingTier         String   @default("TIER_1K")
-  statusMeta            String   @default("CONNECTED")
+  id                    String    @id @default(uuid())
+  name                  String
+  phoneNumber           String    @default("")
+  whatsappToken         String    @default("")
+  whatsappPhoneId       String    @unique
+  whatsappVerifyToken   String    @default("antigravity_token_123")
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  currentDayLeads       Int       @default(0)
+  dailyLeadLimit        Int       @default(1000)
+  distributionWeight    Int       @default(1)
+  isDistributionEnabled Boolean   @default(false)
+  messagingTier         String    @default("TIER_1K")
+  qualityRating         String    @default("GREEN")
+  statusMeta            String    @default("CONNECTED")
+  agents                Agent[]
+  contacts              Contact[]
+  flows                 Flow[]
+  users                 User[]    @relation("UserToWhatsAppConnection")
 }
 
 model Message {
-  id              String   @id // Message ID retornado pelo WhatsApp
-  contactId       String
-  contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  direction       String   // "INCOMING" (cliente para bot) ou "OUTGOING" (bot/humano para cliente)
-  senderType      String   // "BOT", "HUMAN", "CLIENT"
-  type            String   // "text", "image", "audio", "video", "document"
-  content         String   // Texto ou legenda da mídia
-  mediaUrl        String   @default("") // Caminho local do arquivo salvo no Next.js public
-  sendError       String   @default("") // Erro de entrega se falhar
-  status          String   @default("sent")
-  timestamp       DateTime @default(now())
-  replyToId       String   @default("")
-  replyToContent  String   @default("")
-  reactions       String   @default("[]")
-  isEdited        Boolean  @default(false)
-  isDeleted       Boolean  @default(false)
-  deletedFor      String   @default("")
+  id             String   @id
+  contactId      String
+  direction      String
+  senderType     String
+  type           String
+  content        String
+  mediaUrl       String   @default("")
+  timestamp      DateTime @default(now())
+  sendError      String   @default("")
+  status         String   @default("sent")
+  deletedFor     String   @default("")
+  isDeleted      Boolean  @default(false)
+  isEdited       Boolean  @default(false)
+  reactions      String   @default("[]")
+  replyToContent String   @default("")
+  replyToId      String   @default("")
+  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([timestamp])
 }
 
 model ProcessedWebhook {
-  id          String   @id // Message ID do WhatsApp para evitar processar duplicados
+  id          String   @id
   processedAt DateTime @default(now())
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String   // Hashed password
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  assignedContacts Contact[]
-  connections WhatsAppConnection[]
-  pushSubscriptions PushSubscription[]
+  id                String               @id @default(uuid())
+  name              String
+  email             String               @unique
+  password          String
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  assignedContacts  Contact[]
   sales             Payment[]            @relation("PaymentSeller")
+  pushSubscriptions PushSubscription[]
+  connections       WhatsAppConnection[] @relation("UserToWhatsAppConnection")
 }
 
 model Flow {
-  id        String   @id @default(uuid())
-  name      String
-  trigger   String   @default("keyword") // "welcome" or "keyword"
-  keywords  String   @default("")        // comma-separated trigger keywords
-  isActive  Boolean  @default(true)
-  steps     String   @default("[]")      // JSON string of steps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Designate an AI Agent to this Chatbot Flow
-  agentId   String?
-  agent     Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
-
-  connectionId      String?
-  connection        WhatsAppConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
-  productId         String?
-  product           Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  id           String              @id @default(uuid())
+  name         String
+  trigger      String              @default("keyword")
+  keywords     String              @default("")
+  isActive     Boolean             @default(true)
+  steps        String              @default("[]")
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  agentId      String?
+  connectionId String?
+  productId    String?
+  agent        Agent?              @relation(fields: [agentId], references: [id])
+  connection   WhatsAppConnection? @relation(fields: [connectionId], references: [id])
+  product      Product?            @relation(fields: [productId], references: [id])
 }
 
 model Log {
   id        String   @id @default(uuid())
-  level     String   @default("INFO") // "INFO", "WARN", "ERROR"
-  category  String   @default("SYSTEM") // "WEBHOOK", "FLOW", "API", "DATABASE", "AI"
+  level     String   @default("INFO")
+  category  String   @default("SYSTEM")
   message   String
-  details   String   @default("") // Trace do erro ou dados do payload
+  details   String   @default("")
   timestamp DateTime @default(now())
 
   @@index([timestamp])
@@ -221,7 +204,6 @@ model PushSubscription {
   keysAuth   String
   keysP256dh String
   createdAt  DateTime @default(now())
-  
   userId     String?
   user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -229,19 +211,19 @@ model PushSubscription {
 }
 
 model Call {
-  id            String   @id @default(uuid())
-  contactId     String
-  contact       Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  vapiCallId    String   @default("")
-  type          String   @default("outbound") // "outbound" ou "inbound"
-  status        String   @default("queued")   // "queued","ringing","in-progress","completed","failed","no-answer","busy"
-  duration      Int      @default(0)
-  transcript    String   @default("")
-  recordingUrl  String   @default("")
-  summary       String   @default("")
-  cost          Float    @default(0)
-  endedReason   String   @default("")
-  createdAt     DateTime @default(now())
+  id           String   @id @default(uuid())
+  contactId    String
+  vapiCallId   String   @default("")
+  type         String   @default("outbound")
+  status       String   @default("queued")
+  duration     Int      @default(0)
+  transcript   String   @default("")
+  recordingUrl String   @default("")
+  summary      String   @default("")
+  cost         Float    @default(0)
+  endedReason  String   @default("")
+  createdAt    DateTime @default(now())
+  contact      Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
 }
@@ -255,12 +237,12 @@ model Upload {
 
 model PaymentGateway {
   id            String    @id @default(uuid())
-  name          String    // Ex: "Mercado Pago", "Stripe", "Asaas"
-  type          String    // "stripe", "mercadopago", "asaas", "custom"
+  name          String
+  type          String
   isActive      Boolean   @default(true)
-  apiKey        String    @default("") // Chave secreta / API Token
-  publicKey     String    @default("") // Public Key / Client ID (opcional)
-  webhookSecret String    @default("") // Webhook signing secret (opcional)
+  apiKey        String    @default("")
+  publicKey     String    @default("")
+  webhookSecret String    @default("")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   payments      Payment[]
@@ -269,20 +251,20 @@ model PaymentGateway {
 model Payment {
   id            String         @id @default(uuid())
   gatewayId     String
-  gateway       PaymentGateway @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
   contactId     String?
-  contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  externalId    String         @default("") // ID do pagamento no gateway externo
+  externalId    String         @default("")
   amount        Float
-  status        String         @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
-  paymentMethod String         @default("pix") // pix, credit_card, boleto, etc.
+  status        String         @default("PENDING")
+  paymentMethod String         @default("pix")
   description   String         @default("")
-  productId     String?
-  product       Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
-  sellerId      String?
-  seller        User?          @relation("PaymentSeller", fields: [sellerId], references: [id], onDelete: SetNull)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  productId     String?
+  sellerId      String?
+  contact       Contact?       @relation(fields: [contactId], references: [id])
+  gateway       PaymentGateway @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+  product       Product?       @relation(fields: [productId], references: [id])
+  seller        User?          @relation("PaymentSeller", fields: [sellerId], references: [id])
 
   @@index([contactId])
   @@index([gatewayId])
@@ -291,109 +273,109 @@ model Payment {
 }
 
 model Product {
-  id          String      @id @default(uuid())
-  name        String
-  description String      @default("")
-  type        String      @default("DIGITAL") // "DIGITAL" ou "PHYSICAL"
-  price       Float       @default(0.0)
-  imageUrl    String      @default("")
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  offers      Offer[]
-  pixels      Pixel[]
-  orderBumps  OrderBump[] @relation("BumpMainProduct")
-  bumpedIn    OrderBump[] @relation("BumpTargetProduct")
-  upsells     Upsell[]    @relation("UpsellMainProduct")
-  upselledIn  Upsell[]    @relation("UpsellTargetProduct")
-  agents      Agent[]
-  flows       Flow[]
-  payments    Payment[]
+  id             String      @id @default(uuid())
+  name           String
+  description    String      @default("")
+  type           String      @default("DIGITAL")
+  price          Float       @default(0.0)
+  imageUrl       String      @default("")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
   postSaleFlowId String?
+  agents         Agent[]
+  flows          Flow[]
+  offers         Offer[]
+  orderBumps     OrderBump[] @relation("BumpMainProduct")
+  bumpedIn       OrderBump[] @relation("BumpTargetProduct")
+  payments       Payment[]
+  pixels         Pixel[]
+  upsells        Upsell[]    @relation("UpsellMainProduct")
+  upselledIn     Upsell[]    @relation("UpsellTargetProduct")
 }
 
 model Offer {
   id          String   @id @default(uuid())
   productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   name        String
   price       Float
   description String   @default("")
-  code        String   @default("") // Slug / URL da oferta
+  code        String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model OrderBump {
   id              String   @id @default(uuid())
   productId       String
-  product         Product  @relation("BumpMainProduct", fields: [productId], references: [id], onDelete: Cascade)
   targetProductId String
-  targetProduct   Product  @relation("BumpTargetProduct", fields: [targetProductId], references: [id], onDelete: Cascade)
   title           String
   description     String   @default("")
   price           Float
   createdAt       DateTime @default(now())
+  product         Product  @relation("BumpMainProduct", fields: [productId], references: [id], onDelete: Cascade)
+  targetProduct   Product  @relation("BumpTargetProduct", fields: [targetProductId], references: [id], onDelete: Cascade)
 }
 
 model Upsell {
   id              String   @id @default(uuid())
   productId       String
-  product         Product  @relation("UpsellMainProduct", fields: [productId], references: [id], onDelete: Cascade)
   targetProductId String
-  targetProduct   Product  @relation("UpsellTargetProduct", fields: [targetProductId], references: [id], onDelete: Cascade)
   title           String
   description     String   @default("")
   price           Float
   createdAt       DateTime @default(now())
+  product         Product  @relation("UpsellMainProduct", fields: [productId], references: [id], onDelete: Cascade)
+  targetProduct   Product  @relation("UpsellTargetProduct", fields: [targetProductId], references: [id], onDelete: Cascade)
 }
 
 model Pixel {
   id        String   @id @default(uuid())
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  platform  String   // "facebook", "google", "tiktok"
+  platform  String
   pixelId   String
-  token     String   @default("") // Token de Conversão da API (opcional)
-  testCode  String   @default("") // Código de teste de eventos (opcional)
+  token     String   @default("")
   createdAt DateTime @default(now())
+  testCode  String   @default("")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model Broadcast {
-  id          String   @id @default(uuid())
+  id          String         @id @default(uuid())
   name        String
-  status      String   @default("PENDING") // PENDING, RUNNING, PAUSED, COMPLETED, CANCELLED
-  message     String   // Texto da mensagem (com suporte a Spintax)
-  flowId      String?  // Opcional: disparar um fluxo/chatbot após a mensagem
-  senderIds   String   // IDs das conexões usadas no disparo (separados por vírgula)
-  totalLeads  Int      @default(0)
-  sentLeads   Int      @default(0)
-  failedLeads Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      String         @default("PENDING")
+  message     String
+  flowId      String?
+  senderIds   String
+  totalLeads  Int            @default(0)
+  sentLeads   Int            @default(0)
+  failedLeads Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
   logs        BroadcastLog[]
 }
 
 model BroadcastLog {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   broadcastId String
-  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
   contactId   String
-  status      String   // SENT, FAILED
-  error       String   @default("")
-  timestamp   DateTime @default(now())
+  status      String
+  error       String    @default("")
+  timestamp   DateTime  @default(now())
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
 }
 
 model UtmTracker {
-  id           String   @id // Código de referência único (Ex: "A5X9B")
-  utmSource    String   @default("")
-  utmMedium    String   @default("")
-  utmCampaign  String   @default("")
-  utmContent   String   @default("")
-  utmTerm      String   @default("")
-  fbp          String   @default("")
-  fbc          String   @default("")
-  flowId       String   @default("")
-  createdAt    DateTime @default(now())
+  id          String   @id
+  utmSource   String   @default("")
+  utmMedium   String   @default("")
+  utmCampaign String   @default("")
+  utmContent  String   @default("")
+  utmTerm     String   @default("")
+  fbp         String   @default("")
+  fbc         String   @default("")
+  createdAt   DateTime @default(now())
+  flowId      String   @default("")
 }
 
 model Page {
@@ -401,21 +383,21 @@ model Page {
   title              String
   slug               String   @unique
   description        String   @default("")
-  status             String   @default("DRAFT") // DRAFT, PUBLISHED
-  content            Json     // Estrutura de blocos da página (JSON Array)
-  facebookPixelId    String   @default("") // Pixel específico da página
-  facebookPixelToken String   @default("") // Token de Conversão Meta específico
+  status             String   @default("DRAFT")
+  content            Json
+  facebookPixelId    String   @default("")
+  facebookPixelToken String   @default("")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
 
 model FacebookConfig {
-  id            String   @id @default(uuid())
-  accessToken   String   // Token de acesso do usuário do Facebook
-  adAccountId   String   @default("") // Conta de anúncio selecionada (ex: "act_123456")
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String   @id @default(uuid())
+  accessToken String
+  adAccountId String   @default("")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model EmailCampaign {
@@ -423,7 +405,7 @@ model EmailCampaign {
   name            String
   subject         String
   body            String
-  status          String     @default("PENDING") // PENDING, SENDING, COMPLETED, FAILED
+  status          String     @default("PENDING")
   totalRecipients Int        @default(0)
   sentCount       Int        @default(0)
   failedCount     Int        @default(0)
@@ -435,27 +417,25 @@ model EmailCampaign {
 model EmailLog {
   id         String        @id @default(uuid())
   campaignId String
-  campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   contactId  String
-  status     String        // SENT, FAILED
+  status     String
   error      String        @default("")
   timestamp  DateTime      @default(now())
+  campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 }
 
 model GroupAutomation {
-  id              String   @id @default(uuid())
-  name            String
-  type            String   // invite, post, welcome
-  event           String   // payment_approved, lead_created
-  target          String   // link de convite ou ID do grupo/canal
-  message         String   @default("")
-  productId       String?  // Opcional: produto associado se o evento for pagamento
-  isActive        Boolean  @default(true)
-  apiType         String   @default("official") // official (envia link de convite), evolution, zapi
-  apiUrl          String   @default("")
-  apiToken        String   @default("")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id        String   @id @default(uuid())
+  name      String
+  type      String
+  event     String
+  target    String
+  message   String   @default("")
+  productId String?
+  isActive  Boolean  @default(true)
+  apiType   String   @default("official")
+  apiUrl    String   @default("")
+  apiToken  String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
-
-

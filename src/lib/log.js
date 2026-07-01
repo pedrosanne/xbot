@@ -16,6 +16,12 @@ export async function logToDb(level, category, message, details = '') {
     // Output to stdout as well
     console.log(`[${level}] [${category}] ${message} ${detailStr ? '- details available' : ''}`);
 
+    // Optimization: Do not save INFO logs to the database to prevent Supabase connection exhaustion and bloat,
+    // unless explicitly enabled via environment variables.
+    if (level === 'INFO' && process.env.ENABLE_DB_INFO_LOGS !== 'true') {
+      return;
+    }
+
     // Aguarda a gravação no banco de dados para evitar thread suspensa na Vercel
     await prisma.log.create({
       data: {
