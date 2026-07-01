@@ -4,27 +4,81 @@
  * without requiring external MP3 assets.
  */
 
-export function playSynthesizedSound(type) {
+let globalAudioContext = null;
+let isUnlocked = false;
+
+export function getAudioContext() {
+  if (typeof window === 'undefined') return null;
+  if (!globalAudioContext) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      globalAudioContext = new AudioContext();
+    }
+  }
+  return globalAudioContext;
+}
+
+export function unlockAudio() {
+  if (isUnlocked || typeof window === 'undefined') return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const unlock = () => {
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    // Play a silent buffer to definitively unlock iOS Web Audio
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+    isUnlocked = true;
+
+    ['touchstart', 'touchend', 'click', 'keydown'].forEach(evt => {
+      document.removeEventListener(evt, unlock, true);
+    });
+  };
+
+  ['touchstart', 'touchend', 'click', 'keydown'].forEach(evt => {
+    document.addEventListener(evt, unlock, true);
+  });
+}
+
+export async function playSynthesizedSound(type) {
   if (typeof window === 'undefined') return;
   
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  
+  if (ctx.state === 'suspended') {
+    await ctx.resume().catch(e => console.warn('Could not resume context:', e));
+  }
   
   try {
-    // If the sound type is a custom URL (uploaded file), play it directly
+    // If the sound type is a custom URL (uploaded file), play it directly via Web Audio API (fixes iOS)
     if (type && (type.startsWith('http://') || type.startsWith('https://') || type.startsWith('/api/uploads/'))) {
-      const customAudio = new Audio(type);
-      customAudio.play().catch(e => console.error("Error playing custom audio from URL:", e));
+      try {
+        const response = await fetch(type);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        source.start(0);
+      } catch (e) {
+        console.error("Error playing custom audio via Web Audio API:", e);
+        // Fallback
+        const customAudio = new Audio(type);
+        customAudio.play().catch(err => console.error("Fallback HTML Audio failed:", err));
+      }
       return;
     }
 
-    const ctx = new AudioContext();
     const now = ctx.currentTime;
     
     if (type === 'sale') {
       // --- "CHA-CHING" (Cash Register) ---
-      
-      // 1. High-pitched metallic bell strike
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
       const bellGain = ctx.createGain();
@@ -46,8 +100,8 @@ export function playSynthesizedSound(type) {
       osc1.stop(now + 0.35);
       osc2.stop(now + 0.35);
       
-      // 2. Coin rattle (white noise burst with bandpass filter)
-      const bufferSize = ctx.sampleRate * 0.3; // 0.3 seconds
+      // Coin rattle
+      const bufferSize = ctx.sampleRate * 0.3; 
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
@@ -63,7 +117,6 @@ export function playSynthesizedSound(type) {
       filter.Q.setValueAtTime(3, now);
       
       const noiseGain = ctx.createGain();
-      // Start slightly after the bell strike to simulate the coins clinking
       noiseGain.gain.setValueAtTime(0, now);
       noiseGain.gain.setValueAtTime(0.15, now + 0.04);
       noiseGain.gain.exponentialRampToValueAtTime(0.005, now + 0.28);
@@ -81,8 +134,8 @@ export function playSynthesizedSound(type) {
       const gainNode = ctx.createGain();
       
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, now); // A5
-      osc.frequency.exponentialRampToValueAtTime(1318.51, now + 0.08); // E6
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(1318.51, now + 0.08);
       
       gainNode.gain.setValueAtTime(0.2, now);
       gainNode.gain.exponentialRampToValueAtTime(0.005, now + 0.3);
@@ -99,8 +152,8 @@ export function playSynthesizedSound(type) {
       const gainNode = ctx.createGain();
       
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, now); // D5
-      osc.frequency.setValueAtTime(783.99, now + 0.08); // G5
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.setValueAtTime(783.99, now + 0.08);
       
       gainNode.gain.setValueAtTime(0.12, now);
       gainNode.gain.setValueAtTime(0, now + 0.06);

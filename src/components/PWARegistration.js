@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
-import { playSynthesizedSound } from '@/lib/audioSynth';
+import { playSynthesizedSound, unlockAudio } from '@/lib/audioSynth';
 
 export default function PWARegistration() {
   useEffect(() => {
+    // Unlock iOS audio context on the first user interaction
+    unlockAudio();
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       const registerSW = () => {
         navigator.serviceWorker.register('/sw.js')
