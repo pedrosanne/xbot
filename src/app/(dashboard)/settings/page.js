@@ -90,11 +90,7 @@ const PushCategoryEditor = ({
         <button
           type="button"
           onClick={() => {
-            if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) {
-              navigator.serviceWorker.controller.postMessage({ type: 'PLAY_SOUND', soundType: soundVal });
-            } else {
-              import('@/lib/audioSynth').then(m => m.playSynthesizedSound(soundVal));
-            }
+            import('@/lib/audioSynth').then(m => m.playSynthesizedSound(soundVal));
           }}
           className="btn btn-secondary"
           style={{ padding: '8px 12px', fontSize: '0.8rem' }}
