@@ -61,7 +61,9 @@ export async function playSynthesizedSound(type) {
       try {
         const response = await fetch(type);
         const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const audioBuffer = await new Promise((resolve, reject) => {
+          ctx.decodeAudioData(arrayBuffer, resolve, reject);
+        });
         const source = ctx.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(ctx.destination);
