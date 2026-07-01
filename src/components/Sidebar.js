@@ -256,7 +256,7 @@ export default function Sidebar() {
         
         <div className="logo-container" style={{ marginBottom: '24px' }}>
           <div className="logo-icon">X</div>
-          <div className="logo-text">X bot</div>
+          <div className="logo-text">X botting</div>
         </div>
         
         {/* Desktop Navigation organized by Category */}
@@ -358,7 +358,7 @@ export default function Sidebar() {
           className="version-text"
           style={{ borderTop: user ? 'none' : '1px solid var(--border-glass)' }}
         >
-          {isCollapsed ? 'v1.0.0' : 'X bot v1.0.0'}
+          {isCollapsed ? 'v1.0.0' : 'X botting v1.0.0'}
         </div>
       </aside>
 
@@ -366,7 +366,7 @@ export default function Sidebar() {
       <div className="mobile-header-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div className="logo-icon" style={{ width: '32px', height: '32px', fontSize: '16px' }}>X</div>
-          <span className="logo-text" style={{ display: 'block', fontSize: '1.1rem', fontWeight: 700 }}>X bot</span>
+          <span className="logo-text" style={{ display: 'block', fontSize: '1.1rem', fontWeight: 700 }}>X botting</span>
         </div>
         <button 
           onClick={() => setIsMobileOpen(true)} 
