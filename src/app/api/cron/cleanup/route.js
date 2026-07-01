@@ -66,30 +66,87 @@ export async function GET(request) {
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    // 4. Delete old uploads not associated with active flows/products
-    const oldUploads = await prisma.upload.findMany({
-      where: {
-        createdAt: { lt: oneDayAgo }
-      },
-      select: { filename: true }
-    });
-
-    const filenamesToDelete = oldUploads
-      .map(u => u.filename)
-      .filter(filename => !activeMediaFilenames.has(filename));
-
+    // 4. Ghost & Deduplication Deep Cleanup
     let deletedUploadsCount = 0;
-    if (filenamesToDelete.length > 0) {
-      // 1. Delete binary files from Supabase Storage
-      await deleteFromSupabaseStorage(filenamesToDelete);
+    try {
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const bucket = process.env.SUPABASE_BUCKET || 'media';
+      const supabase = import('@supabase/supabase-js').then(m => m.createClient(supabaseUrl, serviceKey));
+      const client = await supabase;
 
-      // 2. Delete metadata records from database
-      const deleteRes = await prisma.upload.deleteMany({
-        where: {
-          filename: { in: filenamesToDelete }
+      let allFiles = [];
+      let offset = 0;
+      while (true) {
+        const { data, error } = await client.storage.from(bucket).list('', { limit: 1000, offset });
+        if (error || !data || data.length === 0) break;
+        allFiles = allFiles.concat(data.filter(f => f.name !== '.emptyFolderPlaceholder'));
+        if (data.length < 1000) break;
+        offset += 1000;
+      }
+
+      const dbUploads = await prisma.upload.findMany({ select: { filename: true } });
+      const dbUploadSet = new Set(dbUploads.map(u => u.filename));
+      const sizeGroups = {};
+      const orphans = [];
+
+      for (const f of allFiles) {
+        const size = f.metadata?.size || 0;
+        const isReferencedInDb = activeMediaFilenames.has(f.name);
+        const isInGallery = dbUploadSet.has(f.name);
+        
+        if (!isReferencedInDb && !isInGallery) {
+          orphans.push(f.name);
+          continue;
         }
-      });
-      deletedUploadsCount = deleteRes.count;
+
+        if (size > 1024 && (isReferencedInDb || isInGallery)) {
+          const mime = f.metadata?.mimetype || 'unknown';
+          const key = `${size}_${mime}`;
+          if (!sizeGroups[key]) sizeGroups[key] = [];
+          sizeGroups[key].push(f);
+        }
+      }
+
+      // Delete orphans
+      if (orphans.length > 0) {
+        for (let i = 0; i < orphans.length; i += 100) {
+          await deleteFromSupabaseStorage(orphans.slice(i, i + 100));
+        }
+        deletedUploadsCount += orphans.length;
+      }
+
+      // Deduplicate
+      const duplicatesToDelete = [];
+      const renameMap = {};
+      for (const [key, files] of Object.entries(sizeGroups)) {
+        if (files.length > 1) {
+          files.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          const root = files[0];
+          const dups = files.slice(1);
+          for (const dup of dups) {
+            duplicatesToDelete.push(dup.name);
+            renameMap[dup.name] = root.name;
+          }
+        }
+      }
+
+      if (duplicatesToDelete.length > 0) {
+        for (const [dupName, rootName] of Object.entries(renameMap)) {
+          const dupUrl = `/api/uploads/${dupName}`;
+          const rootUrl = `/api/uploads/${rootName}`;
+          await prisma.message.updateMany({ where: { mediaUrl: dupUrl }, data: { mediaUrl: rootUrl } });
+          await prisma.contact.updateMany({ where: { avatarUrl: dupUrl }, data: { avatarUrl: rootUrl } });
+          await prisma.product.updateMany({ where: { imageUrl: dupUrl }, data: { imageUrl: rootUrl } });
+        }
+        await prisma.upload.deleteMany({ where: { filename: { in: duplicatesToDelete } } });
+        for (let i = 0; i < duplicatesToDelete.length; i += 100) {
+          await deleteFromSupabaseStorage(duplicatesToDelete.slice(i, i + 100));
+        }
+        deletedUploadsCount += duplicatesToDelete.length;
+      }
+    } catch (cleanErr) {
+      console.error('Error during deep cleanup in cron:', cleanErr);
     }
 
     // 5. Clean logs older than 15 days

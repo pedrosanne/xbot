@@ -11,12 +11,66 @@ export default function GalleryPage() {
   const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
   const [copiedFilename, setCopiedFilename] = useState('');
   
+  const [healthStats, setHealthStats] = useState(null);
+  const [loadingHealth, setLoadingHealth] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+
   // Preview modal states
   const [previewMedia, setPreviewMedia] = useState(null); // { filename, mimeType }
 
   useEffect(() => {
-    fetchUploads();
+    if (activeTab === 'health') {
+      fetchHealth();
+    } else {
+      fetchUploads();
+    }
   }, [activeTab]);
+
+  async function fetchHealth() {
+    setLoadingHealth(true);
+    setStatusMsg({ type: '', text: '' });
+    try {
+      const res = await fetch('/api/media/health');
+      if (res.ok) {
+        const data = await res.json();
+        setHealthStats(data.stats);
+      } else {
+        const err = await res.json();
+        setStatusMsg({ type: 'error', text: err.error || 'Erro ao carregar saúde do banco.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setStatusMsg({ type: 'error', text: 'Erro ao conectar com o servidor.' });
+    } finally {
+      setLoadingHealth(false);
+    }
+  }
+
+  const handleCleanup = async (actionType) => {
+    if (!confirm('🚨 Tem certeza? Esta ação apagará arquivos permanentemente do servidor.')) return;
+    setCleaning(true);
+    setStatusMsg({ type: '', text: '' });
+    try {
+      const res = await fetch('/api/media/cleanup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: actionType })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStatusMsg({ type: 'success', text: `Limpeza concluída! ${data.deletedCount} arquivos apagados.` });
+        fetchHealth(); // Reload
+      } else {
+        const err = await res.json();
+        setStatusMsg({ type: 'error', text: err.error || 'Erro ao executar limpeza.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setStatusMsg({ type: 'error', text: 'Erro ao conectar com o servidor.' });
+    } finally {
+      setCleaning(false);
+    }
+  };
 
   // Fetch uploads from API
   async function fetchUploads() {
@@ -295,7 +349,8 @@ export default function GalleryPage() {
             { key: 'image', label: 'Imagens' },
             { key: 'video', label: 'Vídeos' },
             { key: 'audio', label: 'Áudios' },
-            { key: 'document', label: 'Documentos' }
+            { key: 'document', label: 'Documentos' },
+            { key: 'health', label: 'Saúde do Banco' }
           ].map((tab) => (
             <button
               key={tab.key}
@@ -336,7 +391,86 @@ export default function GalleryPage() {
         </div>
       </div>
 
-      {/* Media Grid */}
+      {/* Content Area */}
+      {activeTab === 'health' ? (
+        <div className="glass-panel" style={{ padding: '24px', borderRadius: '12px', border: '1px solid var(--border-glass)' }}>
+          <h2 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>📊</span> Saúde do Armazenamento de Mídias
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+            Esta área monitora o consumo do bucket de mídias no Supabase. Mídias duplicadas (arquivos idênticos enviados várias vezes) e arquivos órfãos (que não estão em uso) podem ser limpos para economizar espaço e custos.
+          </p>
+
+          {loadingHealth ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+              Analisando banco de dados e arquivos de mídia... Isso pode levar alguns segundos.
+            </div>
+          ) : healthStats ? (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                <div className="glass-card" style={{ padding: '20px', borderRadius: '12px', textAlign: 'center', borderLeft: '4px solid #3b82f6' }}>
+                  <h4 style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Total Consumido</h4>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 600 }}>{(healthStats.totalSize / (1024 * 1024)).toFixed(2)} MB</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{healthStats.totalCount} arquivos</div>
+                </div>
+                
+                <div className="glass-card" style={{ padding: '20px', borderRadius: '12px', textAlign: 'center', borderLeft: '4px solid #10b981' }}>
+                  <h4 style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Mídias Úteis (Raízes)</h4>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 600 }}>{(healthStats.rootSize / (1024 * 1024)).toFixed(2)} MB</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{healthStats.rootCount} arquivos</div>
+                </div>
+
+                <div className="glass-card" style={{ padding: '20px', borderRadius: '12px', textAlign: 'center', borderLeft: '4px solid #f59e0b' }}>
+                  <h4 style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Duplicatas (Desperdício)</h4>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 600, color: '#f59e0b' }}>{(healthStats.duplicateSize / (1024 * 1024)).toFixed(2)} MB</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{healthStats.duplicateCount} arquivos</div>
+                </div>
+
+                <div className="glass-card" style={{ padding: '20px', borderRadius: '12px', textAlign: 'center', borderLeft: '4px solid #ef4444' }}>
+                  <h4 style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Arquivos Órfãos (Lixo)</h4>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 600, color: '#ef4444' }}>{(healthStats.orphanSize / (1024 * 1024)).toFixed(2)} MB</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{healthStats.orphanCount} arquivos</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '32px' }}>
+                <div style={{ flex: 1, minWidth: '300px', padding: '16px', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <h3 style={{ fontSize: '1rem', marginBottom: '8px', color: '#f87171' }}>Limpar Órfãos</h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                    Remove fisicamente os arquivos que não estão sendo usados em lugar nenhum do sistema.
+                  </p>
+                  <button 
+                    onClick={() => handleCleanup('clean_orphans')} 
+                    disabled={cleaning || healthStats.orphanCount === 0}
+                    className="btn btn-secondary"
+                    style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}
+                  >
+                    {cleaning ? 'Limpando...' : `Apagar ${healthStats.orphanCount} arquivos órfãos`}
+                  </button>
+                </div>
+
+                <div style={{ flex: 1, minWidth: '300px', padding: '16px', background: 'rgba(245, 158, 11, 0.05)', borderRadius: '12px', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <h3 style={{ fontSize: '1rem', marginBottom: '8px', color: '#fbbf24' }}>Resolver Duplicatas</h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                    Mescla arquivos idênticos, redirecionando o banco de dados para a cópia mais antiga e deletando o resto para poupar espaço.
+                  </p>
+                  <button 
+                    onClick={() => handleCleanup('deduplicate')} 
+                    disabled={cleaning || healthStats.duplicateCount === 0}
+                    className="btn btn-secondary"
+                    style={{ borderColor: 'rgba(245,158,11,0.4)', color: '#fbbf24' }}
+                  >
+                    {cleaning ? 'Resolvendo...' : `Mesclar e Apagar ${healthStats.duplicateCount} duplicatas`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: '#ef4444' }}>Não foi possível carregar as métricas.</div>
+          )}
+        </div>
+      ) : (
+      <>
       {fetching ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
           <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Buscando arquivos na galeria...</span>
@@ -598,6 +732,8 @@ export default function GalleryPage() {
             );
           })}
         </div>
+      )}
+      </>
       )}
 
       {/* Lightbox / Preview Modal Overlay */}
