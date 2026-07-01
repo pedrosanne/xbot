@@ -11,6 +11,13 @@ export function playSynthesizedSound(type) {
   if (!AudioContext) return;
   
   try {
+    // If the sound type is a custom URL (uploaded file), play it directly
+    if (type && (type.startsWith('http://') || type.startsWith('https://') || type.startsWith('/api/uploads/'))) {
+      const customAudio = new Audio(type);
+      customAudio.play().catch(e => console.error("Error playing custom audio from URL:", e));
+      return;
+    }
+
     const ctx = new AudioContext();
     const now = ctx.currentTime;
     

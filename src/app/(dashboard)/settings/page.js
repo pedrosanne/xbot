@@ -19,6 +19,93 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+const PushCategoryEditor = ({
+  categoryName,
+  titlePlaceholder,
+  bodyPlaceholder,
+  titleVal,
+  setTitleVal,
+  bodyVal,
+  setBodyVal,
+  soundVal,
+  setSoundVal,
+  handleAudioUpload
+}) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '24px', marginBottom: '24px' }}>
+    <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-primary-hover)' }}>{categoryName}</h4>
+    
+    <div className="form-group" style={{ margin: 0 }}>
+      <label className="form-label">Formato do Título</label>
+      <input
+        type="text"
+        value={titleVal}
+        onChange={(e) => setTitleVal(e.target.value)}
+        className="form-input"
+        style={{ padding: '8px' }}
+      />
+      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
+        {titlePlaceholder}
+      </span>
+    </div>
+    
+    <div className="form-group" style={{ margin: 0 }}>
+      <label className="form-label">Formato da Mensagem</label>
+      <input
+        type="text"
+        value={bodyVal}
+        onChange={(e) => setBodyVal(e.target.value)}
+        className="form-input"
+        style={{ padding: '8px' }}
+      />
+      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
+        {bodyPlaceholder}
+      </span>
+    </div>
+    
+    <div className="form-group" style={{ margin: 0 }}>
+      <label className="form-label">Efeito Sonoro (PWA)</label>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <select
+          value={soundVal}
+          onChange={(e) => setSoundVal(e.target.value)}
+          className="form-input"
+          style={{ padding: '8px', flex: 1, minWidth: '200px' }}
+        >
+          <option value="default">Padrão (Beep duplo suave)</option>
+          <option value="message">Sino / Chime Agradável (Mensagem)</option>
+          <option value="sale">Venda (Caixa Registradora / Cha-Ching)</option>
+          {(soundVal.startsWith('http') || soundVal.startsWith('/api')) ? <option value={soundVal}>Áudio Customizado 🎵</option> : null}
+        </select>
+        
+        <label className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem', cursor: 'pointer' }}>
+          Upload Áudio ⬆️
+          <input 
+            type="file" 
+            accept="audio/*" 
+            style={{ display: 'none' }} 
+            onChange={(e) => handleAudioUpload(e, setSoundVal)} 
+          />
+        </label>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({ type: 'PLAY_SOUND', soundType: soundVal });
+            } else {
+              import('@/lib/audioSynth').then(m => m.playSynthesizedSound(soundVal));
+            }
+          }}
+          className="btn btn-secondary"
+          style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+        >
+          Ouvir 🔊
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 export default function SettingsPage() {
   // Configs
   const [whatsappToken, setWhatsappToken] = useState('');
@@ -55,9 +142,21 @@ export default function SettingsPage() {
   const [subLoading, setSubLoading] = useState(false);
   
   // Push Customization Options
-  const [pushNotificationTitle, setPushNotificationTitle] = useState('Atendimento Manual: {nome} 💬');
-  const [pushNotificationBody, setPushNotificationBody] = useState('{mensagem}');
-  const [pushNotificationSound, setPushNotificationSound] = useState('default');
+  const [pushTitleManual, setPushTitleManual] = useState('Atendimento Manual: {nome} 💬');
+  const [pushBodyManual, setPushBodyManual] = useState('{mensagem}');
+  const [pushSoundManual, setPushSoundManual] = useState('default');
+
+  const [pushTitleSale, setPushTitleSale] = useState('Venda Aprovada! 🎉');
+  const [pushBodySale, setPushBodySale] = useState('R$ {valor} - {nome}');
+  const [pushSoundSale, setPushSoundSale] = useState('sale');
+
+  const [pushTitleAlert, setPushTitleAlert] = useState('Alerta do Sistema ⚠️');
+  const [pushBodyAlert, setPushBodyAlert] = useState('{mensagem}');
+  const [pushSoundAlert, setPushSoundAlert] = useState('default');
+
+  const [pushTitleLead, setPushTitleLead] = useState('Ação Necessária: {nome} 👤');
+  const [pushBodyLead, setPushBodyLead] = useState('{mensagem}');
+  const [pushSoundLead, setPushSoundLead] = useState('message');
 
   // Test Push Customization
   const [testTitle, setTestTitle] = useState('Mensagem do Xbot ⚡');
@@ -77,9 +176,22 @@ export default function SettingsPage() {
         setElevenLabsVoiceId(data.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM');
         setVapidPublicKey(data.vapidPublicKey || '');
         setVapidPrivateKey(data.vapidPrivateKey || '');
-        setPushNotificationTitle(data.pushNotificationTitle || 'Atendimento Manual: {nome} 💬');
-        setPushNotificationBody(data.pushNotificationBody || '{mensagem}');
-        setPushNotificationSound(data.pushNotificationSound || 'default');
+        
+        setPushTitleManual(data.pushTitleManual || 'Atendimento Manual: {nome} 💬');
+        setPushBodyManual(data.pushBodyManual || '{mensagem}');
+        setPushSoundManual(data.pushSoundManual || 'default');
+        
+        setPushTitleSale(data.pushTitleSale || 'Venda Aprovada! 🎉');
+        setPushBodySale(data.pushBodySale || 'R$ {valor} - {nome}');
+        setPushSoundSale(data.pushSoundSale || 'sale');
+        
+        setPushTitleAlert(data.pushTitleAlert || 'Alerta do Sistema ⚠️');
+        setPushBodyAlert(data.pushBodyAlert || '{mensagem}');
+        setPushSoundAlert(data.pushSoundAlert || 'default');
+        
+        setPushTitleLead(data.pushTitleLead || 'Ação Necessária: {nome} 👤');
+        setPushBodyLead(data.pushBodyLead || '{mensagem}');
+        setPushSoundLead(data.pushSoundLead || 'message');
       }
     } catch (err) {
       console.error('Error fetching settings:', err);
@@ -132,9 +244,18 @@ export default function SettingsPage() {
           elevenLabsVoiceId,
           vapidPublicKey,
           vapidPrivateKey,
-          pushNotificationTitle,
-          pushNotificationBody,
-          pushNotificationSound
+          pushTitleManual,
+          pushBodyManual,
+          pushSoundManual,
+          pushTitleSale,
+          pushBodySale,
+          pushSoundSale,
+          pushTitleAlert,
+          pushBodyAlert,
+          pushSoundAlert,
+          pushTitleLead,
+          pushBodyLead,
+          pushSoundLead
         })
       });
 
@@ -281,6 +402,38 @@ export default function SettingsPage() {
     } catch (err) {
       console.error('Error sending test push:', err);
       setStatusMsg({ type: 'error', text: 'Falha ao conectar na API de envio de teste.' });
+    }
+  };
+
+  const handleAudioUpload = async (e, setSoundState) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('audio/')) {
+      alert("Por favor, selecione um arquivo de áudio (.mp3, .ogg, .wav).");
+      return;
+    }
+
+    try {
+      setStatusMsg({ type: '', text: 'Fazendo upload do áudio...' });
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await fetch('/api/uploads?category=audio', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setSoundState(data.url);
+        setStatusMsg({ type: 'success', text: 'Upload concluído! Salve as configurações.' });
+      } else {
+        setStatusMsg({ type: 'error', text: data.error || 'Erro no upload.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setStatusMsg({ type: 'error', text: 'Falha na conexão ao fazer upload.' });
     }
   };
 
@@ -638,67 +791,47 @@ export default function SettingsPage() {
               </div>
             </div>
             {/* Push Notification Customization */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '24px', marginBottom: '24px' }}>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Personalização das Notificações Push</h4>
-              
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Formato do Título</label>
-                <input
-                  type="text"
-                  value={pushNotificationTitle}
-                  onChange={(e) => setPushNotificationTitle(e.target.value)}
-                  className="form-input"
-                  style={{ padding: '8px' }}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
-                  Use <code>{'{nome}'}</code> para o nome do contato. Padrão: <code>Atendimento Manual: {'{nome}'} 💬</code>
-                </span>
-              </div>
-              
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Formato da Mensagem</label>
-                <input
-                  type="text"
-                  value={pushNotificationBody}
-                  onChange={(e) => setPushNotificationBody(e.target.value)}
-                  className="form-input"
-                  style={{ padding: '8px' }}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
-                  Use <code>{'{mensagem}'}</code> para o conteúdo. Padrão: <code>{'{mensagem}'}</code>
-                </span>
-              </div>
-              
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Efeito Sonoro (PWA)</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <select
-                    value={pushNotificationSound}
-                    onChange={(e) => setPushNotificationSound(e.target.value)}
-                    className="form-input"
-                    style={{ padding: '8px', flex: 1 }}
-                  >
-                    <option value="default">Padrão (Beep duplo suave)</option>
-                    <option value="message">Sino / Chime Agradável (Mensagem)</option>
-                    <option value="sale">Venda (Caixa Registradora / Cha-Ching)</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) {
-                        navigator.serviceWorker.controller.postMessage({ type: 'PLAY_SOUND', soundType: pushNotificationSound });
-                      } else {
-                        import('@/lib/audioSynth').then(m => m.playSynthesizedSound(pushNotificationSound));
-                      }
-                    }}
-                    className="btn btn-secondary"
-                    style={{ padding: '8px 12px', fontSize: '0.8rem' }}
-                  >
-                    Ouvir 🔊
-                  </button>
-                </div>
-              </div>
-            </div>
+            <h4 style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '24px' }}>Categorias de Notificações</h4>
+            
+            <PushCategoryEditor 
+              categoryName="1. Atendimento Manual"
+              titlePlaceholder="Use {'{nome}'} para o nome do contato."
+              bodyPlaceholder="Use {'{mensagem}'} para o conteúdo."
+              titleVal={pushTitleManual} setTitleVal={setPushTitleManual}
+              bodyVal={pushBodyManual} setBodyVal={setPushBodyManual}
+              soundVal={pushSoundManual} setSoundVal={setPushSoundManual}
+              handleAudioUpload={handleAudioUpload}
+            />
+
+            <PushCategoryEditor 
+              categoryName="2. Venda Aprovada (Pix)"
+              titlePlaceholder="Ex: Venda Aprovada! 🎉"
+              bodyPlaceholder="Use {'{valor}'} e {'{nome}'}."
+              titleVal={pushTitleSale} setTitleVal={setPushTitleSale}
+              bodyVal={pushBodySale} setBodyVal={setPushBodySale}
+              soundVal={pushSoundSale} setSoundVal={setPushSoundSale}
+              handleAudioUpload={handleAudioUpload}
+            />
+
+            <PushCategoryEditor 
+              categoryName="3. Alertas do Sistema"
+              titlePlaceholder="Ex: Alerta do Sistema ⚠️"
+              bodyPlaceholder="Use {'{mensagem}'} para o erro/alerta."
+              titleVal={pushTitleAlert} setTitleVal={setPushTitleAlert}
+              bodyVal={pushBodyAlert} setBodyVal={setPushBodyAlert}
+              soundVal={pushSoundAlert} setSoundVal={setPushSoundAlert}
+              handleAudioUpload={handleAudioUpload}
+            />
+
+            <PushCategoryEditor 
+              categoryName="4. Ações do Lead (Aguardando / Humano Solicitado)"
+              titlePlaceholder="Ex: Ação Necessária: {'{nome}'} 👤"
+              bodyPlaceholder="Use {'{mensagem}'} para o motivo."
+              titleVal={pushTitleLead} setTitleVal={setPushTitleLead}
+              bodyVal={pushBodyLead} setBodyVal={setPushBodyLead}
+              soundVal={pushSoundLead} setSoundVal={setPushSoundLead}
+              handleAudioUpload={handleAudioUpload}
+            />
 
             {/* Push Test Box */}
             <div>

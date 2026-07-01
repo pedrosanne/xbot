@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { logToDb } from '@/lib/log';
 import { sendText } from '@/lib/whatsapp';
 import { sendPushNotification } from '@/lib/push';
+import { getSystemSettings } from '@/lib/settings';
 import { sendMetaCapiPurchase } from '@/lib/capi';
 import { startFlowForContact, tagContactForPayment } from '@/lib/queue';
 
@@ -116,12 +117,20 @@ export async function POST(request) {
     // d. Dispatch push notifications to collaborators
     try {
       const contactName = contact.name || contact.profileName || contact.id;
-      const title = `Venda Manual Confirmada! 💰`;
-      const body = `O lead ${contactName} realizou um Pix Direto CNPJ de R$ ${parseFloat(amount).toFixed(2).replace('.', ',')}.`;
+      const settings = await getSystemSettings();
+      const titleFormat = settings.pushTitleSale || 'Venda Aprovada! 🎉';
+      const bodyFormat = settings.pushBodySale || 'R$ {valor} - {nome}';
+      const soundFormat = settings.pushSoundSale || 'sale';
+      
+      const finalTitle = titleFormat.replace('{nome}', contactName);
+      const finalBody = bodyFormat
+        .replace('{nome}', contactName)
+        .replace('{valor}', parseFloat(amount).toFixed(2).replace('.', ','));
+
       const url = `/chat?contactId=${contact.id}`;
       const targetUserIds = contact.assignedUserId ? [contact.assignedUserId] : null;
       
-      await sendPushNotification(title, body, url, targetUserIds, 'sale');
+      await sendPushNotification(finalTitle, finalBody, url, targetUserIds, soundFormat);
     } catch (pushError) {
       console.error('Error sending manual payment push notification:', pushError);
     }

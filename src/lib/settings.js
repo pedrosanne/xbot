@@ -30,9 +30,18 @@ export async function getSystemSettings() {
           vapiPhoneNumberId: '',
           vapiAssistantId: '',
           publicBaseUrl: '',
-          pushNotificationTitle: 'Atendimento Manual: {nome} 💬',
-          pushNotificationBody: '{mensagem}',
-          pushNotificationSound: 'default',
+          pushTitleManual: 'Atendimento Manual: {nome} 💬',
+          pushBodyManual: '{mensagem}',
+          pushSoundManual: 'default',
+          pushTitleSale: 'Venda Aprovada! 🎉',
+          pushBodySale: 'R$ {valor} - {nome}',
+          pushSoundSale: 'sale',
+          pushTitleAlert: 'Alerta do Sistema ⚠️',
+          pushBodyAlert: '{mensagem}',
+          pushSoundAlert: 'default',
+          pushTitleLead: 'Ação Necessária: {nome} 👤',
+          pushBodyLead: '{mensagem}',
+          pushSoundLead: 'message',
           globalPixelId: ''
         }
       });

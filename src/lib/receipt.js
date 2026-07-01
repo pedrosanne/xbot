@@ -279,12 +279,18 @@ export async function processPixReceiptPayment(contact, receiptData, mockMode = 
     // c. Dispatch push notification
     try {
       const contactName = contact.name || contact.profileName || contact.id;
-      const title = mockMode ? `Pix via IA (Simulado)! 🤖💰` : `Pix Automático via IA! 🤖💰`;
-      const body = mockMode
-        ? `O lead ${contactName} enviou o comprovante e a IA aprovou o Pix de R$ ${payment.amount.toFixed(2).replace('.', ',')} (Sem verificação MP).`
-        : `O lead ${contactName} enviou o comprovante e a IA identificou o Pix de R$ ${payment.amount.toFixed(2).replace('.', ',')} no Mercado Pago.`;
+      const settings = await getSystemSettings();
+      const titleFormat = settings.pushTitleSale || 'Venda Aprovada! 🎉';
+      const bodyFormat = settings.pushBodySale || 'R$ {valor} - {nome}';
+      const soundFormat = settings.pushSoundSale || 'sale';
+      
+      const finalTitle = titleFormat.replace('{nome}', contactName);
+      const finalBody = bodyFormat
+        .replace('{nome}', contactName)
+        .replace('{valor}', payment.amount.toFixed(2).replace('.', ','));
+        
       const pushUrl = `/chat?contactId=${contact.id}`;
-      await sendPushNotification(title, body, pushUrl, null, 'sale');
+      await sendPushNotification(finalTitle, finalBody, pushUrl, null, soundFormat);
     } catch (pushError) {
       console.error('Error sending push for IA Pix:', pushError);
     }

@@ -186,9 +186,9 @@ export async function processSingleMessageWrapper(contactId, messageData) {
 
         const settings = await getCachedSettings();
         
-        const titleFormat = settings.pushNotificationTitle || 'Atendimento Manual: {nome} 💬';
-        const bodyFormat = settings.pushNotificationBody || '{mensagem}';
-        const soundFormat = settings.pushNotificationSound || 'default';
+        const titleFormat = settings.pushTitleManual || 'Atendimento Manual: {nome} 💬';
+        const bodyFormat = settings.pushBodyManual || '{mensagem}';
+        const soundFormat = settings.pushSoundManual || 'default';
         
         const finalTitle = titleFormat.replace('{nome}', contactName);
         const finalBody = bodyFormat.replace('{mensagem}', messageSnippet);
@@ -472,9 +472,17 @@ async function processSingleMessage(contact, messageData) {
             
             // Notify collaborators
             const contactName = freshContact.name || freshContact.profileName || contactId;
-            const title = `Comprovante Pix não localizado! ⚠️`;
-            const body = `O lead ${contactName} enviou comprovante de R$ ${receiptData.amount.toFixed(2).replace('.', ',')} mas não foi localizado no Mercado Pago.`;
-            await sendPushNotification(title, body, `/chat?contactId=${contactId}`, null, 'message');
+            const settings = await getCachedSettings();
+            
+            const titleFormat = settings.pushTitleAlert || 'Alerta do Sistema ⚠️';
+            const bodyFormat = settings.pushBodyAlert || '{mensagem}';
+            const soundFormat = settings.pushSoundAlert || 'default';
+            
+            const pushMsg = `O lead ${contactName} enviou comprovante de R$ ${receiptData.amount.toFixed(2).replace('.', ',')} mas não foi localizado no Mercado Pago.`;
+            const finalTitle = titleFormat.replace('{nome}', contactName);
+            const finalBody = bodyFormat.replace('{mensagem}', pushMsg);
+            
+            await sendPushNotification(finalTitle, finalBody, `/chat?contactId=${contactId}`, null, soundFormat);
           }
           
           return; // Terminate queue task, don't let bot send generic reply
@@ -567,13 +575,16 @@ async function processSingleMessage(contact, messageData) {
         return parts.length > 1 ? parts[1] : parts[0];
       }).join(', ');
 
-      await sendPushNotification(
-        `Cliente Recorrente: ${contactName} 👤`,
-        `Já passou por: ${flowNames} e retornou contato.`,
-        `/chat?contactId=${contactId}`,
-        targetUserIds,
-        'message'
-      );
+      const settings = await getCachedSettings();
+      const titleFormat = settings.pushTitleLead || 'Ação Necessária: {nome} 👤';
+      const bodyFormat = settings.pushBodyLead || '{mensagem}';
+      const soundFormat = settings.pushSoundLead || 'message';
+      
+      const pushMsg = `Já passou por: ${flowNames} e retornou contato.`;
+      const finalTitle = titleFormat.replace('{nome}', contactName);
+      const finalBody = bodyFormat.replace('{mensagem}', pushMsg);
+
+      await sendPushNotification(finalTitle, finalBody, `/chat?contactId=${contactId}`, targetUserIds, soundFormat);
 
       return;
     }
@@ -644,11 +655,17 @@ async function processSingleMessage(contact, messageData) {
 
               const contactName = freshContact.name || freshContact.profileName || contactId;
               const textSnippet = messageData.content || (messageData.type === 'document' ? 'PDF enviado' : 'Mídia enviada');
-              const pushTitle = `Aguardando Comprovante: ${contactName} ⏳`;
-              const pushBody = `[${alertReason}] ${textSnippet.length > 60 ? textSnippet.substring(0, 60) + '...' : textSnippet}`;
+              const settings = await getCachedSettings();
+              const titleFormat = settings.pushTitleLead || 'Ação Necessária: {nome} 👤';
+              const bodyFormat = settings.pushBodyLead || '{mensagem}';
+              const soundFormat = settings.pushSoundLead || 'message';
+              
+              const pushMsg = `[${alertReason}] ${textSnippet.length > 60 ? textSnippet.substring(0, 60) + '...' : textSnippet}`;
+              const finalTitle = titleFormat.replace('{nome}', contactName);
+              const finalBody = bodyFormat.replace('{mensagem}', pushMsg);
               
               await logToDb('INFO', 'FLOW', `Silenciando resposta automática para ${contactId} na etapa '${currentStep.id}' e notificando atendentes. Motivo: ${alertReason}`);
-              await sendPushNotification(pushTitle, pushBody, `/chat?contactId=${contactId}`, targetUserIds, 'message');
+              await sendPushNotification(finalTitle, finalBody, `/chat?contactId=${contactId}`, targetUserIds, soundFormat);
             };
 
             if (isMedia && messageData.mediaUrl) {
@@ -898,13 +915,16 @@ async function processSingleMessage(contact, messageData) {
                   ? (text.length > 60 ? text.substring(0, 60) + '...' : text) 
                   : 'Mensagem fora de contexto';
 
-                await sendPushNotification(
-                  `Mensagem fora de contexto: ${contactName} ⚠️`,
-                  `Mensagem: "${messageSnippet}" (Aguardando ação do colaborador)`,
-                  `/chat?contactId=${contactId}`,
-                  targetUserIds,
-                  'message'
-                );
+                const settings = await getCachedSettings();
+                const titleFormat = settings.pushTitleAlert || 'Alerta do Sistema ⚠️';
+                const bodyFormat = settings.pushBodyAlert || '{mensagem}';
+                const soundFormat = settings.pushSoundAlert || 'default';
+                
+                const pushMsg = `Mensagem fora de contexto: "${messageSnippet}"`;
+                const finalTitle = titleFormat.replace('{nome}', contactName);
+                const finalBody = bodyFormat.replace('{mensagem}', pushMsg);
+
+                await sendPushNotification(finalTitle, finalBody, `/chat?contactId=${contactId}`, targetUserIds, soundFormat);
               } catch (pushErr) {
                 console.error('Error sending invalid input push notification:', pushErr);
               }
@@ -1074,13 +1094,15 @@ async function processSingleMessage(contact, messageData) {
       ? (text.length > 60 ? text.substring(0, 60) + '...' : text) 
       : 'Mídia recebida';
 
-    await sendPushNotification(
-      `Novo Atendimento: ${contactName} 👤`,
-      messageSnippet,
-      `/chat?contactId=${contactId}`,
-      targetUserIds,
-      'message'
-    );
+    const settings = await getCachedSettings();
+    const titleFormat = settings.pushTitleManual || 'Atendimento Manual: {nome} 💬';
+    const bodyFormat = settings.pushBodyManual || '{mensagem}';
+    const soundFormat = settings.pushSoundManual || 'default';
+    
+    const finalTitle = titleFormat.replace('{nome}', contactName);
+    const finalBody = bodyFormat.replace('{mensagem}', messageSnippet);
+
+    await sendPushNotification(finalTitle, finalBody, `/chat?contactId=${contactId}`, targetUserIds, soundFormat);
 
   } catch (error) {
     await logToDb('ERROR', 'SYSTEM', `Erro crítico ao processar mensagem do contato ${contactId}: ${error.message}`, {
@@ -1734,13 +1756,16 @@ async function executeFlowOption(contact, flow, steps, option, groupedText, late
 
     // Envia notificação push para os operadores indicando o transbordo
     const contactName = contact.name || contact.profileName || contact.id;
-    await sendPushNotification(
-      `Solicitação de Atendimento: ${contactName} 👤`,
-      `Cliente solicitou atendimento humano no fluxo.`,
-      `/chat?contactId=${contact.id}`,
-      null,
-      'message'
-    );
+    const settings = await getCachedSettings();
+    const titleFormat = settings.pushTitleLead || 'Ação Necessária: {nome} 👤';
+    const bodyFormat = settings.pushBodyLead || '{mensagem}';
+    const soundFormat = settings.pushSoundLead || 'message';
+    
+    const pushMsg = `Cliente solicitou atendimento humano no fluxo.`;
+    const finalTitle = titleFormat.replace('{nome}', contactName);
+    const finalBody = bodyFormat.replace('{mensagem}', pushMsg);
+
+    await sendPushNotification(finalTitle, finalBody, `/chat?contactId=${contact.id}`, null, soundFormat);
   } else if (option.action === 'end_flow') {
     await logToDb('INFO', 'SYSTEM', `Finalizando fluxo para o contato ${contact.id}`);
     const endMessage = option.text || "Atendimento finalizado. Obrigado!";

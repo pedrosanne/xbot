@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { logToDb } from '@/lib/log';
 import { sendText } from '@/lib/whatsapp';
 import { sendPushNotification } from '@/lib/push';
+import { getSystemSettings } from '@/lib/settings';
 
 function normalizePhone(phone) {
   if (!phone) return null;
@@ -452,12 +453,20 @@ export async function POST(request, { params }) {
       // d. Dispatch push notifications to assigned collaborator or all
       try {
         const contactName = contact.name || contact.profileName || contact.id;
-        const title = `Pagamento Confirmado! 💰`;
-        const body = `O lead ${contactName} realizou um pagamento de R$ ${amount.toFixed(2).replace('.', ',')} via ${gateway.name}.`;
+        const settings = await getSystemSettings();
+        const titleFormat = settings.pushTitleSale || 'Venda Aprovada! 🎉';
+        const bodyFormat = settings.pushBodySale || 'R$ {valor} - {nome}';
+        const soundFormat = settings.pushSoundSale || 'sale';
+        
+        const finalTitle = titleFormat.replace('{nome}', contactName);
+        const finalBody = bodyFormat
+          .replace('{nome}', contactName)
+          .replace('{valor}', amount.toFixed(2).replace('.', ','));
+
         const url = `/chat?contactId=${contact.id}`;
         const targetUserIds = contact.assignedUserId ? [contact.assignedUserId] : null;
         
-        await sendPushNotification(title, body, url, targetUserIds, 'sale');
+        await sendPushNotification(finalTitle, finalBody, url, targetUserIds, soundFormat);
       } catch (pushError) {
         console.error('Error sending payment push notification:', pushError);
       }

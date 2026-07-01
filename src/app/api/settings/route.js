@@ -36,9 +36,18 @@ export async function POST(request) {
         globalPixelId: data.globalPixelId !== undefined ? data.globalPixelId : undefined,
         globalPixelToken: data.globalPixelToken !== undefined ? data.globalPixelToken : undefined,
         globalPixelTestCode: data.globalPixelTestCode !== undefined ? data.globalPixelTestCode : undefined,
-        pushNotificationTitle: data.pushNotificationTitle !== undefined ? data.pushNotificationTitle : undefined,
-        pushNotificationBody: data.pushNotificationBody !== undefined ? data.pushNotificationBody : undefined,
-        pushNotificationSound: data.pushNotificationSound !== undefined ? data.pushNotificationSound : undefined
+        pushTitleManual: data.pushTitleManual !== undefined ? data.pushTitleManual : undefined,
+        pushBodyManual: data.pushBodyManual !== undefined ? data.pushBodyManual : undefined,
+        pushSoundManual: data.pushSoundManual !== undefined ? data.pushSoundManual : undefined,
+        pushTitleSale: data.pushTitleSale !== undefined ? data.pushTitleSale : undefined,
+        pushBodySale: data.pushBodySale !== undefined ? data.pushBodySale : undefined,
+        pushSoundSale: data.pushSoundSale !== undefined ? data.pushSoundSale : undefined,
+        pushTitleAlert: data.pushTitleAlert !== undefined ? data.pushTitleAlert : undefined,
+        pushBodyAlert: data.pushBodyAlert !== undefined ? data.pushBodyAlert : undefined,
+        pushSoundAlert: data.pushSoundAlert !== undefined ? data.pushSoundAlert : undefined,
+        pushTitleLead: data.pushTitleLead !== undefined ? data.pushTitleLead : undefined,
+        pushBodyLead: data.pushBodyLead !== undefined ? data.pushBodyLead : undefined,
+        pushSoundLead: data.pushSoundLead !== undefined ? data.pushSoundLead : undefined
       }
     });
 
