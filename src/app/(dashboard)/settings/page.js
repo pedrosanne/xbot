@@ -159,8 +159,9 @@ export default function SettingsPage() {
   const [pushSoundLead, setPushSoundLead] = useState('message');
 
   // Test Push Customization
-  const [testTitle, setTestTitle] = useState('Mensagem do Xbot ⚡');
-  const [testBody, setTestBody] = useState('Uma nova mensagem precisa de atendimento humano no painel!');
+  const [testTitle, setTestTitle] = useState('Teste do Xbot ⚡');
+  const [testBody, setTestBody] = useState('Notificação PWA recebida!');
+  const [testSoundType, setTestSoundType] = useState('default');
 
   const fetchSettings = async () => {
     try {
@@ -387,7 +388,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/push/send-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: testTitle, body: testBody })
+        body: JSON.stringify({ title: testTitle, body: testBody, soundType: testSoundType })
       });
       const data = await res.json();
       if (res.ok) {
@@ -859,6 +860,19 @@ export default function SettingsPage() {
                     className="form-input"
                     style={{ padding: '8px' }}
                   />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Efeito Sonoro do Teste</label>
+                  <select
+                    value={testSoundType}
+                    onChange={(e) => setTestSoundType(e.target.value)}
+                    className="form-select"
+                    style={{ padding: '8px', width: '100%' }}
+                  >
+                    <option value="default">Padrão (Beep Curto)</option>
+                    <option value="message">Sino Alegre (Mensagem)</option>
+                    <option value="sale">Caixa Registradora (Venda/Pix)</option>
+                  </select>
                 </div>
               </div>
 

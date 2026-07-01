@@ -4,14 +4,18 @@ import { logToDb } from '@/lib/log';
 
 export async function POST(request) {
   try {
-    const { title, body } = await request.json();
+    const { title, body, soundType } = await request.json();
     
     await logToDb('INFO', 'API', 'Disparando notificação push de teste.');
     
+    const finalSound = soundType || 'default';
+
     const result = await sendPushNotification(
       title || 'Teste do Xbot ⚡',
       body || 'Sua notificação de teste nativa do PWA está funcionando perfeitamente!',
-      '/chat'
+      '/chat',
+      null,
+      finalSound
     );
 
     if (!result.success) {
