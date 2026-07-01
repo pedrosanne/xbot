@@ -42,7 +42,9 @@ export async function getSystemSettings() {
           pushTitleLead: 'Ação Necessária: {nome} 👤',
           pushBodyLead: '{mensagem}',
           pushSoundLead: 'message',
-          globalPixelId: ''
+          globalPixelId: '',
+          geminiPixPrompt: 'Analise o seguinte texto enviado por um cliente que quer fazer um pagamento e extraia o valor numérico em reais (BRL).\nResponda APENAS com o número decimal puro (ex: 150.00 ou 30.50), usando ponto como separador decimal.\nSe o texto não contiver nenhuma menção de valor ou quantidade financeira, responda EXATAMENTE "null" (sem aspas).\n\nTexto do cliente: "{texto}"',
+          geminiPixModel: 'gemini-2.5-flash'
         }
       });
     } catch (err) {

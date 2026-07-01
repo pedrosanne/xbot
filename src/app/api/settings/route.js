@@ -47,7 +47,9 @@ export async function POST(request) {
         pushSoundAlert: data.pushSoundAlert !== undefined ? data.pushSoundAlert : undefined,
         pushTitleLead: data.pushTitleLead !== undefined ? data.pushTitleLead : undefined,
         pushBodyLead: data.pushBodyLead !== undefined ? data.pushBodyLead : undefined,
-        pushSoundLead: data.pushSoundLead !== undefined ? data.pushSoundLead : undefined
+        pushSoundLead: data.pushSoundLead !== undefined ? data.pushSoundLead : undefined,
+        geminiPixPrompt: data.geminiPixPrompt !== undefined ? data.geminiPixPrompt : undefined,
+        geminiPixModel: data.geminiPixModel !== undefined ? data.geminiPixModel : undefined
       }
     });
 

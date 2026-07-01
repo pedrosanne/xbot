@@ -290,18 +290,20 @@ export async function extractAmountFromText(incomingText, customAgentId = null) 
       return null;
     }
 
-    const modelName = agent?.model === 'gemini-1.5-flash' || agent?.model === 'gemini-1.5-pro' 
-      ? 'gemini-2.5-flash' 
-      : (agent?.model || 'gemini-2.5-flash');
+    let modelName = settings.geminiPixModel || 'gemini-2.5-flash';
+    if (!agent?.model && agent) {
+        // Fallback for retro-compatibility if needed, but primary is global setting
+    }
 
     const genAI = new GoogleGenerativeAI(apiKeyToUse);
     const model = genAI.getGenerativeModel({ model: modelName });
 
-    const prompt = `Analise o seguinte texto enviado por um cliente que quer fazer um pagamento e extraia o valor numérico em reais (BRL).
-Responda APENAS com o número decimal puro (ex: 150.00 ou 30.50), usando ponto como separador decimal.
-Se o texto não contiver nenhuma menção de valor ou quantidade financeira, responda EXATAMENTE "null" (sem aspas).
-
-Texto do cliente: "${incomingText}"`;
+    let promptTemplate = settings.geminiPixPrompt || `Analise o seguinte texto enviado por um cliente que quer fazer um pagamento e extraia o valor numérico em reais (BRL).\nResponda APENAS com o número decimal puro (ex: 150.00 ou 30.50), usando ponto como separador decimal.\nSe o texto não contiver nenhuma menção de valor ou quantidade financeira, responda EXATAMENTE "null" (sem aspas).\n\nTexto do cliente: "{texto}"`;
+    
+    // Replace {texto} if present, or append it if the user forgot the placeholder
+    let prompt = promptTemplate.includes('{texto}') 
+        ? promptTemplate.replace('{texto}', incomingText) 
+        : `${promptTemplate}\n\nTexto do cliente: "${incomingText}"`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;

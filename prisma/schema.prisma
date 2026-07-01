@@ -41,6 +41,8 @@ model Setting {
   pushTitleLead       String   @default("Ação Necessária: {nome} 👤")
   pushTitleManual     String   @default("Atendimento Manual: {nome} 💬")
   pushTitleSale       String   @default("Venda Aprovada! 🎉")
+  geminiPixPrompt     String   @default("Analise o seguinte texto enviado por um cliente que quer fazer um pagamento e extraia o valor numérico em reais (BRL).\nResponda APENAS com o número decimal puro (ex: 150.00 ou 30.50), usando ponto como separador decimal.\nSe o texto não contiver nenhuma menção de valor ou quantidade financeira, responda EXATAMENTE \"null\" (sem aspas).\n\nTexto do cliente: \"{texto}\"")
+  geminiPixModel      String   @default("gemini-2.5-flash")
 }
 
 model Agent {
