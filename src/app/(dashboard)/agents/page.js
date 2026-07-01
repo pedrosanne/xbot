@@ -2178,21 +2178,32 @@ export default function AgentsPage() {
                   Ao ativar, o fluxo pausará nesta etapa até o cliente enviar uma imagem ou PDF de comprovante. A IA analisará e confirmará o Pix no Mercado Pago.
                 </p>
 
-                {selectedNode.waitPixReceipt && (
-                  <div style={{ marginTop: '12px', paddingLeft: '20px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Reação a mensagens que não são comprovante:</label>
-                    <select
-                      className="form-select"
-                      style={{ padding: '6px 10px', fontSize: '0.82rem', height: '34px', background: 'var(--bg-glass)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', width: '100%' }}
-                      value={selectedNode.waitPixReceiptBehavior || 'request_receipt'}
-                      onChange={(e) => updateNode(selectedNodeId, { waitPixReceiptBehavior: e.target.value })}
-                    >
-                      <option value="request_receipt" style={{ background: 'var(--bg-primary)' }}>💬 Responder pedindo comprovante</option>
-                      <option value="ignore_and_notify" style={{ background: 'var(--bg-primary)' }}>🤫 Ignorar bot e notificar atendente</option>
-                      <option value="approve_on_any_receipt" style={{ background: 'var(--bg-primary)' }}>🤖 Aprovar qualquer comprovante válido (Sem API)</option>
-                    </select>
-                  </div>
-                )}
+                <div style={{ marginTop: '12px', paddingLeft: '20px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: '600', color: selectedNode.waitPixReceipt ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', display: 'block', marginBottom: '4px' }}>
+                    Reação a mensagens que não são comprovante:
+                  </label>
+                  <select
+                    className="form-select"
+                    style={{ 
+                      padding: '6px 10px', 
+                      fontSize: '0.82rem', 
+                      height: '34px', 
+                      background: 'var(--bg-glass)', 
+                      color: selectedNode.waitPixReceipt ? 'var(--text-primary)' : 'rgba(255,255,255,0.25)', 
+                      border: '1px solid var(--border-glass)', 
+                      width: '100%',
+                      opacity: selectedNode.waitPixReceipt ? 1 : 0.4,
+                      pointerEvents: selectedNode.waitPixReceipt ? 'auto' : 'none'
+                    }}
+                    value={selectedNode.waitPixReceiptBehavior || 'request_receipt'}
+                    onChange={(e) => updateNode(selectedNodeId, { waitPixReceiptBehavior: e.target.value })}
+                    disabled={!selectedNode.waitPixReceipt}
+                  >
+                    <option value="request_receipt" style={{ background: 'var(--bg-primary)' }}>💬 Responder pedindo comprovante</option>
+                    <option value="ignore_and_notify" style={{ background: 'var(--bg-primary)' }}>🤫 Ignorar bot e notificar atendente</option>
+                    <option value="approve_on_any_receipt" style={{ background: 'var(--bg-primary)' }}>🤖 Aprovar qualquer comprovante válido (Sem API)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Buttons */}
