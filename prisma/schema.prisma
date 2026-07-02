@@ -471,6 +471,7 @@ model AiProvider {
   isActive    Boolean  @default(true)
   usageCount  Int      @default(0)
   errorCount  Int      @default(0)
+  dailyLimit  Int      @default(1500)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   usages      AiUsage[]

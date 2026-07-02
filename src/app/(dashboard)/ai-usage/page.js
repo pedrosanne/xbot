@@ -589,6 +589,21 @@ export default function AiUsagePage() {
                           </div>
                           
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ marginBottom: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Cota Diária Estimada</span>
+                                <span><strong style={{ color: p.metrics?.dailyUsage > (p.dailyLimit || 1500) * 0.9 ? '#ef4444' : '#10b981' }}>{p.metrics?.dailyUsage || 0}</strong> / {p.dailyLimit || 1500}</span>
+                              </div>
+                              <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ 
+                                  height: '100%', 
+                                  width: `${Math.min(100, ((p.metrics?.dailyUsage || 0) / (p.dailyLimit || 1500)) * 100)}%`,
+                                  background: ((p.metrics?.dailyUsage || 0) / (p.dailyLimit || 1500)) > 0.9 ? '#ef4444' : (((p.metrics?.dailyUsage || 0) / (p.dailyLimit || 1500)) > 0.7 ? '#f59e0b' : '#10b981'),
+                                  transition: 'width 0.3s ease'
+                                }}></div>
+                              </div>
+                            </div>
+                            
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Taxa de Sucesso</span>
                               <span style={{ color: successRate > 80 ? '#10b981' : (successRate > 50 ? '#f59e0b' : '#ef4444'), fontWeight: '600', fontSize: '0.9rem' }}>

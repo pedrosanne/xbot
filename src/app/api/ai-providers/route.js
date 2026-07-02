@@ -19,6 +19,10 @@ export async function GET() {
         ? p.usages.reduce((acc, u) => acc + (u.durationMs || 0), 0) / p.usages.length 
         : 0;
 
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const dailyUsage = p.usages.filter(u => new Date(u.timestamp) >= startOfDay).length;
+
       const { usages, ...rest } = p;
       return {
         ...rest,
@@ -26,7 +30,8 @@ export async function GET() {
         metrics: {
           totalCost,
           totalTokens,
-          avgDuration: Math.round(avgDuration)
+          avgDuration: Math.round(avgDuration),
+          dailyUsage
         }
       };
     });
