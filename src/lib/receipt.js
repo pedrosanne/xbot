@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { prisma } from './prisma';
 import { getSystemSettings } from './settings';
 import { logToDb } from './log';
@@ -12,26 +13,41 @@ import { sendMetaCapiPurchase } from './capi';
 export async function analyzePixReceipt(mediaUrl, mimeType) {
   try {
     const settings = await getSystemSettings();
-    // Fetch active agent to get its Gemini API key
-    const agent = await prisma.agent.findFirst({
-      where: { isActive: true }
-    });
-    
-    let apiKeyToUse = agent?.geminiApiKey || settings.geminiApiKey;
-    if (!apiKeyToUse) {
-      console.error('Gemini API key is not configured for Pix receipt analysis.');
-      return null;
+    const startTime = Date.now();
+    let lastError = null;
+
+    let keysToTry = [];
+    try {
+      const dbProviders = await prisma.aiProvider.findMany({
+        where: { isActive: true },
+        orderBy: { usageCount: 'asc' }
+      });
+      if (dbProviders && dbProviders.length > 0) {
+        keysToTry = dbProviders;
+      }
+    } catch (err) {}
+
+    // Fallback se não houver Contingência configurada, usa a chave do agente
+    if (keysToTry.length === 0) {
+      const agent = await prisma.agent.findFirst({
+        where: { isActive: true }
+      });
+      const apiKeyToUse = agent?.geminiApiKey || settings.geminiApiKey;
+      if (apiKeyToUse) {
+        keysToTry.push({
+          id: 'legacy',
+          name: 'Legacy Key',
+          provider: 'GEMINI',
+          key: apiKeyToUse,
+          model: agent?.model || 'gemini-2.5-flash'
+        });
+      }
     }
 
-    const genAI = new GoogleGenerativeAI(apiKeyToUse);
-    const modelName = agent?.model === 'gemini-1.5-flash' || agent?.model === 'gemini-1.5-pro' 
-      ? 'gemini-2.5-flash' 
-      : (agent?.model || 'gemini-2.5-flash');
-
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      generationConfig: { responseMimeType: 'application/json' }
-    });
+    if (keysToTry.length === 0) {
+      console.error('No AI keys configured for Pix receipt analysis.');
+      return null;
+    }
 
     let fileBuffer = null;
     if (mediaUrl.startsWith('/api/uploads/')) {
@@ -56,6 +72,10 @@ export async function analyzePixReceipt(mediaUrl, mimeType) {
       return null;
     }
 
+    const base64Data = fileBuffer.toString('base64');
+    const cleanMimeType = mimeType.split(';')[0].trim();
+    const isPdf = cleanMimeType === 'application/pdf';
+
     const prompt = `Analise o documento ou imagem em anexo. Ele é um comprovante de transferência, pagamento ou agendamento de Pix?
 Retorne um objeto JSON com o seguinte formato:
 {
@@ -67,29 +87,104 @@ Retorne um objeto JSON com o seguinte formato:
   "payerName": "o nome da pessoa que realizou o pagamento"
 }`;
 
-    const generativePart = {
-      inlineData: {
-        data: fileBuffer.toString('base64'),
-        mimeType: mimeType.split(';')[0].trim()
-      }
-    };
+    for (let i = 0; i < keysToTry.length; i++) {
+      const currentProvider = keysToTry[i];
+      const providerType = currentProvider.provider || 'GEMINI';
 
-    const result = await model.generateContent([prompt, generativePart]);
-    const responseText = (await result.response).text().trim();
-    
-    const data = JSON.parse(responseText);
-    await logToDb('INFO', 'AI', `Análise de comprovante concluída por Gemini. É Pix: ${data.isPixReceipt}, Valor: ${data.amount}, ID: ${data.transactionId}`);
-    return data;
-  } catch (err) {
-    console.error('Error analyzing Pix receipt with Gemini:', err);
-    try {
-      await logToDb('ERROR', 'AI', `Erro ao analisar comprovante Pix com Gemini: ${err.message}`, {
-        error: err.message,
-        stack: err.stack
-      });
-    } catch (logErr) {
-      console.error('Failed to log receipt analysis error to DB:', logErr);
+      // Pula OpenAI se for PDF, pois a OpenAI Vision via API direta não suporta PDF nativamente em mensagens base64.
+      if (isPdf && providerType !== 'GEMINI') continue;
+      
+      // Pula DeepSeek pois não suporta visão ainda.
+      if (providerType === 'DEEPSEEK') continue;
+
+      try {
+        let textResponse = '';
+        let totalTokens = 0;
+        let estimatedCost = 0;
+
+        if (providerType === 'GEMINI') {
+           const genAI = new GoogleGenerativeAI(currentProvider.key);
+           const model = genAI.getGenerativeModel({
+             model: currentProvider.model || 'gemini-2.5-flash',
+             generationConfig: { responseMimeType: 'application/json' }
+           });
+           
+           const generativePart = {
+             inlineData: { data: base64Data, mimeType: cleanMimeType }
+           };
+           
+           const result = await model.generateContent([prompt, generativePart]);
+           const response = await result.response;
+           textResponse = response.text().trim();
+           
+           totalTokens = response.usageMetadata?.totalTokenCount || 0;
+           estimatedCost = (totalTokens / 1000000) * 0.15;
+           
+        } else if (providerType === 'OPENAI') {
+           const openai = new OpenAI({ apiKey: currentProvider.key });
+           const completion = await openai.chat.completions.create({
+             model: currentProvider.model || 'gpt-4o-mini',
+             response_format: { type: 'json_object' },
+             messages: [
+               {
+                 role: 'user',
+                 content: [
+                   { type: 'text', text: prompt },
+                   { type: 'image_url', image_url: { url: `data:${cleanMimeType};base64,${base64Data}` } }
+                 ]
+               }
+             ]
+           });
+           textResponse = completion.choices[0].message.content.trim();
+           totalTokens = completion.usage?.total_tokens || 0;
+           estimatedCost = (totalTokens / 1000000) * 0.15;
+        }
+
+        const durationMs = Date.now() - startTime;
+        
+        // Log Success & increment usage
+        if (currentProvider.id !== 'legacy') {
+          await prisma.aiProvider.update({
+             where: { id: currentProvider.id },
+             data: { usageCount: { increment: 1 } }
+          });
+          try {
+             await prisma.aiUsage.create({
+                data: {
+                  provider: providerType,
+                  model: currentProvider.model || 'unknown',
+                  action: 'analyzePixReceipt',
+                  tokens: totalTokens,
+                  cost: estimatedCost,
+                  status: 'SUCCESS',
+                  durationMs,
+                  providerId: currentProvider.id
+                }
+             });
+          } catch(e){}
+        }
+
+        const data = JSON.parse(textResponse);
+        await logToDb('INFO', 'AI', `Análise de comprovante concluída por ${providerType}. É Pix: ${data.isPixReceipt}, Valor: ${data.amount}, ID: ${data.transactionId}`);
+        return data;
+      } catch (err) {
+        console.error(`AI Provider [${currentProvider.name || 'Legacy'}] failed on analyzePixReceipt:`, err.message);
+        lastError = err.message;
+        if (currentProvider.id !== 'legacy') {
+           await prisma.aiProvider.update({
+             where: { id: currentProvider.id },
+             data: { usageCount: { increment: 1 }, errorCount: { increment: 1 } }
+           });
+        }
+        // Tentará o próximo provedor no loop (Contingência)
+      }
     }
+
+    // Se todos falharam
+    await logToDb('ERROR', 'AI', `Erro ao analisar comprovante Pix: Todos os provedores do Pool falharam. Último erro: ${lastError}`);
+    return null;
+  } catch (err) {
+    console.error('Error analyzing Pix receipt:', err);
     return null;
   }
 }
