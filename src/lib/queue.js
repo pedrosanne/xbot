@@ -675,7 +675,24 @@ async function processSingleMessage(contact, messageData) {
               // Sempre analisa o comprovante com a IA para obter o valor, independentemente do modo
               const receiptData = await analyzePixReceipt(messageData.mediaUrl, mimeType);
               
-              if (receiptData && receiptData.isPixReceipt) {
+              if (receiptData === null) {
+                // Erro na IA (rate limit, fora do ar, cota excedida)
+                if (activeBehavior === 'ignore_and_notify') {
+                  await notifyHumanTeam('Falha na IA ao analisar mídia (comprovante)');
+                  return;
+                }
+
+                const aiErrorMsg = "Tivemos uma instabilidade momentânea no sistema automático de leitura. Já acionei nossa equipe humana, e eles farão a liberação manual do seu acesso em instantes! ⏳";
+                await sendText(contactId, aiErrorMsg, messageData.id, freshContact.connection);
+                await saveOutgoingMessage(`bot_${Date.now()}_ai_fail`, contactId, 'text', '', aiErrorMsg);
+                
+                await prisma.contact.update({
+                  where: { id: contactId },
+                  data: { status: 'MANUAL' }
+                });
+                await notifyHumanTeam('Falha técnica da IA ao ler comprovante enviado. Assuma o atendimento.');
+                return;
+              } else if (receiptData.isPixReceipt) {
                 // Se NÃO for aprovação rápida (sem API), rejeita agendamentos antes de chamar o Mercado Pago
                 if (behavior !== 'approve_on_any_receipt' && receiptData.isScheduled) {
                   const warningMsg = `Identifiquei que este é um AGENDAMENTO de Pix de R$ ${receiptData.amount.toFixed(2).replace('.', ',')}, e não o pagamento final. Por favor, envie o comprovante de pagamento definitivo para que eu possa liberar seu acesso! ⚠️`;
