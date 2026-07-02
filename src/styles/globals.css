@@ -1227,6 +1227,7 @@ input:checked + .slider:before {
   overflow: hidden;
   background: rgba(4, 5, 8, 0.6);
   transition: var(--transition-smooth);
+  min-width: 0;
 }
 
 .chat-header {
@@ -2519,6 +2520,9 @@ input:checked + .slider:before {
   background-color: transparent;
   scrollbar-width: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .quick-replies-bar::-webkit-scrollbar {
