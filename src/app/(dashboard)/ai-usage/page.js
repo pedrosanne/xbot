@@ -360,7 +360,7 @@ export default function AiUsagePage() {
                         className="form-control"
                         value={settings.geminiPixModel || 'gemini-2.5-flash'}
                         onChange={(e) => setSettings({...settings, geminiPixModel: e.target.value})}
-                        style={{ width: '100%' }}
+                        style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                       >
                         <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado, Rápido)</option>
                         <option value="gemini-2.5-pro">Gemini 2.5 Pro (Preciso, mais caro)</option>
@@ -373,7 +373,7 @@ export default function AiUsagePage() {
                         rows="8"
                         value={settings.geminiPixPrompt}
                         onChange={(e) => setSettings({...settings, geminiPixPrompt: e.target.value})}
-                        style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.9rem' }}
+                        style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.9rem', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                       />
                     </div>
                     <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Salvando...' : 'Salvar Prompt'}</button>
@@ -440,21 +440,21 @@ export default function AiUsagePage() {
                     <div className="form-group" style={{ marginBottom: '16px' }}>
                       <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Identificação (ex: Conta Marketing)</label>
                       <input 
-                        type="text" className="form-control" style={{ width: '100%' }}
+                        type="text" className="form-control" style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                         value={newProvider.name} onChange={e => setNewProvider({...newProvider, name: e.target.value})} required
                       />
                     </div>
                     <div className="form-group" style={{ marginBottom: '16px' }}>
                       <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>API Key</label>
                       <input 
-                        type="password" className="form-control" style={{ width: '100%' }}
+                        type="password" className="form-control" style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                         value={newProvider.apiKey} onChange={e => setNewProvider({...newProvider, apiKey: e.target.value})} required
                       />
                     </div>
                     <div className="form-group" style={{ marginBottom: '16px' }}>
                       <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Provedor</label>
                       <select 
-                        className="form-control" style={{ width: '100%' }}
+                        className="form-control" style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                         value={newProvider.provider} onChange={e => {
                           const provider = e.target.value;
                           let defaultModel = 'gemini-2.5-flash';
@@ -471,7 +471,7 @@ export default function AiUsagePage() {
                     <div className="form-group" style={{ marginBottom: '16px' }}>
                       <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Modelo Preferido</label>
                       <select 
-                        className="form-control" style={{ width: '100%' }}
+                        className="form-control" style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                         value={newProvider.model} onChange={e => setNewProvider({...newProvider, model: e.target.value})}
                       >
                         {newProvider.provider === 'GEMINI' && (
