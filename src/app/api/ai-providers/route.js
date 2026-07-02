@@ -4,13 +4,32 @@ import { prisma } from '@/lib/prisma';
 export async function GET() {
   try {
     const providers = await prisma.aiProvider.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        usages: {
+          select: { cost: true, tokens: true, durationMs: true }
+        }
+      }
     });
-    // Mask API keys for security
-    const masked = providers.map(p => ({
-      ...p,
-      apiKey: p.apiKey ? `${p.apiKey.substring(0, 4)}...${p.apiKey.substring(p.apiKey.length - 4)}` : ''
-    }));
+    // Mask API keys for security and calculate metrics
+    const masked = providers.map(p => {
+      const totalCost = p.usages.reduce((acc, u) => acc + (u.cost || 0), 0);
+      const totalTokens = p.usages.reduce((acc, u) => acc + (u.tokens || 0), 0);
+      const avgDuration = p.usages.length > 0 
+        ? p.usages.reduce((acc, u) => acc + (u.durationMs || 0), 0) / p.usages.length 
+        : 0;
+
+      const { usages, ...rest } = p;
+      return {
+        ...rest,
+        apiKey: p.apiKey ? `${p.apiKey.substring(0, 4)}...${p.apiKey.substring(p.apiKey.length - 4)}` : '',
+        metrics: {
+          totalCost,
+          totalTokens,
+          avgDuration: Math.round(avgDuration)
+        }
+      };
+    });
     return NextResponse.json(masked);
   } catch (error) {
     console.error('Error fetching AI providers:', error);

@@ -563,6 +563,63 @@ export default function AiUsagePage() {
                   </div>
                 </div>
               </div>
+
+              {/* Performance e Analytics por Provedor */}
+              <div className="glass-panel" style={{ padding: '24px', marginBottom: '32px' }}>
+                <h3 style={{ marginBottom: '20px', fontSize: '1.2rem', color: '#10b981' }}>Performance & Custo por Node</h3>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
+                  Análise detalhada do desempenho e durabilidade de cada chave configurada no seu Pool.
+                </p>
+
+                {providers.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)' }}>Sem dados para exibir.</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                    {providers.map(p => {
+                      const totalRequests = p.usageCount + p.errorCount;
+                      const successRate = totalRequests > 0 ? ((p.usageCount / totalRequests) * 100).toFixed(1) : 0;
+                      
+                      return (
+                        <div key={'metrics-'+p.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>{p.name}</span>
+                            <span style={{ fontSize: '0.75rem', background: 'rgba(139,92,246,0.15)', color: '#a78bfa', padding: '4px 8px', borderRadius: '4px' }}>
+                              {p.provider || 'GEMINI'}
+                            </span>
+                          </div>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Taxa de Sucesso</span>
+                              <span style={{ color: successRate > 80 ? '#10b981' : (successRate > 50 ? '#f59e0b' : '#ef4444'), fontWeight: '600', fontSize: '0.9rem' }}>
+                                {successRate}%
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Tokens Processados</span>
+                              <span style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '0.9rem' }}>
+                                {p.metrics?.totalTokens?.toLocaleString() || 0}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Custo Acumulado</span>
+                              <span style={{ color: '#10b981', fontWeight: '500', fontSize: '0.9rem' }}>
+                                ${(p.metrics?.totalCost || 0).toFixed(5)}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Latência Média</span>
+                              <span style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '0.9rem' }}>
+                                {p.metrics?.avgDuration || 0}ms
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </>
