@@ -693,12 +693,23 @@ async function processSingleMessage(contact, messageData) {
                 await notifyHumanTeam('Falha técnica da IA ao ler comprovante enviado. Assuma o atendimento.');
                 return;
               } else if (receiptData.isPixReceipt) {
-                // Se NÃO for aprovação rápida (sem API), rejeita agendamentos antes de chamar o Mercado Pago
-                if (behavior !== 'approve_on_any_receipt' && receiptData.isScheduled) {
-                  const warningMsg = `Identifiquei que este é um AGENDAMENTO de Pix de R$ ${receiptData.amount.toFixed(2).replace('.', ',')}, e não o pagamento final. Por favor, envie o comprovante de pagamento definitivo para que eu possa liberar seu acesso! ⚠️`;
-                  await sendText(contactId, warningMsg, messageData.id, freshContact.connection);
-                  await saveOutgoingMessage(`bot_${Date.now()}_scheduled`, contactId, 'text', '', warningMsg);
-                  return;
+                // Tratamento de agendamentos dependendo do modo
+                if (receiptData.isScheduled) {
+                  if (behavior === 'approve_on_any_receipt') {
+                    // Sem API: Não responde nada e transfere para humano
+                    await prisma.contact.update({
+                      where: { id: contactId },
+                      data: { status: 'MANUAL', botMode: 'OFF' }
+                    });
+                    await notifyHumanTeam('O lead enviou um comprovante de AGENDAMENTO. O atendimento foi transferido silenciosamente para você.');
+                    return;
+                  } else {
+                    // Com API (Integração normal): Envia mensagem de alerta
+                    const warningMsg = `Identifiquei que este é um AGENDAMENTO de Pix de R$ ${receiptData.amount.toFixed(2).replace('.', ',')}, e não o pagamento final. Por favor, envie o comprovante de pagamento definitivo para que eu possa liberar seu acesso! ⚠️`;
+                    await sendText(contactId, warningMsg, messageData.id, freshContact.connection);
+                    await saveOutgoingMessage(`bot_${Date.now()}_scheduled`, contactId, 'text', '', warningMsg);
+                    return;
+                  }
                 }
 
                 if (behavior === 'approve_on_any_receipt') {
@@ -1401,6 +1412,19 @@ export async function sendStepResponse(contactId, step, steps, incomingMessageId
       where: { id: contactId },
       include: { connection: true }
     });
+    
+    // Log entry in FlowStepStat
+    if (contact?.activeFlowId && step?.id) {
+      try {
+        await prisma.flowStepStat.upsert({
+          where: { flowId_stepId: { flowId: contact.activeFlowId, stepId: step.id } },
+          create: { flowId: contact.activeFlowId, stepId: step.id, entered: 1 },
+          update: { entered: { increment: 1 } }
+        });
+      } catch (e) {
+        console.error('Error updating flow step stat:', e);
+      }
+    }
   } catch (err) {
     console.error('Error fetching contact in sendStepResponse:', err);
   }

@@ -43,6 +43,7 @@ model Setting {
   pushTitleSale       String   @default("Venda Aprovada! 🎉")
   geminiPixPrompt     String   @default("Analise o seguinte texto enviado por um cliente que quer fazer um pagamento e extraia o valor numérico em reais (BRL).\nResponda APENAS com o número decimal puro (ex: 150.00 ou 30.50), usando ponto como separador decimal.\nSe o texto não contiver nenhuma menção de valor ou quantidade financeira, responda EXATAMENTE \"null\" (sem aspas).\n\nTexto do cliente: \"{texto}\"")
   geminiPixModel      String   @default("gemini-2.5-flash")
+  blockRegistrations  Boolean  @default(false)
 }
 
 model Agent {
@@ -483,4 +484,16 @@ model QuickReply {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model FlowStepStat {
+  id        String   @id @default(uuid())
+  flowId    String
+  stepId    String
+  entered   Int      @default(0)
+  exited    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([flowId, stepId])
 }

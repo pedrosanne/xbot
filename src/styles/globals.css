@@ -42,6 +42,11 @@
   padding: 0;
 }
 
+/* Global Zoom Out / Modern Scale */
+html {
+  font-size: 14px;
+}
+
 /* Smooth Theme Transitions */
 body, .sidebar, .main-content, .page-header, .page-body, .glass-panel, .glass-card, .btn, .form-input, .form-textarea, .form-select, .chat-page-container, .contacts-panel, .chat-window-panel, .chat-header, .message-bubble, .flow-builder-container, .flow-node, .flow-toolbar, .logo-icon, .logo-text, .nav-link, .user-profile-container, .user-name-text, .user-email-text, .logout-btn, .avatar-circle, .version-text, .contacts-search-input, .contact-avatar, .contact-item, .simulator-drawer {
   transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);

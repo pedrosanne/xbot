@@ -49,7 +49,8 @@ export async function POST(request) {
         pushBodyLead: data.pushBodyLead !== undefined ? data.pushBodyLead : undefined,
         pushSoundLead: data.pushSoundLead !== undefined ? data.pushSoundLead : undefined,
         geminiPixPrompt: data.geminiPixPrompt !== undefined ? data.geminiPixPrompt : undefined,
-        geminiPixModel: data.geminiPixModel !== undefined ? data.geminiPixModel : undefined
+        geminiPixModel: data.geminiPixModel !== undefined ? data.geminiPixModel : undefined,
+        blockRegistrations: data.blockRegistrations !== undefined ? data.blockRegistrations : undefined
       }
     });
 

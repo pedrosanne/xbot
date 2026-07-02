@@ -229,6 +229,11 @@ export default function ChatPage() {
   const [loggedUser, setLoggedUser] = useState(null);
   const [assigneeFilter, setAssigneeFilter] = useState('ALL'); // 'ALL', 'ME', 'UNASSIGNED'
   
+  // Bulk Selection States
+  const [selectedContactIds, setSelectedContactIds] = useState([]);
+  const [bulkFlowId, setBulkFlowId] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  
   // Call Modal State
   const [showCallModal, setShowCallModal] = useState(false);
   const [callFirstMessage, setCallFirstMessage] = useState('');
@@ -580,6 +585,51 @@ export default function ChatPage() {
     setIsSelectMode(false);
     setReplyingTo(null);
     setEditingMessage(null);
+  };
+
+  const handleToggleContactSelection = (e, contactId) => {
+    e.stopPropagation();
+    setSelectedContactIds(prev => 
+      prev.includes(contactId) 
+        ? prev.filter(id => id !== contactId)
+        : [...prev, contactId]
+    );
+  };
+
+  const handleBulkTrigger = async () => {
+    if (selectedContactIds.length === 0) {
+      alert('Selecione pelo menos um contato.');
+      return;
+    }
+    if (!bulkFlowId) {
+      alert('Selecione o fluxo que deseja disparar.');
+      return;
+    }
+
+    if (!confirm(`Tem certeza que deseja disparar o fluxo para ${selectedContactIds.length} contatos?`)) return;
+
+    setBulkLoading(true);
+    try {
+      const res = await fetch('/api/flows/trigger-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactIds: selectedContactIds, flowId: bulkFlowId })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Erro ao disparar fluxos.');
+      }
+      
+      alert('Fluxos enfileirados com sucesso!');
+      setSelectedContactIds([]);
+      setBulkFlowId('');
+    } catch (err) {
+      console.error(err);
+      alert(err.message);
+    } finally {
+      setBulkLoading(false);
+    }
   };
 
   // Toggle Bot Status (AUTO / MANUAL)
@@ -1605,6 +1655,37 @@ export default function ChatPage() {
           </button>
         </div>
 
+        {/* Bulk Actions Toolbar */}
+        {selectedContactIds.length > 0 && (
+          <div style={{ padding: '8px', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{selectedContactIds.length} selecionados</span>
+              <button onClick={() => setSelectedContactIds([])} style={{ fontSize: '0.75rem', color: '#ff5c5c', background: 'none', border: 'none', cursor: 'pointer' }}>Desmarcar</button>
+            </div>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <select 
+                className="form-select" 
+                style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', height: '30px' }}
+                value={bulkFlowId}
+                onChange={(e) => setBulkFlowId(e.target.value)}
+              >
+                <option value="">Selecione um fluxo...</option>
+                {flows.filter(f => f.isActive).map(f => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+              <button 
+                className="btn btn-primary" 
+                style={{ padding: '4px 12px', fontSize: '0.8rem', height: '30px' }}
+                onClick={handleBulkTrigger}
+                disabled={bulkLoading || !bulkFlowId}
+              >
+                {bulkLoading ? '...' : 'Disparar'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Contact list body */}
         <div className="contacts-list">
           {sortedContacts.length === 0 ? (
@@ -1629,6 +1710,16 @@ export default function ChatPage() {
                     borderLeft: contact.isPinned ? '3px solid var(--neon-green)' : ''
                   }}
                 >
+                  <div style={{ display: 'flex', alignItems: 'center', marginRight: '8px' }}>
+                    <input 
+                      type="checkbox" 
+                      className="form-checkbox"
+                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--neon-green)' }}
+                      checked={selectedContactIds.includes(contact.id)}
+                      onClick={(e) => handleToggleContactSelection(e, contact.id)}
+                      onChange={() => {}} // React warning prevention, handled by onClick
+                    />
+                  </div>
                   {contact.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img 
@@ -1656,46 +1747,62 @@ export default function ChatPage() {
                     </div>
                     
                     {/* Render Tags (Horizontal Scrollable Row) */}
-                    {contact.tags && (
-                      <div 
-                        className="no-scrollbar"
-                        style={{ 
-                          display: 'flex', 
-                          flexWrap: 'nowrap', 
-                          overflowX: 'auto', 
-                          gap: '4px', 
-                          marginTop: '4px',
-                          marginBottom: '2px',
-                          paddingBottom: '2px',
-                          WebkitOverflowScrolling: 'touch',
-                          msOverflowStyle: 'none',
-                          scrollbarWidth: 'none'
-                        }}
-                      >
-                        {contact.tags.split(',').map(t => t.trim()).filter(Boolean).map((tag, idx) => {
-                          const style = getTagStyle(tag);
-                          return (
-                            <span 
-                              key={idx} 
-                              style={{ 
-                                fontSize: '0.62rem', 
-                                padding: '1px 6px', 
-                                background: style.bg, 
-                                color: style.text, 
-                                border: `1px solid ${style.border}`,
-                                borderRadius: '4px',
-                                fontWeight: 500,
-                                whiteSpace: 'nowrap',
-                                display: 'inline-block',
-                                flexShrink: 0
-                              }}
-                            >
-                              {tag}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <div 
+                      className="no-scrollbar"
+                      style={{ 
+                        display: 'flex', 
+                        flexWrap: 'nowrap', 
+                        overflowX: 'auto', 
+                        gap: '4px', 
+                        marginTop: '4px',
+                        marginBottom: '2px',
+                        paddingBottom: '2px',
+                        WebkitOverflowScrolling: 'touch',
+                        msOverflowStyle: 'none',
+                        scrollbarWidth: 'none'
+                      }}
+                    >
+                      {!isManual && (
+                        <span 
+                          style={{ 
+                            fontSize: '0.62rem', 
+                            padding: '1px 6px', 
+                            background: 'rgba(239, 68, 68, 0.15)', 
+                            color: '#f87171', 
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '4px',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap',
+                            display: 'inline-block',
+                            flexShrink: 0
+                          }}
+                        >
+                          NOVO LEAD
+                        </span>
+                      )}
+                      {contact.tags && contact.tags.split(',').map(t => t.trim()).filter(Boolean).map((tag, idx) => {
+                        const style = getTagStyle(tag);
+                        return (
+                          <span 
+                            key={idx} 
+                            style={{ 
+                              fontSize: '0.62rem', 
+                              padding: '1px 6px', 
+                              background: style.bg, 
+                              color: style.text, 
+                              border: `1px solid ${style.border}`,
+                              borderRadius: '4px',
+                              fontWeight: 500,
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block',
+                              flexShrink: 0
+                            }}
+                          >
+                            {tag}
+                          </span>
+                        );
+                      })}
+                    </div>
 
                     {contact.assignedUser && (
                       <div style={{ fontSize: '0.7rem', color: 'var(--color-primary-hover)', display: 'flex', alignItems: 'center', gap: '3px', margin: '2px 0' }}>
@@ -1706,7 +1813,7 @@ export default function ChatPage() {
                       </div>
                     )}
                     <div className="contact-msg-row">
-                      <span className="contact-last-msg">
+                      <span className="contact-last-msg" style={{ color: !isManual ? '#34d399' : undefined }}>
                         {contact.typingState === 'TYPING' ? (
                           <span className="status-typing-green">digitando...</span>
                         ) : contact.typingState === 'RECORDING' ? (

@@ -3,9 +3,18 @@ import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { signToken } from '@/lib/auth';
+import { getSystemSettings } from '@/lib/settings';
 
 export async function POST(req) {
   try {
+    const settings = await getSystemSettings();
+    if (settings.blockRegistrations) {
+      return NextResponse.json(
+        { error: 'Novos cadastros estão temporariamente bloqueados pelo administrador.' },
+        { status: 403 }
+      );
+    }
+
     const { name, email, password } = await req.json();
 
     if (!name || !email || !password) {

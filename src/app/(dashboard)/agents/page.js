@@ -69,6 +69,30 @@ export default function AgentsPage() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // Heatmap State
+  const [heatmapActive, setHeatmapActive] = useState(false);
+  const [heatmapStats, setHeatmapStats] = useState([]);
+  const [heatmapLoading, setHeatmapLoading] = useState(false);
+
+  async function toggleHeatmap() {
+    if (heatmapActive) {
+      setHeatmapActive(false);
+      return;
+    }
+    setHeatmapActive(true);
+    if (!editingFlowId) return;
+    setHeatmapLoading(true);
+    try {
+      const res = await fetch(`/api/flows/${editingFlowId}/stats`);
+      if (res.ok) {
+        const data = await res.json();
+        setHeatmapStats(data.stats || []);
+      }
+    } catch(err) {
+      console.error(err);
+    }
+    setHeatmapLoading(false);
+  }
   // Gallery Media Selector States
   const [gallerySelectorOpen, setGallerySelectorOpen] = useState(false);
   const [selectorMediaType, setSelectorMediaType] = useState('');
@@ -1383,6 +1407,10 @@ export default function AgentsPage() {
             </button>
             <div className="tb-sep" />
             <button onClick={fitAllNodes}>Encaixar</button>
+            <div className="tb-sep" />
+            <button onClick={toggleHeatmap} style={{ color: heatmapActive ? '#ef4444' : 'inherit' }}>
+              {heatmapLoading ? 'Carregando...' : heatmapActive ? '🔥 Mapa de Calor: ON' : 'Mapa de Calor'}
+            </button>
           </div>
 
           {/* Transformed Canvas Layer */}
@@ -1458,11 +1486,29 @@ export default function AgentsPage() {
             </svg>
 
             {/* Nodes */}
-            {nodes.map((node, idx) => (
+            {nodes.map((node, idx) => {
+              const stat = heatmapStats.find(s => s.stepId === node.id);
+              const entered = stat ? stat.entered : 0;
+              
+              let heatStyle = {};
+              if (heatmapActive) {
+                const maxEntered = Math.max(...heatmapStats.map(s => s.entered), 1);
+                const intensity = entered / maxEntered;
+                if (entered > 0) {
+                  heatStyle = {
+                    boxShadow: `0 0 20px rgba(239, 68, 68, ${intensity * 0.8 + 0.2})`,
+                    border: `2px solid rgba(239, 68, 68, ${intensity * 0.8 + 0.2})`
+                  };
+                } else {
+                  heatStyle = { opacity: 0.5 };
+                }
+              }
+
+              return (
               <div
                 key={node.id}
                 className={`flow-node ${selectedNodeId === node.id ? 'selected' : ''}`}
-                style={{ left: node.x, top: node.y }}
+                style={{ left: node.x, top: node.y, ...heatStyle }}
                 onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
                 onMouseUp={(e) => handleNodeMouseUp(e, node.id)}
                 onClick={(e) => { e.stopPropagation(); }}
@@ -1472,6 +1518,11 @@ export default function AgentsPage() {
 
                 {/* Header */}
                 <div className="flow-node-header" onMouseUp={(e) => handleNodeMouseUp(e, node.id)}>
+                  {heatmapActive && (
+                    <div style={{ position: 'absolute', top: '-28px', right: '0', background: '#ef4444', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                      👁 {entered}
+                    </div>
+                  )}
                   <span className={`flow-node-type-badge ${idx === 0 ? 'type-start' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'type-ia' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'type-human' : 'type-message'}`}>
                     {idx === 0 ? 'Início' : (node.buttons || []).some(b => b.action === 'transfer_to_ia') ? 'IA' : (node.buttons || []).some(b => b.action === 'transfer_to_human') ? 'Humano' : 'Msg'}
                   </span>
@@ -1607,7 +1658,8 @@ export default function AgentsPage() {
                 {/* Output port */}
                 <div className="flow-port port-out" onMouseDown={(e) => handlePortMouseDown(e, node.id)} />
               </div>
-            ))}
+            );
+          })}
           </div>
 
           {/* Minimap */}
