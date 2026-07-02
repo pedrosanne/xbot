@@ -283,6 +283,13 @@ export default function ChatPage() {
   // iOS Attachment menu sheet state
   const [showAttachMenu, setShowAttachMenu] = useState(false);
 
+  // Quick Replies State
+  const [quickReplies, setQuickReplies] = useState([]);
+  const [showQuickReplyModal, setShowQuickReplyModal] = useState(false);
+  const [newQuickReplyTitle, setNewQuickReplyTitle] = useState('');
+  const [newQuickReplyContent, setNewQuickReplyContent] = useState('');
+  const [isSavingQuickReply, setIsSavingQuickReply] = useState(false);
+
   useEffect(() => {
     // Only load mic-recorder-to-mp3 on the client side
     import('mic-recorder-to-mp3').then((module) => {
@@ -457,6 +464,17 @@ export default function ChatPage() {
     }
   };
 
+  async function fetchQuickReplies() {
+    try {
+      const res = await fetch('/api/quick-replies');
+      if (res.ok) {
+        setQuickReplies(await res.json());
+      }
+    } catch (err) {
+      console.error('Error fetching quick replies:', err);
+    }
+  }
+
   useEffect(() => {
     Promise.resolve().then(() => {
       fetchConnections();
@@ -464,6 +482,7 @@ export default function ChatPage() {
       fetchLoggedUser();
       fetchProducts();
       fetchFlows();
+      fetchQuickReplies();
     });
   }, []);
 
@@ -2094,6 +2113,50 @@ export default function ChatPage() {
               </div>
             )}
 
+            {/* Quick Replies Bar */}
+            {!editingMessage && !replyingTo && !isRecording && selectedContact && (
+              <div className="quick-replies-bar">
+                {quickReplies.map((qr) => (
+                  <div key={qr.id} className="quick-reply-chip">
+                    <button 
+                      className="qr-chip-btn"
+                      onClick={() => setInputText(qr.content)}
+                      title={qr.content}
+                    >
+                      ⚡ {qr.title || (qr.content.length > 20 ? qr.content.substring(0, 20) + '...' : qr.content)}
+                    </button>
+                    <button 
+                      className="qr-chip-del"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (window.confirm('Excluir esta resposta rápida?')) {
+                          try {
+                            const res = await fetch(`/api/quick-replies/${qr.id}`, { method: 'DELETE' });
+                            if (res.ok) {
+                              fetchQuickReplies();
+                            }
+                          } catch (err) {}
+                        }
+                      }}
+                      title="Excluir"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  className="quick-reply-add-btn" 
+                  onClick={() => {
+                    setNewQuickReplyContent(inputText);
+                    setShowQuickReplyModal(true);
+                  }}
+                  title="Salvar Resposta Rápida"
+                >
+                  ＋ Nova
+                </button>
+              </div>
+            )}
+
             {/* Input Bar */}
             {editingMessage ? (
               <form onSubmit={handleEditMessageSubmit} className="chat-input-form ios-input-form">
@@ -3188,6 +3251,81 @@ export default function ChatPage() {
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'end', marginTop: '8px' }}>
               <button onClick={() => setShowNotesModal(false)} className="btn btn-secondary" style={{ padding: '8px 16px' }}>Cancelar</button>
               <button onClick={handleSaveNotes} className="btn btn-primary" style={{ padding: '8px 16px', background: 'var(--color-primary)', border: 'none' }}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal - Nova Resposta Rápida */}
+      {showQuickReplyModal && (
+        <div className="modal-overlay" onClick={() => setShowQuickReplyModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Salvar Resposta Rápida</h3>
+              <button className="btn-close" onClick={() => setShowQuickReplyModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: '16px', fontSize: '0.9rem', color: '#a1a1aa' }}>
+                Crie um botão de acesso rápido para mensagens que você envia com frequência. Essa resposta ficará visível para todos os colaboradores da plataforma.
+              </p>
+              
+              <div className="form-group">
+                <label>Título (opcional, ex: "Saudação")</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newQuickReplyTitle}
+                  onChange={(e) => setNewQuickReplyTitle(e.target.value)}
+                  placeholder="Ex: Bom dia"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Conteúdo da Mensagem *</label>
+                <textarea
+                  className="form-textarea"
+                  value={newQuickReplyContent}
+                  onChange={(e) => setNewQuickReplyContent(e.target.value)}
+                  placeholder="Digite a resposta rápida que será colada no chat..."
+                  rows={4}
+                  required
+                />
+              </div>
+
+              <div className="modal-footer" style={{ marginTop: '24px' }}>
+                <button className="btn btn-secondary" onClick={() => setShowQuickReplyModal(false)}>Cancelar</button>
+                <button 
+                  className="btn btn-primary" 
+                  disabled={isSavingQuickReply || !newQuickReplyContent.trim()}
+                  onClick={async () => {
+                    setIsSavingQuickReply(true);
+                    try {
+                      const res = await fetch('/api/quick-replies', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          title: newQuickReplyTitle,
+                          content: newQuickReplyContent
+                        })
+                      });
+                      if (res.ok) {
+                        fetchQuickReplies();
+                        setShowQuickReplyModal(false);
+                        setNewQuickReplyTitle('');
+                        setNewQuickReplyContent('');
+                      } else {
+                        alert('Erro ao salvar.');
+                      }
+                    } catch (err) {
+                      alert('Erro na conexão.');
+                    } finally {
+                      setIsSavingQuickReply(false);
+                    }
+                  }}
+                >
+                  {isSavingQuickReply ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
