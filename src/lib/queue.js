@@ -702,6 +702,17 @@ async function processSingleMessage(contact, messageData) {
                 }
 
                 if (behavior === 'approve_on_any_receipt') {
+                  const expectedAmount = parseFloat(currentStep.pixAmount || 0);
+                  const extractedAmount = parseFloat(receiptData.amount || 0);
+                  
+                  // Verifica se o valor extraído é suficiente (tolerância de 5 centavos)
+                  if (expectedAmount > 0 && extractedAmount < (expectedAmount - 0.05)) {
+                    const diffMsg = `Identifiquei o comprovante, mas o valor pago (R$ ${extractedAmount.toFixed(2).replace('.', ',')}) é menor que o valor do produto (R$ ${expectedAmount.toFixed(2).replace('.', ',')}). Por favor, envie o comprovante com o valor correto ou complete o pagamento.`;
+                    await sendText(contactId, diffMsg, messageData.id, freshContact.connection);
+                    await saveOutgoingMessage(`bot_${Date.now()}_pix_diff`, contactId, 'text', '', diffMsg);
+                    return;
+                  }
+
                   // Reage com coraçãozinho ao aprovar
                   await sendReaction(contactId, messageData.id, "❤️", freshContact.connection);
                 }
