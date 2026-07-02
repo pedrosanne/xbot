@@ -76,15 +76,16 @@ export async function analyzePixReceipt(mediaUrl, mimeType) {
     const cleanMimeType = mimeType.split(';')[0].trim();
     const isPdf = cleanMimeType === 'application/pdf';
 
-    const prompt = `Analise o documento ou imagem em anexo. Ele é um comprovante de transferência, pagamento ou agendamento de Pix?
+    const prompt = `Analise o documento ou imagem em anexo. Ele é um comprovante de pagamento, transferência, Pix, TED, DOC ou depósito bancário?
+Mesmo que seja um comprovante simples, print de tela de aplicativo de banco, comprovante de maquininha ou genérico, considere-o VÁLIDO.
 Retorne um objeto JSON com o seguinte formato:
 {
-  "isPixReceipt": true ou false,
-  "isScheduled": true se for apenas um AGENDAMENTO e não um pagamento confirmado, caso contrário false,
-  "transactionId": "o código de transação, ID da transação ou ID Fim a Fim / End-to-End ID (geralmente começa com E e tem letras e números)",
-  "amount": o valor numérico em reais (ex: 97.00),
-  "date": "a data e hora do pagamento no formato ISO (YYYY-MM-DDTHH:mm:ss) ou aproximado",
-  "payerName": "o nome da pessoa que realizou o pagamento"
+  "isPixReceipt": true ou false (retorne true se houver QUALQUER indício de que é um comprovante de envio/pagamento de dinheiro, seja Pix ou não),
+  "isScheduled": true se o comprovante informar explicitamente que é um AGENDAMENTO futuro não efetivado, caso contrário false,
+  "transactionId": "o código ou ID da transação se houver (ou deixe em branco se não achar)",
+  "amount": o valor numérico do pagamento em reais (ex: 97.00, extraia o valor pago),
+  "date": "data do pagamento se houver (ou deixe em branco)",
+  "payerName": "nome de quem pagou se houver (ou deixe em branco)"
 }`;
 
     for (let i = 0; i < keysToTry.length; i++) {
@@ -101,9 +102,15 @@ Retorne um objeto JSON com o seguinte formato:
         let textResponse = '';
         let totalTokens = 0;
         let estimatedCost = 0;
+        const currentKey = currentProvider.apiKey || currentProvider.key;
+
+        if (!currentKey) {
+          console.error(`Provider ${currentProvider.name} has no valid API key.`);
+          continue;
+        }
 
         if (providerType === 'GEMINI') {
-           const genAI = new GoogleGenerativeAI(currentProvider.key);
+           const genAI = new GoogleGenerativeAI(currentKey);
            const model = genAI.getGenerativeModel({
              model: currentProvider.model || 'gemini-2.5-flash',
              generationConfig: { responseMimeType: 'application/json' }
@@ -121,7 +128,7 @@ Retorne um objeto JSON com o seguinte formato:
            estimatedCost = (totalTokens / 1000000) * 0.15;
            
         } else if (providerType === 'OPENAI') {
-           const openai = new OpenAI({ apiKey: currentProvider.key });
+           const openai = new OpenAI({ apiKey: currentKey });
            const completion = await openai.chat.completions.create({
              model: currentProvider.model || 'gpt-4o-mini',
              response_format: { type: 'json_object' },
