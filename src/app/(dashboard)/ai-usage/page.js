@@ -321,12 +321,12 @@ export default function AiUsagePage() {
                           <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                             <td style={{ padding: '12px 16px' }}>{new Date(log.timestamp).toLocaleString('pt-BR')}</td>
                             <td style={{ padding: '12px 16px' }}>
-                              {p.provider === 'OPENAI' ? (
-                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>{p.provider}</span>
-                              ) : p.provider === 'DEEPSEEK' ? (
-                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' }}>{p.provider}</span>
+                              {log.provider === 'OPENAI' ? (
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>{log.provider}</span>
+                              ) : log.provider === 'DEEPSEEK' ? (
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' }}>{log.provider}</span>
                               ) : (
-                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' }}>{p.provider || 'GEMINI'}</span>
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' }}>{log.provider || 'GEMINI'}</span>
                               )}
                             </td>
                             <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{log.model}</td>
