@@ -3223,6 +3223,53 @@ input:checked + .slider:before {
   border-bottom-color: rgba(0, 0, 0, 0.05) !important;
 }
 
+[data-theme='light'] .mobile-bottom-nav {
+  background: rgba(245, 245, 247, 0.9) !important;
+  border-top-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme='light'] .mobile-nav-drawer-sheet {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-top-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme='light'] .mobile-drawer-header {
+  border-bottom-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme='light'] .mobile-drawer-indicator {
+  background: rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-theme='light'] .mobile-drawer-close-btn {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme='light'] .mobile-grid-link {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme='light'] .mobile-grid-link.active {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme='light'] .mobile-drawer-footer {
+  border-top-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme='light'] .mobile-theme-btn {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme='light'] .mobile-user-profile {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
 /* ==========================================
    GENERIC MOBILE RESPONSIVENESS UTILITIES
    ========================================== */
@@ -3445,6 +3492,26 @@ input:checked + .slider:before {
 
   .mobile-nav-label {
     opacity: 0.8;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 95;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .sidebar-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   /* Mobile Nav Drawer Sheet (Slides up from the bottom) */
