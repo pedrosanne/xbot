@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { prisma } from './prisma';
 import { getSystemSettings } from './settings';
 import { logToDb } from './log';
@@ -311,11 +312,12 @@ export async function extractAmountFromText(incomingText, customAgentId = null) 
         id: p.id,
         key: p.apiKey,
         model: p.model || modelName,
-        name: p.name
+        name: p.name,
+        provider: p.provider
       }));
     } else {
       // Fallback to global setting if no providers in pool
-      keysToTry.push({ id: null, key: apiKeyToUse, model: modelName, name: 'System Default' });
+      keysToTry.push({ id: null, key: apiKeyToUse, model: modelName, name: 'System Default', provider: 'GEMINI' });
     }
 
     let promptTemplate = settings.geminiPixPrompt || `Analise o seguinte texto enviado por um cliente que quer fazer um pagamento e extraia o valor numérico em reais (BRL).\nResponda APENAS com o número decimal puro (ex: 150.00 ou 30.50), usando ponto como separador decimal.\nSe o texto não contiver nenhuma menção de valor ou quantidade financeira, responda EXATAMENTE "null" (sem aspas).\n\nTexto do cliente: "{texto}"`;
@@ -332,23 +334,55 @@ export async function extractAmountFromText(incomingText, customAgentId = null) 
     for (let i = 0; i < keysToTry.length; i++) {
       const currentProvider = keysToTry[i];
       try {
-        const genAI = new GoogleGenerativeAI(currentProvider.key);
-        const model = genAI.getGenerativeModel({ model: currentProvider.model });
-
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const textResponse = response.text().trim().toLowerCase();
-        const durationMs = Date.now() - startTime;
+        let textResponse = '';
+        let totalTokens = 0;
+        let estimatedCost = 0;
         
-        // Log AI Usage - Success
-        const usageMetadata = response.usageMetadata;
-        let totalTokens = usageMetadata?.totalTokenCount || 0;
-        let estimatedCost = (totalTokens / 1000000) * 0.15;
+        // 1. Google Gemini
+        if (!currentProvider.provider || currentProvider.provider === 'GEMINI') {
+          const genAI = new GoogleGenerativeAI(currentProvider.key);
+          const model = genAI.getGenerativeModel({ model: currentProvider.model });
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          textResponse = response.text().trim().toLowerCase();
+          
+          totalTokens = response.usageMetadata?.totalTokenCount || 0;
+          estimatedCost = (totalTokens / 1000000) * 0.15;
+        } 
+        // 2. OpenAI (ChatGPT)
+        else if (currentProvider.provider === 'OPENAI') {
+          const openai = new OpenAI({ apiKey: currentProvider.key });
+          const completion = await openai.chat.completions.create({
+            model: currentProvider.model,
+            messages: [{ role: 'user', content: prompt }]
+          });
+          textResponse = completion.choices[0].message.content.trim().toLowerCase();
+          
+          totalTokens = completion.usage?.total_tokens || 0;
+          estimatedCost = (totalTokens / 1000000) * 0.15; // Rough average estimate
+        }
+        // 3. DeepSeek
+        else if (currentProvider.provider === 'DEEPSEEK') {
+          const openai = new OpenAI({ 
+            apiKey: currentProvider.key, 
+            baseURL: 'https://api.deepseek.com' 
+          });
+          const completion = await openai.chat.completions.create({
+            model: currentProvider.model,
+            messages: [{ role: 'user', content: prompt }]
+          });
+          textResponse = completion.choices[0].message.content.trim().toLowerCase();
+          
+          totalTokens = completion.usage?.total_tokens || 0;
+          estimatedCost = (totalTokens / 1000000) * 0.14; // DeepSeek is very cheap
+        }
+
+        const durationMs = Date.now() - startTime;
         
         try {
           await prisma.aiUsage.create({
             data: {
-              provider: 'GEMINI',
+              provider: currentProvider.provider || 'GEMINI',
               model: currentProvider.model,
               action: 'extractAmount',
               tokens: totalTokens,

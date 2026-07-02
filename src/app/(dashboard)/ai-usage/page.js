@@ -321,7 +321,13 @@ export default function AiUsagePage() {
                           <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                             <td style={{ padding: '12px 16px' }}>{new Date(log.timestamp).toLocaleString('pt-BR')}</td>
                             <td style={{ padding: '12px 16px' }}>
-                              <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' }}>{log.provider}</span>
+                              {p.provider === 'OPENAI' ? (
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>{p.provider}</span>
+                              ) : p.provider === 'DEEPSEEK' ? (
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' }}>{p.provider}</span>
+                              ) : (
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' }}>{p.provider || 'GEMINI'}</span>
+                              )}
                             </td>
                             <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{log.model}</td>
                             <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{log.action}</td>
@@ -446,13 +452,48 @@ export default function AiUsagePage() {
                       />
                     </div>
                     <div className="form-group" style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Provedor</label>
+                      <select 
+                        className="form-control" style={{ width: '100%' }}
+                        value={newProvider.provider} onChange={e => {
+                          const provider = e.target.value;
+                          let defaultModel = 'gemini-2.5-flash';
+                          if (provider === 'OPENAI') defaultModel = 'gpt-4o-mini';
+                          if (provider === 'DEEPSEEK') defaultModel = 'deepseek-chat';
+                          setNewProvider({...newProvider, provider, model: defaultModel});
+                        }}
+                      >
+                        <option value="GEMINI">Google AI Studio (Gemini)</option>
+                        <option value="OPENAI">OpenAI (ChatGPT)</option>
+                        <option value="DEEPSEEK">DeepSeek</option>
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '16px' }}>
                       <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Modelo Preferido</label>
                       <select 
                         className="form-control" style={{ width: '100%' }}
                         value={newProvider.model} onChange={e => setNewProvider({...newProvider, model: e.target.value})}
                       >
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                        {newProvider.provider === 'GEMINI' && (
+                          <>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                          </>
+                        )}
+                        {newProvider.provider === 'OPENAI' && (
+                          <>
+                            <option value="gpt-4o-mini">GPT-4o Mini (Recomendado)</option>
+                            <option value="gpt-4o">GPT-4o</option>
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                          </>
+                        )}
+                        {newProvider.provider === 'DEEPSEEK' && (
+                          <>
+                            <option value="deepseek-chat">DeepSeek Chat (V3)</option>
+                            <option value="deepseek-reasoner">DeepSeek Reasoner (R1)</option>
+                          </>
+                        )}
                       </select>
                     </div>
                     <button type="submit" className="btn btn-primary" style={{ width: '100%', background: '#f59e0b' }}>Adicionar ao Pool</button>
@@ -471,6 +512,7 @@ export default function AiUsagePage() {
                       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid var(--border-glass)' }}>
+                            <th style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Empresa</th>
                             <th style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Conta/Node</th>
                             <th style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Modelo</th>
                             <th style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Requisições</th>
@@ -482,6 +524,15 @@ export default function AiUsagePage() {
                         <tbody>
                           {providers.map(p => (
                             <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                              <td style={{ padding: '12px 16px' }}>
+                                {p.provider === 'OPENAI' ? (
+                                  <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>{p.provider}</span>
+                                ) : p.provider === 'DEEPSEEK' ? (
+                                  <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' }}>{p.provider}</span>
+                                ) : (
+                                  <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' }}>{p.provider || 'GEMINI'}</span>
+                                )}
+                              </td>
                               <td style={{ padding: '12px 16px', fontWeight: '500' }}>{p.name}</td>
                               <td style={{ padding: '12px 16px', color: '#8b5cf6' }}>{p.model}</td>
                               <td style={{ padding: '12px 16px' }}>{p.usageCount}</td>
